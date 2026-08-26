@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, FlaskConical, Hand, Plug, Wrench, Zap } from "lucide-react";
+import { Eye, FlaskConical, GitBranch, Hand, Plug, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,13 @@ const POLICY_META: Record<
   },
 };
 
-export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
+export function StatusBar({
+  onOpenPlugins,
+  onOpenActivity,
+}: {
+  onOpenPlugins: () => void;
+  onOpenActivity?: () => void;
+}) {
   const sessions = useDshStore((s) => s.sessions);
   const activeSessionId = useDshStore((s) => s.activeSessionId);
   const isRunning = useDshStore((s) => s.isRunning);
@@ -105,6 +111,23 @@ export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
         <span className="truncate text-muted-foreground/60">
           #{shortId(activeSessionId)}
         </span>
+        {onOpenActivity && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onOpenActivity}
+                className="flex items-center gap-1 rounded border border-border/70 bg-background px-1.5 py-px transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label="Open activity timeline (⌘E)"
+              >
+                <GitBranch className="size-3 rotate-90" aria-hidden /> main
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Activity timeline — ledger of every prompt, tool call and file change (⌘E)
+            </TooltipContent>
+          </Tooltip>
+        )}
         {isDemoMode(settings) && (
           <Tooltip>
             <TooltipTrigger asChild>

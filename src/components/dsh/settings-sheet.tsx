@@ -5,14 +5,18 @@ import {
   Brain,
   Check,
   Copy,
+  DatabaseBackup,
+  Download,
   Eye,
   EyeOff,
   ExternalLink,
+  FileJson,
   FlaskConical,
   Hand,
   KeyRound,
   MessageSquare,
   TriangleAlert,
+  Upload,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,9 +49,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
+import {
+  downloadSessionsBackup,
+  parseBackupFile,
+} from "@/lib/dsh/session-backup";
 import type { PermissionPolicy, Settings } from "@/lib/dsh/types";
 
-export type SettingsTab = "models" | "behavior" | "about";
+export type SettingsTab = "models" | "behavior" | "data" | "about";
 
 const FALLBACK_DEFAULTS: Settings = {
   apiKey: "",
@@ -99,9 +107,10 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
         </SheetHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)} className="flex min-h-0 flex-1 flex-col gap-0">
-          <TabsList className="mx-4 mt-3 grid grid-cols-3">
+          <TabsList className="mx-4 mt-3 grid grid-cols-4">
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="behavior">Behavior</TabsTrigger>
+            <TabsTrigger value="data">Data</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
 
@@ -305,6 +314,11 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
               </section>
             </TabsContent>
 
+            {/* ── Data ───────────────────────────────────────────────── */}
+            <TabsContent value="data" className="mt-0 space-y-5">
+              <BackupSection />
+            </TabsContent>
+
             {/* ── About ──────────────────────────────────────────────── */}
             <TabsContent value="about" className="mt-0 space-y-5">
               <section className="rounded-md border p-3">
@@ -413,6 +427,123 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
 }
 
 /* ─────────────────────────── sub-pieces ─────────────────────────────────── */
+
+/** Data tab — full backup export/import of every session as one JSON file. */
+function BackupSection() {
+  const sessions = useDshStore((s) => s.sessions);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const totalMessages = React.useMemo(
+    () => sessions.reduce((n, s) => n + s.messages.length, 0),
+    [sessions],
+  );
+  const totalFiles = React.useMemo(
+    () => sessions.reduce((n, s) => n + Object.keys(s.workspace).length, 0),
+    [sessions],
+  );
+
+  const exportBackup = () => {
+    if (sessions.length === 0) {
+      toast.info("Nothing to back up yet", { description: "Create a session first." });
+      return;
+    }
+    downloadSessionsBackup(sessions);
+    toast.success("Backup downloaded", {
+      description: `${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${totalMessages} messages. API key never included.`,
+    });
+  };
+
+  const onImportFile = async (file: File) => {
+    try {
+      const res = parseBackupFile(await file.text());
+      const imported = useDshStore.getState().importSessions(res.sessions);
+      if (imported === 0) throw new Error("No valid sessions found in this backup.");
+      toast.success(`Imported ${imported} session${imported === 1 ? "" : "s"}`, {
+        description:
+          res.skipped > 0
+            ? `${res.skipped} malformed entr${res.skipped === 1 ? "y" : "ies"} skipped. Ids were regenerated — no collisions.`
+            : "Ids regenerated — safe to import repeatedly.",
+      });
+    } catch (e) {
+      toast.error("Import failed", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
+
+  return (
+    <section className="space-y-3 rounded-md border p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex size-8 items-center justify-center rounded-md border border-[#4D6BFE]/40 bg-[#4D6BFE]/10">
+          <DatabaseBackup className="size-4 text-[#4D6BFE]" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-xs font-semibold">Local backup</h3>
+          <p className="text-[11px] text-muted-foreground">
+            All sessions with messages, virtual workspaces and todos in one JSON file.
+          </p>
+        </div>
+      </div>
+
+      {/* stat strip */}
+      <div className="grid grid-cols-3 gap-2" aria-label="Backup scope">
+        {[
+          { label: "sessions", value: sessions.length },
+          { label: "messages", value: totalMessages },
+          { label: "v-files", value: totalFiles },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-center"
+          >
+            <p className="font-mono text-sm font-semibold">{stat.value}</p>
+            <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+              {stat.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" size="sm" onClick={exportBackup} disabled={sessions.length === 0}>
+          <Download className="mr-1.5 size-3.5" /> Export .json
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="mr-1.5 size-3.5" /> Import…
+        </Button>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void onImportFile(f);
+          e.target.value = "";
+        }}
+      />
+
+      <ul className="space-y-1 border-t pt-2 text-[11px] leading-relaxed text-muted-foreground">
+        <li className="flex items-start gap-1.5">
+          <FileJson className="mt-0.5 size-3 shrink-0 text-muted-foreground/70" aria-hidden />
+          Imports are sanitized and ids regenerated, so re-importing never duplicates or collides.
+        </li>
+        <li className="flex items-start gap-1.5">
+          <TriangleAlert className="mt-0.5 size-3 shrink-0 text-amber-400" aria-hidden />
+          Your API key is deliberately never written to backups.
+        </li>
+      </ul>
+    </section>
+  );
+}
 
 function ModelCard({
   active,

@@ -36,7 +36,9 @@ const SLASH_COMMANDS = [
   { cmd: "/model <m>", desc: "Switch model — deepseek-chat | deepseek-reasoner" },
   { cmd: "/policy <p>", desc: "Permission policy — readonly | ask | auto" },
   { cmd: "/plugins", desc: "Open the plugin manager" },
+  { cmd: "/activity", desc: "Open the activity timeline (⌘E)" },
   { cmd: "/export", desc: "Download the session as a Markdown transcript" },
+  { cmd: "/backup", desc: "Download all sessions as a JSON backup" },
 ] as const;
 
 interface ComposerProps {

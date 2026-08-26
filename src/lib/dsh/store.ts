@@ -15,6 +15,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import type {
   ApprovalRequest,
   ChatMessage,
+  Session,
   Settings,
   StoredState,
   TodoItem,
@@ -134,6 +135,8 @@ interface DshActions {
   toggleStar(id: string): void;
   /** Deep-copy messages/workspace/todos/stats into a fresh session; selects it. Returns the new id ("" if source missing). */
   duplicateSession(id: string): string;
+  /** Prepend pre-sanitized sessions (backup restore) and select the first one. */
+  importSessions(items: Session[]): number;
   clearAllSessions(): void;
   /** Compatibility alias expected by the UI side: clears messages + todos, keeps the session. */
   clearSession(sessionId: string): void;
@@ -266,6 +269,16 @@ export const useDshStore = create<DshStore>()(
         };
         set((st) => ({ sessions: [copy, ...st.sessions], activeSessionId: copy.id }));
         return copy.id;
+      },
+
+      importSessions(items) {
+        const valid = items.filter((s) => s && typeof s.id === 'string' && Array.isArray(s.messages));
+        if (valid.length === 0) return 0;
+        set((st) => ({
+          sessions: [...valid, ...st.sessions],
+          activeSessionId: valid[0].id,
+        }));
+        return valid.length;
       },
 
       clearAllSessions() {

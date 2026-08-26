@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { ActivityTimelinePanel } from "@/components/dsh/activity-panel";
 import { ApprovalCard } from "@/components/dsh/approval-card";
 import { AskUserCard } from "@/components/dsh/ask-user-card";
 import { ChatStream } from "@/components/dsh/chat-stream";
@@ -35,6 +36,7 @@ export default function DshWebPage() {
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab | undefined>(undefined);
   const [pluginsOpen, setPluginsOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
+  const [activityOpen, setActivityOpen] = React.useState(false);
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
 
   const agent = useDshAgent();
@@ -53,6 +55,11 @@ export default function DshWebPage() {
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setActivityOpen((v) => !v);
         return;
       }
       if (
@@ -132,6 +139,25 @@ export default function DshWebPage() {
             description: "Markdown transcript downloaded.",
           });
         });
+        break;
+      }
+      case "/activity": {
+        setActivityOpen(true);
+        break;
+      }
+      case "/backup": {
+        const all = st.sessions;
+        if (all.length === 0) return toast.info("Nothing to back up yet");
+        import("@/lib/dsh/session-backup").then(({ downloadSessionsBackup }) => {
+          downloadSessionsBackup(all);
+          toast.success("Backup downloaded", {
+            description: `${all.length} session${all.length === 1 ? "" : "s"} exported as JSON (API key never included).`,
+          });
+        });
+        break;
+      }
+      case "/timeline": {
+        setActivityOpen(true);
         break;
       }
       default:
@@ -292,7 +318,7 @@ export default function DshWebPage() {
         </main>
       </div>
 
-      <StatusBar onOpenPlugins={() => setPluginsOpen(true)} />
+      <StatusBar onOpenPlugins={() => setPluginsOpen(true)} onOpenActivity={() => setActivityOpen(true)} />
 
       {/* globals */}
       <SettingsSheet
@@ -302,6 +328,12 @@ export default function DshWebPage() {
       />
       <PluginsSheet open={pluginsOpen} onOpenChange={setPluginsOpen} />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <ActivityTimelinePanel
+        open={activityOpen}
+        onOpenChange={setActivityOpen}
+        session={activeSession}
+        onPreviewFile={setPreviewPath}
+      />
       <FilePreviewDialog
         path={previewPath}
         content={

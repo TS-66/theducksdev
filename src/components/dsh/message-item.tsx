@@ -12,11 +12,14 @@ import {
   ListTodo,
   Loader2,
   X,
+  Zap,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, TodoItem } from "@/lib/dsh/types";
+import { fmtK } from "./format";
 import { MarkdownBody } from "./markdown-body";
 import { ToolCallCard } from "./tool-call-card";
 
@@ -125,6 +128,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
           ✦
         </span>
         <div className="flex items-center gap-1.5">
+          <UsageChip message={m} />
           {m.status !== "streaming" && m.content.trim() && (
             <button
               type="button"
@@ -190,6 +194,38 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         )}
       </div>
     </motion.div>
+  );
+}
+
+/* ─────────────────────────────── UsageChip ─────────────────────────────── */
+
+/** Token/model metadata for a finished assistant turn — quiet mono chip. */
+function UsageChip({ message: m }: { message: ChatMessage }) {
+  const meta = m.meta;
+  if (!meta) return null;
+  const prompt = meta.promptTokens ?? 0;
+  const completion = meta.completionTokens ?? 0;
+  const total = prompt + completion;
+  if (!meta.model && total === 0) return null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="flex cursor-help items-center gap-0.5 rounded border border-border/60 bg-muted/40 px-1 py-px font-mono text-[9px] text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
+          aria-label={`Model ${meta.model ?? "unknown"}, ${total} tokens`}
+        >
+          <Zap className={cn("size-2.5", total > 0 ? "text-[#4D6BFE]" : "text-muted-foreground")} aria-hidden />
+          {meta.model === "demo-script" ? "demo" : total > 0 ? fmtK(total) : (meta.model ?? "")}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="font-mono text-[10px]">
+        <p className="font-sans font-semibold">{meta.model ?? "unknown model"}</p>
+        <p>prompt · {prompt.toLocaleString()} tok</p>
+        <p>completion · {completion.toLocaleString()} tok</p>
+        {typeof meta.iteration === "number" && <p>iteration · #{meta.iteration}</p>}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
