@@ -1,0 +1,136 @@
+"use client";
+
+import * as React from "react";
+import { Eye, Hand, Plug, Wrench, Zap } from "lucide-react";
+import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { PLUGINS } from "@/lib/dsh/plugins";
+import { useDshStore } from "@/lib/dsh/store";
+import type { PermissionPolicy } from "@/lib/dsh/types";
+import { clockHM, fmtK, shortId } from "./format";
+
+const POLICY_ORDER: PermissionPolicy[] = ["readonly", "ask", "auto"];
+
+const POLICY_META: Record<
+  PermissionPolicy,
+  { label: string; icon: React.ReactNode; nextHint: string }
+> = {
+  readonly: {
+    label: "readOnly",
+    icon: <Eye className="size-3" aria-hidden />,
+    nextHint: "ask (approve side effects before they run)",
+  },
+  ask: {
+    label: "ask",
+    icon: <Hand className="size-3" aria-hidden />,
+    nextHint: "auto (run everything without asking)",
+  },
+  auto: {
+    label: "auto",
+    icon: <Zap className="size-3" aria-hidden />,
+    nextHint: "readonly (no writes at all)",
+  },
+};
+
+export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
+  const sessions = useDshStore((s) => s.sessions);
+  const activeSessionId = useDshStore((s) => s.activeSessionId);
+  const isRunning = useDshStore((s) => s.isRunning);
+  const settings = useDshStore((s) => s.settings);
+  const disabledPlugins = useDshStore((s) => s.disabledPlugins);
+
+  const [now, setNow] = React.useState<string>("");
+  React.useEffect(() => {
+    const tick = () => setNow(clockHM());
+    tick();
+    const id = setInterval(tick, 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // aggregate usage across all sessions
+  const totals = sessions.reduce(
+    (acc, s) => ({
+      toolCalls: acc.toolCalls + s.stats.toolCalls,
+      tokens: acc.tokens + s.stats.promptTokens + s.stats.completionTokens,
+    }),
+    { toolCalls: 0, tokens: 0 },
+  );
+
+  const enabledCount = PLUGINS.length - disabledPlugins.length;
+  const policy = settings.policy;
+
+  const cyclePolicy = () => {
+    const idx = POLICY_ORDER.indexOf(policy);
+    const next = POLICY_ORDER[(idx + 1) % POLICY_ORDER.length];
+    useDshStore.getState().updateSettings({ policy: next });
+    toast.success(`Permission policy → ${POLICY_META[next].label}`, {
+      description: `Next: ${POLICY_META[next].nextHint}`,
+    });
+  };
+
+  return (
+    <footer
+      className="z-20 flex h-7 shrink-0 items-center justify-between gap-4 border-t bg-muted/40 px-3 font-mono text-[11px] text-muted-foreground"
+      role="status"
+      aria-label="Status bar"
+    >
+      {/* left */}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <span
+            aria-hidden
+            className={cn(
+              "inline-block size-1.5 rounded-full",
+              isRunning ? "dsh-pulse-dot bg-amber-400" : "bg-emerald-400",
+            )}
+          />
+          {isRunning ? `Running… ${settings.model}` : "Ready"}
+        </span>
+        <span className="truncate text-muted-foreground/60">
+          #{shortId(activeSessionId)}
+        </span>
+      </div>
+
+      {/* center */}
+      <div className="hidden items-center gap-3 md:flex">
+        <span className="flex items-center gap-1" title="Tool calls executed">
+          <Wrench className="size-3" aria-hidden /> {totals.toolCalls}
+        </span>
+        <span className="flex items-center gap-1" title="Tokens used (all sessions)">
+          <Zap className="size-3" aria-hidden /> {fmtK(totals.tokens)}
+        </span>
+        <button
+          type="button"
+          onClick={onOpenPlugins}
+          className="flex items-center gap-1 rounded px-1 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label={`Plugins: ${enabledCount} of ${PLUGINS.length} enabled — open manager`}
+        >
+          <Plug className="size-3" aria-hidden /> {enabledCount}/{PLUGINS.length}
+        </button>
+      </div>
+
+      {/* right */}
+      <div className="flex items-center gap-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={cyclePolicy}
+              className="flex items-center gap-1 rounded border border-border/70 bg-background px-1.5 py-px transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              aria-label={`Permission policy ${POLICY_META[policy].label}. Click to cycle.`}
+            >
+              {POLICY_META[policy].icon}
+              {POLICY_META[policy].label}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Cycle permission policy</TooltipContent>
+        </Tooltip>
+        <span aria-label="Current time">{now || "--:--"}</span>
+        <span aria-hidden className="select-none text-muted-foreground/50">
+          vercel ▲
+        </span>
+      </div>
+    </footer>
+  );
+}

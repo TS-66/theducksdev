@@ -14,34 +14,36 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "dsh web — DeepSeek Harness Web Edition",
+  description:
+    "A browser-native recreation of the deepseek-harness agent console: plugin-based tools, virtual workspace, permission gates and streaming DeepSeek models — deployable on Vercel.",
+  keywords: [
+    "dsh",
+    "deepseek",
+    "deepseek-harness",
+    "agent harness",
+    "AI agent",
+    "Next.js",
+    "Vercel",
+  ],
+  authors: [{ name: "dsh web contributors" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
-  openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-  },
 };
 
+/**
+ * Theme decision (Task 2-b): static dark default via `<html className="dark">`.
+ * We intentionally omit next-themes/ThemeProvider to keep zero FOUC and lock
+ * the terminal aesthetic. suppressHydrationWarning retained defensively.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

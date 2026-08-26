@@ -120,3 +120,67 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ───────────────────────── dsh web (Task 2-b) additions ───────────────────── */
+
+/* Custom scrollbars for internal scrolling regions */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+}
+
+/* Streaming caret ▊ */
+@keyframes dsh-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.dsh-caret {
+  animation: dsh-caret-blink 1.05s steps(2, jump-none) infinite;
+}
+
+/* Slow wrench spin while a tool call is inferred as running */
+@keyframes dsh-spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dsh-spin-slow {
+  animation: dsh-spin-slow 2.2s linear infinite;
+}
+
+/* Pulsing status dot */
+@keyframes dsh-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.dsh-pulse-dot {
+  animation: dsh-pulse-dot 1.6s ease-in-out infinite;
+}
+
+/*
+ * Theme choice: static dark default.
+ * `<html className="dark">` is set in src/app/layout.tsx; no ThemeProvider so
+ * the console keeps its terminal-grade aesthetic with zero FOUC and no
+ * flash-of-light-theme. Light :root tokens above remain valid if someone
+ * removes the class manually.
+ */
