@@ -56,3 +56,23 @@ Stage Summary:
 - App fully functional: sessions, virtual workspace + tools, plugins registry, permission gates, plan mode, slash commands, status bar, sheets/dialogs, responsive mobile.
 - Chat requires a DeepSeek API key (Settings) or server DEEPSEEK_API_KEY; /api/chat returns actionable 400 guidance without one (verified).
 - tsc clean (project code), eslint 0/0, dev server 200s.
+
+---
+Task ID: R1 (cron review round 1)
+Agent: coordinator
+Task: QA stability, then zero-config demo mode + styling upgrades + output features.
+
+Work Log:
+- QA: page errors none, console clean, dev 200s → project stable, proceeded to features.
+- FEATURE demo mode (zero-config): types.ts Settings gained `demoMode` + `isDemoMode()` helper (demo implied when apiKey empty). New src/lib/dsh/demo-loop.ts — scripted engine emitting the SAME AgentEvent protocol as the live loop but driving REAL executors: summarize flow (bash tree + read README/package.json → live stats table), LICENSE+deploy flow (writes real LICENSE & scripts/deploy.sh, verified via bash), test-review flow, shell playground (any ls/cat/tree/grep/wc/… command really executes), default capabilities intro. Text streams char-chunked for a live feel; aborts honored. Hook branches to demo before runAgentLoop; assistant meta.model = 'demo-script'.
+- Fixed regex bug found in browser QA: "bash tree && wc …" fell to default route because pattern forbade space between `bash` and command → rewrote with [\s`'\"“”]* gap + expanded verb list (mkdir/touch/rm/mv/cp/date/uname/whoami).
+- STYLING per-tool presentation (upstream tool-owned-UI spirit): new tool-meta.ts registry (icon+color per tool: read=sky file, write=emerald file-plus, edit=amber pen, bash=emerald terminal, glob/grep=violet, todo=teal, subagent=fuchsia, web=cyan, ask=orange). ToolCallCard now shows per-tool icon/tint/label chip + left accent border while running. New diff-view.tsx: edit_file cards render a real −/+ unified diff from old_str/new_str and auto-expand when done.
+- FEATURES output: export-md.ts (session→Markdown transcript w/ details-collapsed tool calls, todos, workspace manifest; blob download), wired into sidebar dropdown ("Export .md") + /export slash command; sidebar session search (title+content filter w/ clear button + empty states); copy button on assistant messages (hover reveal, ✓ feedback).
+- UI polish: amber DEMO chip in status bar (tooltip explains) + Settings→Models demo-mode toggle card (FlaskConical, amber tint).
+- Browser QA all green: demo summarize (3 real tools, stats from real files), LICENSE flow (file tree live-updated to 9 files incl scripts/deploy.sh), bash route executes tree && wc, tool card expansion shows args+real output, /export toast, search filter + empty state. lint 0/0, tsc clean.
+
+Stage Summary:
+- App now works with ZERO configuration: no-key users get an honest scripted demo with real tool execution; adding a DeepSeek key seamlessly unlocks the full agent (no UI change needed).
+- Tool cards are tool-specific with diff previews for edits — closest yet to upstream's tool-owned presentation.
+- Known risk: demo regex routing is keyword-based (fine for golden paths); live agent path unchanged and still requires key or DEEPSEEK_API_KEY env.
+- Next suggestions: ask_user_question/exit_plan_mode demo variants, token-usage tooltip breakdown, i18n zh, keyboard shortcut help dialog, workspace file upload/paste-create.

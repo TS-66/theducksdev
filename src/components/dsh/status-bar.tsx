@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Hand, Plug, Wrench, Zap } from "lucide-react";
+import { Eye, FlaskConical, Hand, Plug, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PLUGINS } from "@/lib/dsh/plugins";
 import { useDshStore } from "@/lib/dsh/store";
-import type { PermissionPolicy } from "@/lib/dsh/types";
+import { isDemoMode, type PermissionPolicy } from "@/lib/dsh/types";
 import { clockHM, fmtK, shortId } from "./format";
 
 const POLICY_ORDER: PermissionPolicy[] = ["readonly", "ask", "auto"];
@@ -85,11 +85,23 @@ export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
               isRunning ? "dsh-pulse-dot bg-amber-400" : "bg-emerald-400",
             )}
           />
-          {isRunning ? `Running… ${settings.model}` : "Ready"}
+          {isRunning ? `Running… ${isDemoMode(settings) ? "demo-script" : settings.model}` : "Ready"}
         </span>
         <span className="truncate text-muted-foreground/60">
           #{shortId(activeSessionId)}
         </span>
+        {isDemoMode(settings) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                <FlaskConical className="size-3" aria-hidden /> demo
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              No API key — scripted engine with real tool execution. Add a key in Settings for the full agent.
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       {/* center */}

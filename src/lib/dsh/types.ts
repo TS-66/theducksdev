@@ -129,6 +129,16 @@ export interface Settings {
   systemPromptExtra: string;
   maxToolIterations: number;
   showReasoning: boolean;
+  /**
+   * Force scripted demo mode even when a key exists. When apiKey is empty,
+   * demo mode is implied regardless of this flag.
+   */
+  demoMode: boolean;
+}
+
+/** True when the next turn should run the scripted demo engine. */
+export function isDemoMode(s: Settings): boolean {
+  return s.demoMode || s.apiKey.trim() === "";
 }
 
 /* ------------------------------- Engine events ---------------------------- */

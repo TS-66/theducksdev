@@ -20,6 +20,8 @@ import {
 } from '@/lib/dsh/agent-loop';
 import { PLUGINS, resolveEnabledPluginIds } from '@/lib/dsh/plugins';
 import { renderTree } from '@/lib/dsh/tools-vfs';
+import { demoEnabledToolNames, runDemoTurn } from '@/lib/dsh/demo-loop';
+import { isDemoMode } from '@/lib/dsh/types';
 import type { AskUserQuestion } from '@/lib/dsh/plugins';
 import type {
   ApprovalRequest,
@@ -261,7 +263,7 @@ export function useDshAgent() {
         content: '',
         reasoning: '',
         status: 'streaming',
-        meta: { model: settings.model },
+        meta: { model: isDemoMode(settings) ? 'demo-script' : settings.model },
         createdAt: Date.now(),
       });
       return id;
@@ -419,25 +421,47 @@ export function useDshAgent() {
       }
     };
 
+    const demoActive = isDemoMode(settings);
     try {
-      await runAgentLoop({
-        sessionId: sid,
-        settings,
-        messages: wireHistory,
-        tools: buildToolSchemas(enabledPluginIds),
-        executors: buildExecutors({
+      if (demoActive) {
+        // Scripted demo engine: same event protocol, REAL tool executors.
+        await runDemoTurn({
           sessionId: sid,
           settings,
-          signal: controller.signal,
+          userText: trimmed,
+          executors: buildExecutors({
+            sessionId: sid,
+            settings,
+            signal: controller.signal,
+            onEvent: handleEvent,
+          }),
+          enabledToolNames: demoEnabledToolNames(disabledPlugins),
+          listFiles: () => useDshStore.getState().listWorkspaceFiles(sid),
+          readFile: (p) => useDshStore.getState().getFile(sid, p),
+          todos: session.todos,
           onEvent: handleEvent,
-        }),
-        onEvent: handleEvent,
-        signal: controller.signal,
-        requestApproval: requestApprovalBridge,
-        askUser: askUserBridge,
-        onPlanExit: onPlanExitBridge,
-        planModeActive: session.planMode,
-      });
+          signal: controller.signal,
+        });
+      } else {
+        await runAgentLoop({
+          sessionId: sid,
+          settings,
+          messages: wireHistory,
+          tools: buildToolSchemas(enabledPluginIds),
+          executors: buildExecutors({
+            sessionId: sid,
+            settings,
+            signal: controller.signal,
+            onEvent: handleEvent,
+          }),
+          onEvent: handleEvent,
+          signal: controller.signal,
+          requestApproval: requestApprovalBridge,
+          askUser: askUserBridge,
+          onPlanExit: onPlanExitBridge,
+          planModeActive: session.planMode,
+        });
+      }
     } catch (e) {
       // Engine already reports structured errors; this guards against listener crashes.
       const store = useDshStore.getState();

@@ -106,6 +106,18 @@ export default function DshWebPage() {
         setPluginsOpen(true);
         break;
       }
+      case "/export": {
+        if (!sid) return toast.info("Select a session first");
+        const target = st.sessions.find((s) => s.id === sid);
+        if (!target) return toast.error("Session not found");
+        import("@/lib/dsh/export-md").then(({ downloadSessionMarkdown }) => {
+          downloadSessionMarkdown(target);
+          toast.success("Session exported", {
+            description: "Markdown transcript downloaded.",
+          });
+        });
+        break;
+      }
       default:
         toast.error(`Unknown command “${name}”`);
     }

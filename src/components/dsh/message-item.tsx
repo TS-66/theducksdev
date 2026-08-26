@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Circle,
+  Copy,
   ListTodo,
   Loader2,
   X,
@@ -80,6 +81,9 @@ interface MessageItemProps {
 }
 
 export function MessageItem({ message: m, toolResults, sessionRunning }: MessageItemProps) {
+  // assistant + shared copy state (hooks must run before the early return)
+  const [copied, setCopied] = React.useState(false);
+
   if (m.role === "user") {
     return (
       <motion.div
@@ -99,19 +103,40 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
     );
   }
 
-  // assistant
+  const copyContent = async () => {
+    try {
+      await navigator.clipboard.writeText(m.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="space-y-1"
+      className="group/msg space-y-1"
     >
       <div className="flex items-start justify-between gap-3">
         <span aria-hidden className="select-none font-mono text-sm leading-6 text-[#4D6BFE]">
           ✦
         </span>
-        <Stamp t={m.createdAt} />
+        <div className="flex items-center gap-1.5">
+          {m.status !== "streaming" && m.content.trim() && (
+            <button
+              type="button"
+              onClick={copyContent}
+              aria-label={copied ? "Copied" : "Copy message"}
+              className="rounded p-0.5 text-muted-foreground/0 transition-all hover:text-muted-foreground focus-visible:text-muted-foreground group-hover/msg:text-muted-foreground/70"
+            >
+              {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+            </button>
+          )}
+          <Stamp t={m.createdAt} />
+        </div>
       </div>
 
       <div className="-mt-1 space-y-2.5 pl-6">

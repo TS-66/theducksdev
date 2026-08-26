@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  FlaskConical,
   Hand,
   KeyRound,
   MessageSquare,
@@ -58,6 +59,7 @@ const FALLBACK_DEFAULTS: Settings = {
   systemPromptExtra: "",
   maxToolIterations: 6,
   showReasoning: true,
+  demoMode: false,
 };
 
 interface SettingsSheetProps {
@@ -182,6 +184,25 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                     icon={<Brain className="size-4 text-[#4D6BFE]" aria-hidden />}
                     desc="R1 · shows chain-of-thought for deep reasoning tasks."
                     blurb="slower · deeper thinking"
+                  />
+                </div>
+              </section>
+
+              <section className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label className="flex items-center gap-1.5 text-xs">
+                      <FlaskConical className="size-3 text-amber-400" aria-hidden /> Demo mode
+                    </Label>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      Scripted agent flows with <strong>real</strong> tool execution — no key
+                      required. Implied automatically while the API key is empty.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={draft.demoMode}
+                    onCheckedChange={(v) => patch({ demoMode: v })}
+                    aria-label="Force demo mode"
                   />
                 </div>
               </section>

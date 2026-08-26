@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import {
+  Download,
   FolderTree,
   MoreHorizontal,
   Pencil,
   Plus,
   RotateCcw,
+  Search,
   Star,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -39,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
+import { downloadSessionMarkdown } from "@/lib/dsh/export-md";
 import type { Session } from "@/lib/dsh/types";
 import { relTime } from "./format";
 import { FileTree } from "./file-tree";
@@ -52,13 +56,21 @@ interface SidebarProps {
 export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
   const sessions = useDshStore((s) => s.sessions);
   const activeSessionId = useDshStore((s) => s.activeSessionId);
+  const [query, setQuery] = React.useState("");
 
   const sorted = React.useMemo(
     () =>
-      [...sessions].sort(
-        (a, b) => Number(b.starred) - Number(a.starred) || b.updatedAt - a.updatedAt,
-      ),
-    [sessions],
+      [...sessions]
+        .filter((s) => {
+          const q = query.trim().toLowerCase();
+          if (!q) return true;
+          if (s.title.toLowerCase().includes(q)) return true;
+          return s.messages.some((m) => m.content.toLowerCase().includes(q));
+        })
+        .sort(
+          (a, b) => Number(b.starred) - Number(a.starred) || b.updatedAt - a.updatedAt,
+        ),
+    [sessions, query],
   );
 
   const active = sessions.find((s) => s.id === activeSessionId) ?? null;
@@ -87,16 +99,41 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
         </Button>
       </div>
 
-      {/* Sessions */}
+      {/* Search + Sessions */}
+      {sessions.length > 0 && (
+        <div className="px-2 pb-1">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search sessions…"
+              aria-label="Search sessions"
+              className="h-7 border-none bg-muted/40 pl-7 pr-7 text-xs focus-visible:ring-1"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <nav
         aria-label="Sessions"
         className="custom-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2 pr-1"
       >
         {sorted.length === 0 && (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-            No sessions yet.
-            <br />
-            Press ⌘K or hit “New task”.
+            {query ? `No sessions match “${query}”.` : (<>No sessions yet.<br />Press ⌘K or hit “New task”.</>)}
           </p>
         )}
         {sorted.map((s) => (
@@ -223,6 +260,16 @@ function SessionRow({
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => useDshStore.getState().toggleStar(session.id)}>
             <Star className="mr-2 size-3.5" /> {session.starred ? "Unstar" : "Star"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              downloadSessionMarkdown(session);
+              toast.success("Session exported", {
+                description: "Markdown transcript downloaded.",
+              });
+            }}
+          >
+            <Download className="mr-2 size-3.5" /> Export .md
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
