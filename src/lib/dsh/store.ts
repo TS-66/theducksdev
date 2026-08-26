@@ -154,6 +154,8 @@ interface DshActions {
   readWorkspaceSnapshot(sessionId: string): Record<string, string>;
   replaceWorkspace(sessionId: string, workspace: Record<string, string>): void;
   deleteFileEntry(sessionId: string, path: string): boolean;
+  /** Move a workspace file to a new path atomically (returns false when from-path missing or to-path collides). */
+  renameFileEntry(sessionId: string, from: string, to: string): boolean;
   resetWorkspaceToSeed(sessionId: string): void;
 
   setTodos(sessionId: string, todos: TodoItem[]): void;
@@ -363,6 +365,30 @@ export const useDshStore = create<DshStore>()(
           mapSession(st, sessionId, (s) => {
             const next = { ...s.workspace };
             delete next[p];
+            s.workspace = next;
+          }),
+        );
+        return true;
+      },
+
+      renameFileEntry(sessionId, from, to) {
+        const src = normalizePath(from);
+        const dst = normalizePath(to);
+        const sess = get().sessions.find((s) => s.id === sessionId);
+        if (
+          !src ||
+          !dst ||
+          src === dst ||
+          !sess ||
+          !Object.prototype.hasOwnProperty.call(sess.workspace, src) ||
+          Object.prototype.hasOwnProperty.call(sess.workspace, dst)
+        )
+          return false;
+        set((st) =>
+          mapSession(st, sessionId, (s) => {
+            const next = { ...s.workspace };
+            next[dst] = next[src];
+            delete next[src];
             s.workspace = next;
           }),
         );

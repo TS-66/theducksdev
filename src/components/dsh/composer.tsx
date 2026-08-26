@@ -29,7 +29,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
 
-const SLASH_COMMANDS = [
+export const SLASH_COMMANDS = [
+  { cmd: "/help", desc: "Open the cheat sheet (shortcuts + commands)" },
   { cmd: "/new", desc: "Start a fresh session" },
   { cmd: "/clear", desc: "Clear messages of this session" },
   { cmd: "/plan", desc: "Toggle plan mode" },

@@ -106,6 +106,9 @@ export function ActivityTimelinePanel({
               {!hasMessages ? (
                 <EmptyLedger />
               ) : (
+                <LedgerSummaryStrip session={session!} entries={buildTimeline(session!)} />
+              )}
+              {hasMessages && (
                 <LedgerView
                   entries={buildTimeline(session!)}
                   onPreviewFile={onPreviewFile}
@@ -135,6 +138,71 @@ function fmtDur(ms?: number): string | null {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
 }
 
+/** git-log diffstat vibes: one quiet strip of what this session's ledger holds. */
+function LedgerSummaryStrip({
+  session,
+  entries,
+}: {
+  session: Session;
+  entries: TimelineEntry[];
+}) {
+  const toolCalls = entries.filter((e) => e.kind === "tool").length;
+  const files = new Set<string>();
+  for (const e of entries) for (const f of e.files ?? []) files.add(f);
+  const tokens = (session.stats?.promptTokens ?? 0) + (session.stats?.completionTokens ?? 0);
+
+  const stats = [
+    { label: "entries", value: String(entries.length), glyph: "≡" },
+    { label: "tool calls", value: String(toolCalls), glyph: "⚙" },
+    { label: "files", value: String(files.size), glyph: "◇" },
+    { label: "tokens", value: tokens > 0 ? fmtK(tokens) : "—", glyph: "⚡" },
+  ];
+
+  return (
+    <div
+      className="mb-4 grid grid-cols-4 gap-1.5"
+      aria-label="Ledger summary"
+    >
+      {stats.map((s) => (
+        <div
+          key={s.label}
+          className="rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-center transition-colors hover:border-border hover:bg-muted/40"
+        >
+          <p className="font-mono text-[13px] font-semibold leading-tight">
+            <span className="mr-1 text-[10px] text-muted-foreground/70" aria-hidden>
+              {s.glyph}
+            </span>
+            {s.value}
+          </p>
+          <p className="font-mono text-[8.5px] uppercase tracking-wider text-muted-foreground/80">
+            {s.label}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function fmtK(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
+}
+
+/** Calendar-day label for git-log style separators. */
+function dayLabel(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000);
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
 function LedgerView({
   entries,
   onPreviewFile,
@@ -144,7 +212,7 @@ function LedgerView({
   onPreviewFile: (path: string) => void;
   running: boolean;
 }) {
-  // newest commit first, like `git log`
+  // newest commit first, like `git log`, with day separators between groups
   const ordered = [...entries].reverse();
   return (
     <ol className="relative space-y-1" aria-label="Session activity ledger">
@@ -153,9 +221,26 @@ function LedgerView({
         aria-hidden
         className="absolute bottom-3 left-[13px] top-3 w-px bg-gradient-to-b from-border via-border to-transparent"
       />
-      {ordered.map((e) => (
-        <LedgerRow key={e.id} entry={e} onPreviewFile={onPreviewFile} running={running} />
-      ))}
+      {ordered.map((e, i) => {
+        const prev = i > 0 ? ordered[i - 1] : undefined;
+        const newDay = !prev || dayLabel(prev.ts) !== dayLabel(e.ts);
+        return (
+          <React.Fragment key={e.id}>
+            {newDay && (
+              <li className="relative z-10 flex items-center gap-2 py-1.5" aria-hidden>
+                <span className="flex size-[27px] shrink-0 items-center justify-center">
+                  <GitCommitHorizontal className="size-3.5 text-muted-foreground/40" />
+                </span>
+                <span className="rounded border border-dashed border-border/70 bg-muted/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  {dayLabel(e.ts)}
+                </span>
+                <span className="h-px min-w-4 flex-1 bg-border/40" />
+              </li>
+            )}
+            <LedgerRow entry={e} onPreviewFile={onPreviewFile} running={running} />
+          </React.Fragment>
+        );
+      })}
     </ol>
   );
 }

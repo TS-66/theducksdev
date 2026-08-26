@@ -6,7 +6,7 @@
  */
 
 import * as React from "react";
-import { Command, Keyboard } from "lucide-react";
+import { Command, Keyboard, Slash, SquareTerminal } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SLASH_COMMANDS } from "./composer";
 
 const SHORTCUTS: Array<{ keys: string[]; action: string; scope: string }> = [
   { keys: ["⌘", "K"], action: "New task", scope: "global" },
@@ -35,15 +36,23 @@ export function ShortcutsDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="custom-scrollbar max-h-[85dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Keyboard className="size-4 text-[#4D6BFE]" aria-hidden /> Keyboard shortcuts
+            <SquareTerminal className="size-4 text-[#4D6BFE]" aria-hidden /> dsh cheat sheet
           </DialogTitle>
           <DialogDescription>
-            dsh keeps your hands on the keyboard — the harness way.
+            Keyboard bindings and slash commands — the harness way.
           </DialogDescription>
         </DialogHeader>
+        {/* ── keyboard ────────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2">
+          <Keyboard className="size-3.5 text-[#4D6BFE]" aria-hidden />
+          <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            keyboard
+          </h3>
+          <span className="h-px min-w-4 flex-1 bg-border/60" />
+        </div>
         <ul className="space-y-1" aria-label="Keyboard shortcuts">
           {SHORTCUTS.map((s) => (
             <li
@@ -67,9 +76,35 @@ export function ShortcutsDialog({
             </li>
           ))}
         </ul>
+
+        {/* ── slash commands ─────────────────────────────────────────────── */}
+        <div className="mt-3 flex items-center gap-2 border-t pt-3">
+          <Slash className="size-3.5 text-[#4D6BFE]" aria-hidden />
+          <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            slash commands
+          </h3>
+          <span className="h-px min-w-4 flex-1 bg-border/60" />
+        </div>
+        <ul className="space-y-0.5" aria-label="Slash commands">
+          {SLASH_COMMANDS.map((c) => (
+            <li
+              key={c.cmd}
+              className="group flex items-center justify-between gap-3 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-muted/50"
+            >
+              <code className="shrink-0 rounded border border-[#4D6BFE]/25 bg-[#4D6BFE]/[0.07] px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-[#8fa2ff] transition-colors group-hover:border-[#4D6BFE]/45">
+                {c.cmd}
+              </code>
+              <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">
+                {c.desc}
+              </span>
+            </li>
+          ))}
+        </ul>
+
         <p className="flex items-center gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
           <Command className="size-3" aria-hidden />
-          On Windows/Linux, ⌘ = Ctrl.
+          On Windows/Linux, ⌘ = Ctrl. Type <code className="font-mono">/</code> in the composer to
+          filter commands as you go.
         </p>
       </DialogContent>
     </Dialog>

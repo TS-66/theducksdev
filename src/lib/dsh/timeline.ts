@@ -127,6 +127,37 @@ function toolSubject(name: string, argsRaw: string): string {
 }
 
 /**
+ * Detail body for a ledger entry — the tool RESULT excerpt when we have one
+ * (reads like a git commit body: what the call actually produced), falling
+ * back to the raw args only while a call is still pending. Skipped entirely
+ * when the result adds nothing beyond the subject line.
+ */
+function toolDetail(
+  name: string,
+  argsRaw: string,
+  result?: ChatMessage,
+): string | undefined {
+  if (result) {
+    const text = result.content.replace(/\s+/g, " ").trim();
+    // skip trivial acks / empty results / self-repeating outputs
+    if (
+      text.length === 0 ||
+      /^(ok|done|success(ed)?\.?)$/i.test(text) ||
+      text === toolSubject(name, argsRaw)
+    )
+      return undefined;
+    return trunc(text, 120);
+  }
+  // still pending — show compact args as a "what was requested" hint
+  try {
+    const compact = JSON.stringify(JSON.parse(argsRaw || "{}"));
+    return compact === "{}" ? undefined : trunc(compact, 120);
+  } catch {
+    return argsRaw ? trunc(argsRaw, 120) : undefined;
+  }
+}
+
+/**
  * Flatten a session's messages into a chronological ledger. Tool results are
  * paired with their calls so each entry carries ok/duration/output excerpt.
  */
@@ -200,7 +231,9 @@ export function buildTimeline(session: Session): TimelineEntry[] {
           : isTodo
             ? `todos → ${countTodos(argsPreview)}`
             : toolSubject(call.function.name, call.function.arguments),
-        detail: trunc(argsPreview, 140),
+        detail: isTodo
+          ? trunc(argsPreview, 140)
+          : toolDetail(call.function.name, call.function.arguments, res),
         toolName: call.function.name,
         ok: res ? res.status !== "error" : undefined,
         durationMs: res?.durationMs,

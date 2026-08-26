@@ -145,6 +145,10 @@ export default function DshWebPage() {
         setActivityOpen(true);
         break;
       }
+      case "/help": {
+        setShortcutsOpen(true);
+        break;
+      }
       case "/backup": {
         const all = st.sessions;
         if (all.length === 0) return toast.info("Nothing to back up yet");
