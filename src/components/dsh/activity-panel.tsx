@@ -377,11 +377,12 @@ function LedgerView({
   // newest commit first, like `git log`, with day separators between groups
   const ordered = [...entries].reverse();
 
-  /** entries the conversation can truncate after — computed once per render */
+  /** entries the conversation can truncate after (must drop ≥1 message) */
   const truncatable = React.useMemo(() => {
     const set = new Set<string>();
     for (const e of entries) {
-      if (planConversationTruncate(session, e.id)) set.add(e.id);
+      const plan = planConversationTruncate(session, e.id);
+      if (plan && plan.droppedCount > 0) set.add(e.id);
     }
     return set;
   }, [entries, session]);
@@ -443,7 +444,7 @@ function ShortlogFooter({ entries }: { entries: TimelineEntry[] }) {
       aria-hidden
     >
       <span>
-        {prompts} prompt{prompts === 1 ? "" : "s"} · {replies} repl{replies === 1 ? "y" : "ies"} ·{"\n" && " "}
+        {prompts} prompt{prompts === 1 ? "" : "s"} · {replies} repl{replies === 1 ? "y" : "ies"} ·{" "}
         {calls} tool call{calls === 1 ? "" : "s"}
       </span>
       <span className="flex items-center gap-1">
@@ -592,6 +593,103 @@ function LedgerRow({
       {body}
     </li>
   );
+}
+
+/* ───────────────────── continue-from-here (chat rewind) ─────────────────── */
+
+/**
+ * Hover action on any replayable entry: trim everything AFTER this commit from
+ * the conversation, so the user can re-run a divergent branch from here.
+ * Workspace files are NOT touched — that's RestorePointButton's job.
+ */
+function ContinueFromHereButton({
+  entry: e,
+  session,
+}: {
+  entry: TimelineEntry;
+  session: Session;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  const plan = React.useMemo(
+    () => (open ? planConversationTruncate(session, e.id) : null),
+    [open, session, e.id],
+  );
+
+  const confirmTruncate = () => {
+    if (!plan || plan.droppedCount === 0) {
+      setOpen(false);
+      return;
+    }
+    useDshStore.getState().truncateSessionFrom(session.id, plan.messages);
+    toast.success(`Continuing from ${e.sha}`, {
+      description: `${plan.droppedCount} message${plan.droppedCount === 1 ? "" : "s"} trimmed · workspace untouched.`,
+    });
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Trim conversation after ${e.sha}`}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              setOpen(true);
+            }}
+            className="rounded-sm p-0.5 text-muted-foreground/0 transition-all hover:!text-violet-400 focus-visible:text-violet-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:text-muted-foreground/70"
+          >
+            <Scissors className="size-3" aria-hidden />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Continue conversation from here</TooltipContent>
+      </Tooltip>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-mono">
+              continue from <span className="text-violet-400">{e.sha}</span>?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Keeps everything up to and including “{truncateTitle(e.title)}” ({hhmm(e.ts)}) and
+              discards every newer commit when the chat resumes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {plan && (
+            <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-xs">
+              <div className="flex items-center justify-between font-mono">
+                <span className="text-emerald-400">keep {plan.keptCount}</span>
+                <span className="text-red-400">drop {plan.droppedCount}</span>
+              </div>
+              <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                The next message you send continues this branch. Files in the workspace are not
+                rewound — pair this with the amber rewind action if you also want the tree back.
+              </p>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmTruncate}
+              className="bg-violet-600 text-white hover:bg-violet-600/90"
+            >
+              <Scissors className="mr-1.5 size-3.5" aria-hidden /> Trim &amp; continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+/** dialog titles stay one line — clip long prompts politely */
+function truncateTitle(t: string): string {
+  return t.length > 42 ? `${t.slice(0, 39)}…` : t;
 }
 
 /* ─────────────────────────── time-travel restore ────────────────────────── */

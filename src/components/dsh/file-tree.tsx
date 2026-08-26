@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Download,
   File as FileIcon,
+  Image as ImageIcon,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -47,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
+import { isImageEntry, isImagePath } from "@/lib/dsh/images";
 
 interface TreeNode {
   name: string;
@@ -177,7 +179,17 @@ function FileRow({
   };
 
   const download = () => {
-    const blob = new Blob([workspace[node.path] ?? ""], { type: "text/plain" });
+    const content = workspace[node.path] ?? "";
+    // inline images decode back to REAL bytes — text/plain blobs would corrupt them
+    if (isImageEntry(node.path, content)) {
+      const a = document.createElement("a");
+      a.href = content; // data URL — browser decodes to binary on save
+      a.download = node.name;
+      a.click();
+      toast.success("Image downloaded", { description: node.path });
+      return;
+    }
+    const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -206,8 +218,17 @@ function FileRow({
           onClick={() => onOpenFile(node.path)}
           className="flex min-w-0 flex-1 items-center gap-1 rounded-sm py-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <FileIcon className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
-          <span className="truncate font-mono text-xs text-muted-foreground transition-colors group-hover/file:text-foreground group-hover/file:underline">
+          {isImagePath(node.path) ? (
+            <ImageIcon className="size-3 shrink-0 text-pink-400/80" aria-hidden />
+          ) : (
+            <FileIcon className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
+          )}
+          <span
+            className={cn(
+              "truncate font-mono text-xs text-muted-foreground transition-colors group-hover/file:text-foreground group-hover/file:underline",
+              isImagePath(node.path) && "text-pink-200/70 group-hover/file:text-pink-100",
+            )}
+          >
             {node.name}
           </span>
         </button>

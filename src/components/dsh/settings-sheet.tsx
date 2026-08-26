@@ -13,6 +13,8 @@ import {
   FileJson,
   FlaskConical,
   Hand,
+  HardDrive,
+  Image as ImageIcon,
   KeyRound,
   MessageSquare,
   TriangleAlert,
@@ -317,6 +319,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
             {/* ── Data ───────────────────────────────────────────────── */}
             <TabsContent value="data" className="mt-0 space-y-5">
               <BackupSection />
+              <StorageUsageSection />
             </TabsContent>
 
             {/* ── About ──────────────────────────────────────────────── */}
@@ -543,6 +546,138 @@ function BackupSection() {
       </ul>
     </section>
   );
+}
+
+/* ───────────────────────── storage usage (Data tab) ─────────────────────── */
+
+const STORE_KEY = "dsh-web-store-v1";
+/** Chrome/Firefox grant ~5 MB per origin for localStorage — treat as the budget. */
+const LS_QUOTA = 5 * 1024 * 1024;
+
+function fmtBytes(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${n} B`;
+}
+
+/**
+ * Live read of what dsh web actually occupies in localStorage, with a quota
+ * meter and the heaviest sessions called out — pasted images live here too.
+ */
+function StorageUsageSection() {
+  const sessions = useDshStore((s) => s.sessions);
+
+  const usage = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem(STORE_KEY) ?? "";
+      const total = new Blob([raw]).size;
+      let persisted: Array<Record<string, unknown>> = [];
+      try {
+        persisted =
+          (JSON.parse(raw) as { state?: { sessions?: Array<Record<string, unknown>> } })
+            .state?.sessions ?? [];
+      } catch {
+        /* degraded measurements only */
+      }
+      const byId = new Map(
+        persisted.map((p) => [String(p.id ?? ""), p] as const),
+      );
+      const rows = sessions
+        .map((s) => ({
+          id: s.id,
+          title: s.title,
+          bytes: (() => {
+            const p = byId.get(s.id);
+            return p ? new Blob([JSON.stringify(p)]).size : 0;
+          })(),
+          files: Object.keys(s.workspace).length,
+          images: Object.values(s.workspace).filter((c) => typeof c === "string" && isDataUrlImage(c)).length,
+        }))
+        .sort((a, b) => b.bytes - a.bytes);
+      return { total, rows };
+    } catch {
+      return { total: 0, rows: [] };
+    }
+  }, [sessions]);
+
+  const pct = Math.min(100, (usage.total / LS_QUOTA) * 100);
+  const tone = pct >= 85 ? "bg-red-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
+  const topRows = usage.rows.filter((r) => r.bytes > 0).slice(0, 4);
+
+  return (
+    <section className="space-y-3 rounded-md border p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex size-8 items-center justify-center rounded-md border border-violet-500/40 bg-violet-500/10">
+          <HardDrive className="size-4 text-violet-400" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-xs font-semibold">Storage usage</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Everything lives in this browser&apos;s localStorage — messages, workspaces and pasted
+            images.
+          </p>
+        </div>
+      </div>
+
+      {/* quota meter */}
+      <div>
+        <div className="mb-1 flex items-baseline justify-between font-mono text-[10px] text-muted-foreground">
+          <span>
+            {fmtBytes(usage.total)} used · {fmtBytes(Math.max(0, LS_QUOTA - usage.total))} free
+          </span>
+          <span>{pct.toFixed(pct < 10 ? 1 : 0)}%</span>
+        </div>
+        <div
+          role="progressbar"
+          aria-valuenow={Math.round(pct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="localStorage quota used"
+          className="h-1.5 overflow-hidden rounded-full bg-muted"
+        >
+          <div
+            className={cn("h-full rounded-full transition-all duration-500", tone)}
+            style={{ width: `${Math.max(pct, usage.total > 0 ? 2 : 0)}%` }}
+          />
+        </div>
+      </div>
+
+      {topRows.length > 0 ? (
+        <ul className="space-y-1 border-t pt-2">
+          {topRows.map((r) => (
+            <li key={r.id} className="flex items-center gap-2 font-mono text-[10px]">
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">{r.title}</span>
+              {r.images > 0 && (
+                <span
+                  className="flex shrink-0 items-center gap-0.5 rounded bg-pink-500/10 px-1 py-px text-pink-300"
+                  title={`${r.images} image${r.images === 1 ? "" : "s"} in workspace`}
+                >
+                  <ImageIcon className="size-2.5" aria-hidden /> {r.images}
+                </span>
+              )}
+              <span className="w-16 shrink-0 text-right text-foreground/80">{fmtBytes(r.bytes)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="border-t pt-2 font-mono text-[10px] text-muted-foreground">
+          no measurable sessions yet.
+        </p>
+      )}
+
+      {pct >= 60 && (
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-400">
+          <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
+          Storage is filling up — export a backup, then delete heavy sessions (large pasted images
+          are usually the culprit).
+        </p>
+      )}
+    </section>
+  );
+}
+
+function isDataUrlImage(content: string): boolean {
+  return /^data:image\//i.test(content.slice(0, 40));
 }
 
 function ModelCard({

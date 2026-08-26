@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   Brain,
   CornerDownLeft,
+  ImagePlus,
   MessageSquare,
   Plus,
   SendHorizontal,
@@ -28,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
+import { fileToPastedImage } from "@/lib/dsh/images";
 
 export const SLASH_COMMANDS = [
   { cmd: "/help", desc: "Open the cheat sheet (shortcuts + commands)" },
@@ -56,8 +58,41 @@ interface ComposerProps {
 
 export function Composer({ value, onChange, onSend, onStop, running, locked, hasSession }: ComposerProps) {
   const taRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const settings = useDshStore((s) => s.settings);
+  const activeSessionId = useDshStore((s) => s.activeSessionId);
   const disabledSurface = !hasSession;
+
+  /** shared pipeline for pasted & picked images → vFS data-URL entries */
+  const ingestImages = React.useCallback(
+    async (files: File[]) => {
+      if (!activeSessionId || files.length === 0) return;
+      let stored = 0;
+      for (let i = 0; i < files.length; i++) {
+        try {
+          const img = await fileToPastedImage(files[i], i);
+          useDshStore.getState().writeFile(activeSessionId, img.suggestedName, img.dataUrl);
+          toast.success("Image saved to workspace", {
+            description: `${img.suggestedName} · ${(img.bytes / 1024).toFixed(0)} KB — open it from the sidebar tree.`,
+          });
+          stored++;
+        } catch (e) {
+          toast.error("Image skipped", { description: (e as Error).message });
+        }
+      }
+      if (stored > 0) taRef.current?.focus();
+    },
+    [activeSessionId],
+  );
+
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (files.length === 0) return; // let text paste flow normally
+    e.preventDefault();
+    void ingestImages(files);
+  };
 
   // autogrow between 52px and 200px
   const grow = React.useCallback(() => {
@@ -165,7 +200,23 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
           >
             <Plus className="size-3" aria-hidden /> select or create a session…
           </button>
-        ) : null}
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Attach image to workspace"
+                disabled={disabledSurface}
+                onClick={() => fileInputRef.current?.click()}
+                className="ml-auto mr-auto h-7 gap-1 px-2 font-mono text-[11px] text-muted-foreground"
+              >
+                <ImagePlus className="size-3.5" aria-hidden /> image
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Paste an image or pick one — saved into the virtual workspace</TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       {/* textarea */}
@@ -174,6 +225,7 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
         value={disabledSurface ? "" : value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
+        onPaste={onPaste}
         placeholder={
           disabledSurface
             ? "Select or create a session…"
@@ -182,6 +234,21 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
         disabled={disabledSurface}
         aria-label="Message dsh"
         className="min-h-[52px] max-h-[200px] resize-none border-0 bg-transparent px-3 pb-11 pt-1.5 pr-24 focus-visible:ring-0"
+      />
+
+      {/* hidden picker behind the image chip */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        aria-hidden
+        tabIndex={-1}
+        onChange={(e) => {
+          void ingestImages(Array.from(e.target.files ?? []));
+          e.target.value = ""; // allow re-picking the same file
+        }}
       />
 
       {/* action buttons */}
@@ -241,6 +308,6 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
 
 function sessionPlaceholder(model: string): string {
   return model === "deepseek-reasoner"
-    ? "Message dsh (R1 will reason step-by-step)…"
-    : "Message dsh… ('/' for commands)";
+    ? "Message dsh (R1 will reason step-by-step)… paste images too"
+    : "Message dsh… ('/' commands · paste images straight in)";
 }
