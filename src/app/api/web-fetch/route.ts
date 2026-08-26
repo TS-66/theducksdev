@@ -1,11 +1,10 @@
 /**
- * DSH Web — serverless web reader proxy backed by z-ai-web-dev-sdk.
+ * Ducky AI | Coder — serverless web reader proxy backed by z-ai-web-dev-sdk.
  *
  * Primary path: the SDK's `page_reader` function (returns extracted HTML +
  * title). Fallback: a plain `fetch()` of the URL with tags stripped to text,
  * capped at 8000 chars — graceful degradation when the backend is unavailable
- * (e.g. Vercel without SDK credentials). Note: upstream docs call this seam
- * `web_reader`; in the installed SDK version the function id is `page_reader`.
+ * (e.g. on serverless without SDK credentials).
  */
 
 import ZAI from 'z-ai-web-dev-sdk';
@@ -74,7 +73,7 @@ async function readViaPlainFetch(url: string) {
   const res = await fetch(url, {
     headers: {
       'User-Agent':
-        'Mozilla/5.0 (compatible; DSHWeb/1.0; +https://github.com/deepseek-ai/deepseek-harness)',
+        'Mozilla/5.0 (compatible; DuckyAICoder/1.0)',
       Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
     },
     signal: AbortSignal.timeout(15_000),

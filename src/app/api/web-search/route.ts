@@ -1,8 +1,8 @@
 /**
- * DSH Web — serverless web search proxy backed by z-ai-web-dev-sdk.
+ * Ducky AI | Coder — serverless web search proxy backed by z-ai-web-dev-sdk.
  * Backend only (the SDK reads config from the filesystem). Everything is
  * wrapped so the route degrades gracefully (501/500 JSON) when the backend
- * is unavailable, e.g. on Vercel without SDK credentials.
+ * is unavailable, e.g. when the SDK backend has no credentials.
  */
 
 import ZAI from 'z-ai-web-dev-sdk';
@@ -46,7 +46,7 @@ export async function POST(req: Request): Promise<Response> {
   } catch (e) {
     return jsonError(
       501,
-      `Web search backend unavailable in this environment (${(e as Error).message}). The dsh-tool-web plugin will be limited to direct fetches.`,
+      `Web search backend unavailable in this environment (${(e as Error).message}). The ducky-tool-web plugin will be limited to direct fetches.`,
     );
   }
 

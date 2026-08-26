@@ -14,26 +14,31 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "dsh web — DeepSeek Harness Web Edition",
+  metadataBase: new URL("https://ducky-ai-coder.local"),
+  title: "Ducky AI | Coder",
   description:
-    "A browser-native recreation of the deepseek-harness agent console: plugin-based tools, virtual workspace, permission gates and streaming DeepSeek models — deployable on Vercel.",
+    "Ducky AI | Coder — a browser-native coding agent console. Plugin-based tools, a virtual workspace filesystem, permission gates and the Ducky 3.5 Coder model, powered by NVIDIA Neutron 3 Ultra (550B) via AIHUBMIX.",
   keywords: [
-    "dsh",
-    "deepseek",
-    "deepseek-harness",
+    "Ducky AI",
+    "Ducky 3.5 Coder",
+    "AIHUBMIX",
+    "Neutron 3 Ultra",
+    "coding agent",
     "agent harness",
     "AI agent",
     "Next.js",
-    "Vercel",
   ],
-  authors: [{ name: "dsh web contributors" }],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+  authors: [{ name: "Ducky AI" }],
+  openGraph: {
+    title: "Ducky AI | Coder",
+    description:
+      "A browser-native coding agent console running Ducky 3.5 Coder — powered by NVIDIA Neutron 3 Ultra (550B) via AIHUBMIX.",
+    images: ["/ducky-logo.png"],
   },
 };
 
 /**
- * Theme decision (Task 2-b): static dark default via `<html className="dark">`.
+ * Theme decision: static dark default via `<html className="dark">`.
  * We intentionally omit next-themes/ThemeProvider to keep zero FOUC and lock
  * the terminal aesthetic. suppressHydrationWarning retained defensively.
  */

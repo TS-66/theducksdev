@@ -1,5 +1,5 @@
 /**
- * DSH Web — serverless vision (multimodal) proxy backed by z-ai-web-dev-sdk.
+ * Ducky AI | Coder — serverless vision (multimodal) proxy backed by z-ai-web-dev-sdk.
  * Backend only: receives a data:image/* URL from the client's virtual
  * workspace and returns the vision model's description. Degrades gracefully
  * (501/500 JSON) when the backend is unavailable, mirroring /api/web-search.

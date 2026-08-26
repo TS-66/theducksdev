@@ -85,8 +85,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.86 0.155 95);
+  --primary-foreground: oklch(0.18 0.02 95);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -96,20 +96,20 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
+  --ring: oklch(0.72 0.13 90);
+  --chart-1: oklch(0.86 0.155 95);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.86 0.155 95);
+  --sidebar-primary-foreground: oklch(0.18 0.02 95);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.72 0.13 90);
 }
 
 @layer base {
@@ -119,9 +119,14 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Ducky brand selection — duck-yellow highlight */
+  ::selection {
+    background: color-mix(in oklab, #fdc00a 32%, transparent);
+    color: inherit;
+  }
 }
 
-/* ───────────────────────── dsh web (Task 2-b) additions ───────────────────── */
+/* ───────────────────── Ducky AI | Coder additions ──────────────────── */
 
 /* Custom scrollbars for internal scrolling regions */
 .custom-scrollbar {
@@ -144,27 +149,27 @@
 }
 
 /* Streaming caret ▊ */
-@keyframes dsh-caret-blink {
+@keyframes ducky-caret-blink {
   50% {
     opacity: 0;
   }
 }
-.dsh-caret {
-  animation: dsh-caret-blink 1.05s steps(2, jump-none) infinite;
+.ducky-caret {
+  animation: ducky-caret-blink 1.05s steps(2, jump-none) infinite;
 }
 
 /* Slow wrench spin while a tool call is inferred as running */
-@keyframes dsh-spin-slow {
+@keyframes ducky-spin-slow {
   to {
     transform: rotate(360deg);
   }
 }
-.dsh-spin-slow {
-  animation: dsh-spin-slow 2.2s linear infinite;
+.ducky-spin-slow {
+  animation: ducky-spin-slow 2.2s linear infinite;
 }
 
 /* Pulsing status dot */
-@keyframes dsh-pulse-dot {
+@keyframes ducky-pulse-dot {
   0%,
   100% {
     opacity: 1;
@@ -173,8 +178,8 @@
     opacity: 0.35;
   }
 }
-.dsh-pulse-dot {
-  animation: dsh-pulse-dot 1.6s ease-in-out infinite;
+.ducky-pulse-dot {
+  animation: ducky-pulse-dot 1.6s ease-in-out infinite;
 }
 
 /*
@@ -186,7 +191,7 @@
  */
 
 /* Subtle dot-grid texture for the chat canvas — terminal blueprint feel */
-.dsh-grid-bg {
+.ducky-grid-bg {
   background-image: radial-gradient(
     circle at 1px 1px,
     color-mix(in oklab, var(--muted-foreground) 14%, transparent) 1px,
@@ -197,7 +202,7 @@
 }
 
 /* Boot-log hero line shimmer */
-@keyframes dsh-boot-line {
+@keyframes ducky-boot-line {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -207,12 +212,12 @@
     transform: translateY(0);
   }
 }
-.dsh-boot-line {
-  animation: dsh-boot-line 0.5s ease-out both;
+.ducky-boot-line {
+  animation: ducky-boot-line 0.5s ease-out both;
 }
 
 /* Activity ledger rows commit-in (staggered via inline animation-delay) */
-@keyframes dsh-commit-in {
+@keyframes ducky-commit-in {
   from {
     opacity: 0;
     transform: translateY(5px) scale(0.995);
@@ -222,17 +227,17 @@
     transform: translateY(0) scale(1);
   }
 }
-.dsh-commit-in {
-  animation: dsh-commit-in 0.24s ease-out both;
+.ducky-commit-in {
+  animation: ducky-commit-in 0.24s ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .dsh-commit-in {
+  .ducky-commit-in {
     animation: none;
   }
 }
 
 /* Checkerboard backdrop behind image previews in the file dialog */
-.dsh-checkerboard {
+.ducky-checkerboard {
   background-image:
     linear-gradient(45deg, color-mix(in oklab, var(--muted) 55%, transparent) 25%, transparent 25%),
     linear-gradient(-45deg, color-mix(in oklab, var(--muted) 55%, transparent) 25%, transparent 25%),

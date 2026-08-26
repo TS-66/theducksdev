@@ -5,31 +5,31 @@ import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ActivityTimelinePanel } from "@/components/dsh/activity-panel";
-import { ApprovalCard } from "@/components/dsh/approval-card";
-import { AskUserCard } from "@/components/dsh/ask-user-card";
-import { ChatStream } from "@/components/dsh/chat-stream";
-import { Composer } from "@/components/dsh/composer";
-import { CommandPalette } from "@/components/dsh/command-palette";
-import { FilePreviewDialog } from "@/components/dsh/file-preview-dialog";
-import { HeaderBar } from "@/components/dsh/header-bar";
-import { PluginsSheet } from "@/components/dsh/plugins-sheet";
-import { SettingsSheet, type SettingsTab } from "@/components/dsh/settings-sheet";
-import { Sidebar } from "@/components/dsh/sidebar";
-import { ShortcutsDialog } from "@/components/dsh/shortcuts-dialog";
-import { StatusBar } from "@/components/dsh/status-bar";
-import { TodoCard } from "@/components/dsh/message-item";
-import { useDshAgent } from "@/hooks/use-dsh-agent";
-import { useDshStore } from "@/lib/dsh/store";
-import type { PermissionPolicy } from "@/lib/dsh/types";
+import { ActivityTimelinePanel } from "@/components/ducky/activity-panel";
+import { ApprovalCard } from "@/components/ducky/approval-card";
+import { AskUserCard } from "@/components/ducky/ask-user-card";
+import { ChatStream } from "@/components/ducky/chat-stream";
+import { Composer } from "@/components/ducky/composer";
+import { CommandPalette } from "@/components/ducky/command-palette";
+import { FilePreviewDialog } from "@/components/ducky/file-preview-dialog";
+import { HeaderBar } from "@/components/ducky/header-bar";
+import { PluginsSheet } from "@/components/ducky/plugins-sheet";
+import { SettingsSheet, type SettingsTab } from "@/components/ducky/settings-sheet";
+import { Sidebar } from "@/components/ducky/sidebar";
+import { ShortcutsDialog } from "@/components/ducky/shortcuts-dialog";
+import { StatusBar } from "@/components/ducky/status-bar";
+import { TodoCard } from "@/components/ducky/message-item";
+import { useDuckyAgent } from "@/hooks/use-ducky-agent";
+import { useDuckyStore } from "@/lib/ducky/store";
+import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
+import type { PermissionPolicy } from "@/lib/ducky/types";
 
-const KNOWN_MODELS = ["deepseek-chat", "deepseek-reasoner"] as const;
 const KNOWN_POLICIES = ["readonly", "ask", "auto"] as const;
 
-export default function DshWebPage() {
-  const hydrated = useDshStore((s) => s.hydrated);
-  const sessions = useDshStore((s) => s.sessions);
-  const activeSessionId = useDshStore((s) => s.activeSessionId);
+export default function DuckyCoderPage() {
+  const hydrated = useDuckyStore((s) => s.hydrated);
+  const sessions = useDuckyStore((s) => s.sessions);
+  const activeSessionId = useDuckyStore((s) => s.activeSessionId);
 
   const [input, setInput] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
@@ -41,7 +41,7 @@ export default function DshWebPage() {
   const [activityOpen, setActivityOpen] = React.useState(false);
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
 
-  const agent = useDshAgent();
+  const agent = useDuckyAgent();
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
 
@@ -50,7 +50,7 @@ export default function DshWebPage() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        useDshStore.getState().newSession();
+        useDuckyStore.getState().newSession();
         toast.success("New task created");
         return;
       }
@@ -84,7 +84,7 @@ export default function DshWebPage() {
 
   /* ── slash-command pipeline ───────────────────────────────────────────── */
   const executeCommand = React.useCallback((raw: string) => {
-    const st = useDshStore.getState();
+    const st = useDuckyStore.getState();
     const sid = st.activeSessionId;
     const parts = raw.trim().split(/\s+/);
     const name = parts[0];
@@ -111,14 +111,13 @@ export default function DshWebPage() {
         break;
       }
       case "/model": {
-        const m = arg as (typeof KNOWN_MODELS)[number];
-        if (!KNOWN_MODELS.includes(m)) {
+        if (arg !== MODEL_ID) {
           return toast.error("Unknown model", {
-            description: "Usage: /model deepseek-chat | deepseek-reasoner",
+            description: `Ducky AI currently ships a single model: ${MODEL_DISPLAY} (/model ${MODEL_ID}).`,
           });
         }
-        st.updateSettings({ model: m });
-        toast.success(`Model switched to ${m}`);
+        st.updateSettings({ model: arg });
+        toast.success(`Model switched to ${MODEL_DISPLAY}`);
         break;
       }
       case "/policy": {
@@ -140,7 +139,7 @@ export default function DshWebPage() {
         if (!sid) return toast.info("Select a session first");
         const target = st.sessions.find((s) => s.id === sid);
         if (!target) return toast.error("Session not found");
-        import("@/lib/dsh/export-md").then(({ downloadSessionMarkdown }) => {
+        import("@/lib/ducky/export-md").then(({ downloadSessionMarkdown }) => {
           downloadSessionMarkdown(target);
           toast.success("Session exported", {
             description: "Markdown transcript downloaded.",
@@ -154,7 +153,7 @@ export default function DshWebPage() {
         if (!target) return toast.error("Session not found");
         const fileCount = Object.keys(target.workspace).length;
         if (fileCount === 0) return toast.info("Workspace is empty — nothing to zip");
-        import("@/lib/dsh/zip").then(({ downloadWorkspaceZip }) => {
+        import("@/lib/ducky/zip").then(({ downloadWorkspaceZip }) => {
           downloadWorkspaceZip(target);
           toast.success("Workspace exported", {
             description: `${fileCount} files zipped — opens in any archive tool.`,
@@ -173,7 +172,7 @@ export default function DshWebPage() {
       case "/backup": {
         const all = st.sessions;
         if (all.length === 0) return toast.info("Nothing to back up yet");
-        import("@/lib/dsh/session-backup").then(({ downloadSessionsBackup }) => {
+        import("@/lib/ducky/session-backup").then(({ downloadSessionsBackup }) => {
           downloadSessionsBackup(all);
           toast.success("Backup downloaded", {
             description: `${all.length} session${all.length === 1 ? "" : "s"} exported as JSON (API key never included).`,
@@ -216,7 +215,7 @@ export default function DshWebPage() {
   const pickPrompt = React.useCallback(
     (prompt: string, opts?: { planMode?: boolean }) => {
       if (opts?.planMode) {
-        const st = useDshStore.getState();
+        const st = useDuckyStore.getState();
         let sid = st.activeSessionId;
         if (!sid || !st.sessions.some((s) => s.id === sid)) sid = st.newSession();
         if (!st.sessions.find((s) => s.id === sid)?.planMode) {
@@ -232,7 +231,7 @@ export default function DshWebPage() {
   );
 
   const newTask = React.useCallback(() => {
-    useDshStore.getState().newSession();
+    useDuckyStore.getState().newSession();
     toast.success("New task created");
   }, []);
 
@@ -245,8 +244,13 @@ export default function DshWebPage() {
   if (!hydrated) {
     return (
       <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-background">
-        <span aria-hidden className="font-mono text-2xl font-bold text-[#4D6BFE] dsh-pulse-dot">
-          ▚ dsh
+        <img
+          src="/ducky-mark.png"
+          alt="Ducky AI logo"
+          className="size-14 rounded-xl border bg-black ducky-pulse-dot"
+        />
+        <span aria-hidden className="font-mono text-lg font-bold text-[#FDC00A]">
+          ducky ai | coder
         </span>
         <div className="w-48 space-y-2">
           <Skeleton className="h-3 w-full" />
