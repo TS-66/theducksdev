@@ -6,6 +6,7 @@ import {
   ClipboardList,
   CloudUpload,
   FilePenLine,
+  Globe,
   ListTodo,
   MessageCircleQuestion,
   PlugZap,
@@ -22,6 +23,8 @@ interface Suggestion {
   prompt: string;
   /** toggles session plan mode before sending (for the exit_plan_mode flow) */
   planMode?: boolean;
+  /** spans the full grid row (for headline capabilities) */
+  fullWidth?: boolean;
 }
 
 const SUGGESTIONS: Suggestion[] = [
@@ -61,6 +64,13 @@ const SUGGESTIONS: Suggestion[] = [
     title: "Try the shell",
     desc: "bash tree && head -n 12 README.md",
     prompt: "bash tree && head -n 12 README.md",
+  },
+  {
+    icon: <Globe className="size-4 text-cyan-400" aria-hidden />,
+    title: "Search the web — real results",
+    desc: "web_search runs server-side via the plugin, no API key needed",
+    prompt: "Search the web for the latest DeepSeek model releases",
+    fullWidth: true,
   },
 ];
 
@@ -135,6 +145,8 @@ export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
               className={cn(
                 "group flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left shadow-sm transition-all hover:border-ring hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 s.planMode && "border-violet-500/30 hover:border-violet-400/60",
+                s.fullWidth &&
+                  "border-cyan-500/30 bg-cyan-500/[0.04] hover:border-cyan-400/60 hover:bg-cyan-500/[0.08] sm:col-span-2",
               )}
             >
               <span className="mt-0.5 shrink-0">{s.icon}</span>

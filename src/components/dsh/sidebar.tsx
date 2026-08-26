@@ -84,6 +84,35 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
     [sessions, query],
   );
 
+  /** git-log day grouping over the sorted list: pinned → today → … */
+  const groups = React.useMemo(() => {
+    const out: Array<{ label: string; items: typeof sorted }> = [];
+    const push = (label: string, s: (typeof sorted)[number]) => {
+      const last = out[out.length - 1];
+      if (last && last.label === label) last.items.push(s);
+      else out.push({ label, items: [s] });
+    };
+    const startOfDay = (t: number) => {
+      const d = new Date(t);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    };
+    const todayStart = startOfDay(Date.now());
+    const DAY = 86_400_000;
+    for (const s of sorted) {
+      if (s.starred) {
+        push("pinned ★", s);
+        continue;
+      }
+      const upd = startOfDay(s.updatedAt);
+      if (upd >= todayStart) push("today", s);
+      else if (upd >= todayStart - DAY) push("yesterday", s);
+      else if (upd >= todayStart - 7 * DAY) push("previous 7 days", s);
+      else push("earlier", s);
+    }
+    return out;
+  }, [sorted]);
+
   const active = sessions.find((s) => s.id === activeSessionId) ?? null;
 
   const newTask = () => {
@@ -196,23 +225,36 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
       )}
       <nav
         aria-label="Sessions"
-        className="custom-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2 pr-1"
+        className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2 pr-1"
       >
         {sorted.length === 0 && (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
             {query ? `No sessions match “${query}”.` : (<>No sessions yet.<br />Press ⌘K or hit “New task”.</>)}
           </p>
         )}
-        {sorted.map((s) => (
-          <SessionRow
-            key={s.id}
-            session={s}
-            active={s.id === activeSessionId}
-            onSelect={() => {
-              useDshStore.getState().selectSession(s.id);
-              onAfterSelect?.();
-            }}
-          />
+        {groups.map((g) => (
+          <div key={g.label} role="group" aria-label={`${g.label} sessions`}>
+            <p
+              className={cn(
+                "sticky top-0 z-10 bg-background/95 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60 backdrop-blur-sm",
+                g.label === "pinned ★" && "text-amber-400/80",
+              )}
+            >
+              {g.label}
+              <span className="ml-1.5 text-muted-foreground/40">{g.items.length}</span>
+            </p>
+            {g.items.map((s) => (
+              <SessionRow
+                key={s.id}
+                session={s}
+                active={s.id === activeSessionId}
+                onSelect={() => {
+                  useDshStore.getState().selectSession(s.id);
+                  onAfterSelect?.();
+                }}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 

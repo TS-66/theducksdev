@@ -162,3 +162,24 @@ Stage Summary:
 - Workspaces export as a genuinely valid .zip (validated against two independent unzip implementations) with zero dependencies added.
 - Risks: zip writer is STORE-only (fine for text ≤256KB vFS cap); dev-server auto-restart by the sandbox remains flaky — if GET / fails, re-run the setsid pattern from this entry rather than plain nohup.
 - Next priorities: i18n zh; paste-image-into-composer; demo routes for /policy + /model feedback; ledger entry → "restore workspace to this point" (time-travel from timeline); sessions sidebar folder/group by day; hook up /api/web-search to demo web_search flow.
+
+---
+Task ID: R7 (cron review round 7)
+Agent: coordinator
+Task: QA stability, ledger time-travel (replay-reconstruct workspace at any commit), REAL web_search demo flow (server-side, no key needed), sidebar day-grouped sessions, hero web-search banner.
+
+Work Log:
+- QA: lint clean, server 200, R6 regression green (sidebar groups render, ledger intact).
+- FEATURE ledger time-travel: timeline.ts reconstructWorkspaceAt(session, entryId) replays every successful write_file/edit_file from SEED_WORKSPACE up to & including the target entry, mirroring the executor's exact replace semantics (replace_all → split/join, else first occurrence; failed old_str match or JSON parse sets `approximate`); bash commands containing file redirects set `approximate` too (content not replayable). workspaceChangeSets(from,to) classifies added/removed/modified for the confirm UI. Unit-tested via bun before browser QA: partial replay stops at the right op, bash redirect flags approximate, changesets correct.
+- UI (activity-panel.tsx): eligible tool rows (write_file/edit_file/bash, ok===true) show a hover-revealed amber RotateCcw "Rewind workspace to this commit" button (stopPropagation so the row's file deep-link doesn't fire). RestorePointButton opens an AlertDialog: mono title with violet sha, replays-N-ops description, drift preview (~modified/+removed-after/−missing lists capped at 4 paths, or "no drift" message), amber approximate caveat, amber Rewind action → replaceWorkspace + toast "Workspace rewound to <sha> (N ops replayed · M files changed)".
+- BROWSER QA time-travel E2E: rewound the "Howdy" session to its FIRST edit commit — dialog correctly showed "~1 MODIFIED src/greet.ts", after Rewind the file preview shows salutation reverted to 'Hello' (second edit undone). Also verified "no drift" path on the latest commit.
+- FEATURE real web_search in demo mode: demo-loop.ts new route (registered BEFORE the keyword routes so search requests always win) — extracts the topic via extractSearchQuery (strips "search the web for/look up/search for" wrappers), streams an intro, then runs the REAL web_search executor (hits /api/web-search → z-ai SDK server-side, zero user key), streams an honest wrap-up (or backend-unavailable note when the route 501s). Capabilities intro lists the new flow. Hero gains a full-width cyan-bordered suggestion "Search the web — real results" (Suggestion.fullWidth → sm:col-span-2).
+- BUG found & fixed during QA: prompt "Search the web for the la[test] DeepSeek model releases" was HIJACKED by the unit-test demo route (/test/ matched the substring inside "latest"). Fixed twice over: test route now word-boundary guarded (/\btests?\b|\btesting\b|unit test|test suite|test review/) AND the web-search route moved physically above it. Retested: query extracts to "the latest DeepSeek model releases", tool card shows SEARCH chip 1.64s, expanded output contains LIVE results (DeepSeek V4 Preview Release · api-docs.deepseek.com · Apr 24, 2026) — genuinely real data, zero config.
+- FEATURE sidebar day grouping: sessions grouped PINNED ★ (amber header) → TODAY → YESTERDAY → PREVIOUS 7 DAYS → EARLIER with sticky mono headers + counts (startOfDay bucketing); empty-state unchanged. QA: starred a session → PINNED ★ 1 group appears above TODAY 9.
+- Mobile 390px render clean. lint 0/0, tsc clean, server 200.
+
+Stage Summary:
+- Demo mode now includes one genuinely-live capability: web_search returns real results with no API key — the strongest zero-config hook yet (hero banner highlights it).
+- The ledger became actionable history: any commit can rewind the vFS via deterministic replay (seed + write/edit ops), with honest caveats when bash writes make it approximate.
+- Risks: replay semantics assume edits re-apply cleanly in order (diverges when a later edit changed text an earlier replay needs — flagged approximate); web_search route depends on SDK availability (501 path handled with a clear message); sidebar groups use updatedAt only (starred always pinned by design).
+- Next priorities: i18n zh; paste-image-into-composer; demo routes for /policy + /model feedback; web_fetch pairing demo ("fetch the first result"); ledger entry → "continue from here" (truncate session after entry); per-session storage usage indicator; hook /api/web-fetch into a demo flow.

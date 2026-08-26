@@ -311,3 +311,116 @@ export function clampDiffInput(s: string, maxLines = 1600): string {
   const lines = s.split("\n");
   return lines.length <= maxLines ? s : `${lines.slice(0, maxLines).join("\n")}\n… (truncated for preview)`;
 }
+
+/* ────────────────────────── time travel (replay) ────────────────────────── */
+
+export interface WorkspaceReconstruction {
+  workspace: Record<string, string>;
+  /** true when something couldn't be replayed exactly (bash redirects, failed edit match) */
+  approximate: boolean;
+  /** number of write/edit operations replayed */
+  opsApplied: number;
+}
+
+/**
+ * Rebuild the workspace as it stood right after a given ledger entry by
+ * replaying every successful write_file / edit_file from the seed tree up to
+ * and including that entry — mirroring the real executor's replace semantics
+ * (replace_all → split/join, else first occurrence).
+ *
+ * bash redirect writes (`echo > file`) are NOT replayable (content lives in
+ * the shell, not in args) — they set `approximate` so the UI can caveat.
+ */
+export function reconstructWorkspaceAt(
+  session: Session,
+  entryId: string,
+): WorkspaceReconstruction | null {
+  const results = new Map<string, ChatMessage>();
+  for (const m of session.messages) {
+    if (m.role === "tool" && m.toolCallId) results.set(m.toolCallId, m);
+  }
+
+  const ws: Record<string, string> = {};
+  for (const [k, v] of Object.entries(SEED_WORKSPACE)) ws[k] = v;
+
+  let approximate = false;
+  let opsApplied = 0;
+  let reached = false;
+
+  for (const m of session.messages) {
+    if (reached) break;
+    if (m.role !== "assistant") continue;
+    for (const call of m.toolCalls ?? []) {
+      const entryKey = `${m.id}:${call.id}`;
+      const res = results.get(call.id);
+      const ok = res ? res.status !== "error" : false;
+      const name = call.function.name;
+
+      if (ok && (name === "write_file" || name === "edit_file")) {
+        try {
+          const o = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+          const p = typeof o.path === "string" ? o.path : "";
+          if (p) {
+            if (name === "write_file" && typeof o.content === "string") {
+              ws[p] = o.content;
+              opsApplied++;
+            } else if (
+              name === "edit_file" &&
+              typeof o.old_str === "string" &&
+              typeof o.new_str === "string"
+            ) {
+              const cur = ws[p];
+              if (typeof cur === "string" && cur.includes(o.old_str)) {
+                ws[p] =
+                  o.replace_all === true
+                    ? cur.split(o.old_str).join(o.new_str)
+                    : cur.replace(o.old_str, o.new_str);
+                opsApplied++;
+              } else {
+                approximate = true;
+              }
+            }
+          }
+        } catch {
+          approximate = true;
+        }
+      } else if (ok && name === "bash") {
+        try {
+          const o = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+          const cmd = typeof o.command === "string" ? o.command : "";
+          // any file redirect ("> out.txt" / ">> log") means replay can't be exact;
+          // fd redirects like "2>/dev/null" may false-positive — harmless (caveat only)
+          if (/> {0,2}>{0,2}\s*[\w./"'-]/.test(cmd)) approximate = true;
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (entryKey === entryId) {
+        reached = true;
+        break;
+      }
+    }
+  }
+
+  if (!reached) return null;
+  return { workspace: ws, approximate, opsApplied };
+}
+
+/** Classify files changed between two workspace snapshots. */
+export function workspaceChangeSets(
+  from: Record<string, string>,
+  to: Record<string, string>,
+): { added: string[]; removed: string[]; modified: string[] } {
+  const added: string[] = [];
+  const removed: string[] = [];
+  const modified: string[] = [];
+  for (const p of Object.keys(to)) {
+    if (!Object.prototype.hasOwnProperty.call(from, p)) added.push(p);
+    else if (to[p] !== from[p]) modified.push(p);
+  }
+  for (const p of Object.keys(from)) {
+    if (!Object.prototype.hasOwnProperty.call(to, p)) removed.push(p);
+  }
+  return { added, removed, modified };
+}

@@ -22,11 +22,23 @@ import {
   GitCommitHorizontal,
   History,
   Loader2,
+  RotateCcw,
   Search,
+  TriangleAlert,
   X,
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sheet,
@@ -46,6 +58,8 @@ import {
   buildTimeline,
   clampDiffInput,
   lineDelta,
+  reconstructWorkspaceAt,
+  workspaceChangeSets,
   workspaceDelta,
   type TimelineEntry,
 } from "@/lib/dsh/timeline";
@@ -271,7 +285,12 @@ function LedgerBrowser({
               : `no entries match “${filter}”.`}
         </p>
       ) : (
-        <LedgerView entries={filtered} onPreviewFile={onPreviewFile} running={running} />
+        <LedgerView
+          entries={filtered}
+          session={session}
+          onPreviewFile={onPreviewFile}
+          running={running}
+        />
       )}
     </>
   );
@@ -344,10 +363,12 @@ function dayLabel(ts: number): string {
 
 function LedgerView({
   entries,
+  session,
   onPreviewFile,
   running,
 }: {
   entries: TimelineEntry[];
+  session: Session;
   onPreviewFile: (path: string) => void;
   running: boolean;
 }) {
@@ -380,6 +401,7 @@ function LedgerView({
             )}
             <LedgerRow
               entry={e}
+              session={session}
               onPreviewFile={onPreviewFile}
               running={running}
               staggerDelay={delay}
@@ -393,11 +415,13 @@ function LedgerView({
 
 function LedgerRow({
   entry: e,
+  session,
   onPreviewFile,
   running,
   staggerDelay = 0,
 }: {
   entry: TimelineEntry;
+  session: Session;
   onPreviewFile: (path: string) => void;
   running: boolean;
   staggerDelay?: number;
@@ -472,6 +496,9 @@ function LedgerRow({
           {e.title}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 pt-0.5">
+          {e.kind === "tool" && e.ok === true && RESTORE_TOOLS.has(e.toolName ?? "") && (
+            <RestorePointButton entry={e} session={session} />
+          )}
           {dur && (
             <span className="rounded bg-muted/70 px-1 font-mono text-[9px] text-muted-foreground">
               {dur}
@@ -505,6 +532,155 @@ function LedgerRow({
       {node}
       {body}
     </li>
+  );
+}
+
+/* ─────────────────────────── time-travel restore ────────────────────────── */
+
+const RESTORE_TOOLS = new Set(["write_file", "edit_file", "bash"]);
+
+function RestorePointButton({ entry: e, session }: { entry: TimelineEntry; session: Session }) {
+  const [open, setOpen] = React.useState(false);
+
+  const reconstruction = React.useMemo(
+    () => (open ? reconstructWorkspaceAt(session, e.id) : null),
+    [open, session, e.id],
+  );
+
+  const changes = React.useMemo(
+    () => (reconstruction ? workspaceChangeSets(session.workspace, reconstruction.workspace) : null),
+    [reconstruction, session.workspace],
+  );
+
+  const totalChanges = changes
+    ? changes.added.length + changes.removed.length + changes.modified.length
+    : 0;
+
+  const confirmRestore = () => {
+    if (!reconstruction) {
+      toast.error("Cannot rewind", { description: "This entry can't be replayed." });
+      setOpen(false);
+      return;
+    }
+    useDshStore.getState().replaceWorkspace(session.id, reconstruction.workspace);
+    toast.success(`Workspace rewound to ${e.sha}`, {
+      description: `${reconstruction.opsApplied} write/edit op${reconstruction.opsApplied === 1 ? "" : "s"} replayed · ${totalChanges} file${totalChanges === 1 ? "" : "s"} changed.`,
+    });
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Restore workspace to commit ${e.sha}`}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              setOpen(true);
+            }}
+            className="rounded-sm p-0.5 text-muted-foreground/0 transition-all hover:!text-amber-400 focus-visible:text-amber-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:text-muted-foreground/70"
+          >
+            <RotateCcw className="size-3" aria-hidden />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Rewind workspace to this commit</TooltipContent>
+      </Tooltip>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-mono">
+              rewind workspace to <span className="text-violet-400">{e.sha}</span>?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Replays every successful write/edit from the seed tree up to and including this
+              entry ({e.toolName} at {hhmm(e.ts)}), then replaces the current workspace.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {changes && (
+            <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-xs">
+              {totalChanges === 0 ? (
+                <p className="font-mono text-muted-foreground">
+                  no drift — the replayed state matches the current workspace.
+                </p>
+              ) : (
+                <>
+                  {changes.modified.length > 0 && (
+                    <ChangeList
+                      tone="mod"
+                      label={`~${changes.modified.length} modified`}
+                      paths={changes.modified}
+                    />
+                  )}
+                  {changes.added.length > 0 && (
+                    <ChangeList
+                      tone="add"
+                      label={`+${changes.added.length} removed from current`}
+                      paths={changes.added}
+                    />
+                  )}
+                  {changes.removed.length > 0 && (
+                    <ChangeList
+                      tone="del"
+                      label={`−${changes.removed.length} missing after rewind`}
+                      paths={changes.removed}
+                    />
+                  )}
+                </>
+              )}
+              {reconstruction?.approximate && (
+                <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-400">
+                  <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
+                  This history includes bash redirect writes the replay can't reproduce — the
+                  rewound state may differ from the exact historical moment.
+                </p>
+              )}
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRestore}
+              className="bg-amber-600 text-white hover:bg-amber-600/90"
+            >
+              <RotateCcw className="mr-1.5 size-3.5" aria-hidden /> Rewind
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function ChangeList({
+  tone,
+  label,
+  paths,
+}: {
+  tone: "add" | "mod" | "del";
+  label: string;
+  paths: string[];
+}) {
+  const toneCls =
+    tone === "add"
+      ? "text-emerald-400"
+      : tone === "mod"
+        ? "text-amber-400"
+        : "text-red-400";
+  return (
+    <div>
+      <p className={cn("font-mono text-[10px] font-semibold uppercase tracking-wide", toneCls)}>
+        {label}
+      </p>
+      <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+        {paths.slice(0, 4).join(" · ")}
+        {paths.length > 4 ? ` · +${paths.length - 4} more` : ""}
+      </p>
+    </div>
   );
 }
 

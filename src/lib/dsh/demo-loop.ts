@@ -75,6 +75,21 @@ function fmtNum(n: number): string {
   return n.toLocaleString('en-US');
 }
 
+/**
+ * Pull the actual search topic out of a natural-language request:
+ * "search the web for deepseek models" → "deepseek models".
+ */
+function extractSearchQuery(raw: string): string {
+  let q = raw.trim();
+  q = q.replace(/^(please|can you|could you|dsh[,:]?|hey)\s+/i, '');
+  q = q.replace(/^(web\s*search|search\s+(the\s+web|online|the\s+internet))(\s+for|\s+about|\s+:)\s*/i, '');
+  q = q.replace(/^look\s*up(\s+on( the)? web)?(\s+for|\s+about)?\s*/i, '');
+  q = q.replace(/^search\s+for\s+/i, '');
+  q = q.replace(/^(for|about)\s+/i, '');
+  q = q.replace(/[?.!]+$/, '');
+  return q.length > 0 ? q : raw.trim();
+}
+
 export async function runDemoTurn(opts: DemoTurnOptions): Promise<void> {
   const { onEvent, signal } = opts;
   const emitSafe = (e: AgentEvent) => {
@@ -300,8 +315,36 @@ Check them with the sidebar preview or \`cat LICENSE\` in the composer. With a r
       return;
     }
 
+    /* ------------------------- route: web search (REAL) ------------------- */
+    // Unlike the other demo flows, web_search executes against our serverless
+    // proxy (z-ai SDK backend) — it needs NO user API key, so this route is
+    // genuinely live even in demo mode. Registered before the keyword routes
+    // so explicit search requests always win.
+    if (/(search|look ?up|find)\b[^\n]{0,80}\b(web|online|internet)\b|^web ?search|^search (the web|online|for)/.test(text)) {
+      if (can('web_search')) {
+        const q = extractSearchQuery(opts.userText);
+        await streamText(
+          `Demo mode — but this one is **real**: \`web_search\` runs through the server-side plugin proxy and needs no model key. Searching for “${q}”…\n\n`,
+          emitSafe,
+          signal,
+        );
+        const result = await runTool('web_search', { query: q, num: 6 });
+        const failed = /^Error:/i.test(result) || /no results/i.test(result);
+        await streamText(
+          failed
+            ? `\nThe search backend didn't return results here (${result.trim()}). On a deployed instance with the SDK configured this same call returns live results — and with an API key the agent would rank, fetch and synthesize them for you.`
+            : `\nThose are **live results** fetched by the harness plugin — nothing scripted. In a full session the agent would rank them, \`web_fetch\` the promising links and synthesize an answer with citations.\n\nTry another topic anytime: “search the web for …”.`,
+          emitSafe,
+          signal,
+        );
+        emitSafe({ type: 'done', aborted: false });
+        return;
+      }
+    }
+
     /* ------------------------- route: unit tests ------------------------- */
-    if (/test/.test(text)) {
+    // word-boundary guarded: "latest" must NOT trigger the test review
+    if (/\btests?\b|\btesting\b|unit test|test suite|test review/.test(text)) {
       await streamText(
         `Demo mode — scripted test review, but the reads are real.\n\n`,
         emitSafe,
@@ -484,6 +527,7 @@ Try one of these:
 - **“change the default greeting to Howdy”** — real \`edit_file\` calls with live diff views
 - **“write a checklist for the refactor”** — real \`todo_write\`, rendered as the checklist card
 - **“interview me about the greeting style”** — real \`ask_user_question\` bridge
+- **“search the web for deepseek models”** — real \`web_search\` via the server-side plugin (works even in demo)
 - **Toggle Plan mode, then send any task** — research → drafted plan → \`exit_plan_mode\` approval card
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 
