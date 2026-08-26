@@ -89,6 +89,12 @@ export interface Session {
   planDraft?: string;
   /** running counters */
   stats: { promptTokens: number; completionTokens: number; toolCalls: number };
+  /**
+   * URLs returned by this session's most recent live `web_search`, persisted
+   * so ordinal follow-ups like "fetch the first result" survive page reloads.
+   * Kept deliberately small (≤20 entries).
+   */
+  lastSearchUrls?: string[];
 }
 
 /* -------------------------------- Plugins --------------------------------- */

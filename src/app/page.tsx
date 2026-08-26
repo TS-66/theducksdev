@@ -10,6 +10,7 @@ import { ApprovalCard } from "@/components/dsh/approval-card";
 import { AskUserCard } from "@/components/dsh/ask-user-card";
 import { ChatStream } from "@/components/dsh/chat-stream";
 import { Composer } from "@/components/dsh/composer";
+import { CommandPalette } from "@/components/dsh/command-palette";
 import { FilePreviewDialog } from "@/components/dsh/file-preview-dialog";
 import { HeaderBar } from "@/components/dsh/header-bar";
 import { PluginsSheet } from "@/components/dsh/plugins-sheet";
@@ -36,6 +37,7 @@ export default function DshWebPage() {
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab | undefined>(undefined);
   const [pluginsOpen, setPluginsOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
+  const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [activityOpen, setActivityOpen] = React.useState(false);
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
 
@@ -55,6 +57,11 @@ export default function DshWebPage() {
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
@@ -336,7 +343,23 @@ export default function DshWebPage() {
         </main>
       </div>
 
-      <StatusBar onOpenPlugins={() => setPluginsOpen(true)} onOpenActivity={() => setActivityOpen(true)} />
+      <StatusBar
+        onOpenPlugins={() => setPluginsOpen(true)}
+        onOpenActivity={() => setActivityOpen(true)}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onRunCommand={executeCommand}
+        onStageText={(t) => {
+          setInput(t);
+          toast.info("Command staged", { description: "Finish the argument and press Enter." });
+        }}
+        onPreviewFile={setPreviewPath}
+        onToggleActivity={() => setActivityOpen((v) => !v)}
+      />
 
       {/* globals */}
       <SettingsSheet

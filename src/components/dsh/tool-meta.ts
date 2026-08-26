@@ -13,6 +13,7 @@ import {
   Globe,
   HelpCircle,
   ListTodo,
+  ScanEye,
   ScanText,
   SquareTerminal,
   TextSearch,
@@ -102,6 +103,12 @@ const REGISTRY: Record<string, ToolMeta> = {
     tint: "text-cyan-400",
     accent: "border-l-cyan-400/70",
     label: "fetch",
+  },
+  vision_describe: {
+    icon: ScanEye,
+    tint: "text-pink-400",
+    accent: "border-l-pink-400/70",
+    label: "vision",
   },
   ask_user_question: {
     icon: HelpCircle,

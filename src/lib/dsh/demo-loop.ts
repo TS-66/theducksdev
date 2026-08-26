@@ -13,6 +13,7 @@
 
 import type { AgentEvent, ChatMessage, Settings, TodoItem } from './types';
 import { PLUGINS, resolveEnabledPluginIds } from './plugins';
+import { isImageEntry } from './images';
 
 interface DemoTurnOptions {
   sessionId: string;
@@ -39,6 +40,10 @@ interface DemoTurnOptions {
   onPlanExit?: () => Promise<boolean>;
   /** persist the drafted plan into session state (shown later in approval cards) */
   setPlanDraft?: (draft: string) => void;
+  /** URLs of the most recent live web_search for this session (survives reloads) */
+  getSearchUrls?: () => string[];
+  /** store a fresh web_search URL list; empty array clears it */
+  setSearchUrls?: (urls: string[]) => void;
   onEvent: (e: AgentEvent) => void;
   signal: AbortSignal;
 }
@@ -78,9 +83,9 @@ function fmtNum(n: number): string {
 /**
  * Recent web_search results per session, so a follow-up like
  * “fetch the first result” can resolve against the REAL last search.
- * Client-side demo memory only — deliberately ephemeral.
+ * Persisted via `Session.lastSearchUrls` through the store accessors,
+ * so ordinals survive page reloads.
  */
-const lastSearchUrls = new Map<string, string[]>();
 
 const ORDINALS: Array<[RegExp, number]> = [
   [/\b(?:first|top|1st|leading|best)\b/, 0],
@@ -241,6 +246,63 @@ _Awaiting your approval to exit plan mode._`;
       return;
     }
 
+    /* ------------------------- route: vision describe (REAL) ------------- */
+    // Pasted/picked images live in the vFS as data URLs; vision_describe sends
+    // them through the server-side multimodal proxy — no user key needed.
+    {
+      const imagePaths = opts
+        .listFiles()
+        .filter((f) => isImageEntry(f, opts.readFile(f) ?? ""));
+      const mentionsImage =
+        /\b(image|picture|photo|screenshot|screencap|attachment)\b|\.(png|jpe?g|gif|webp)\b/i.test(
+          text,
+        );
+      const wantsVision =
+        mentionsImage &&
+        /\b(describe|explain|analy[sz]e|inspect|look (?:at|into)|view|read|see|caption|ocr|recogni[sz]e|summar(?:y|ize)|what(?:'s| is|s) (?:in|on))\b/.test(
+          text,
+        );
+      if (can('vision_describe') && wantsVision) {
+        if (imagePaths.length === 0) {
+          await streamText(
+            `I'd happily run a **real** \`vision_describe\` — but this session's workspace has no images yet.\n\nDrop one in first: paste an image straight into the composer (⌘V) or use the **image** chip above the input box. It lands in \`images/\` as a data URL, previewable from the sidebar tree. Then ask me *“describe the image”* and I'll analyze it through the server-side multimodal proxy.`,
+            emitSafe,
+            signal,
+          );
+          emitSafe({ type: 'done', aborted: false });
+          return;
+        }
+        const lowerUser = opts.userText.toLowerCase();
+        const explicit = imagePaths.find((p) => {
+          const base = (p.split('/').pop() ?? p).toLowerCase();
+          return lowerUser.includes(p.toLowerCase()) || lowerUser.includes(base);
+        });
+        const target = explicit ?? imagePaths[imagePaths.length - 1];
+        await streamText(
+          `Demo mode — but this one is **real**: \`${target}\` goes through the server-side \`vision_describe\` proxy and needs no model key. Analyzing…\n\n`,
+          emitSafe,
+          signal,
+        );
+        const result = await runTool('vision_describe', { path: target });
+        const failed = /^Error:/i.test(result);
+        if (failed) {
+          await streamText(
+            `\nThe vision backend didn't respond here (${result.trim()}). On a deployed instance with the SDK configured this same call returns a genuine multimodal description of your image.`,
+            emitSafe,
+            signal,
+          );
+        } else {
+          await streamText(
+            `## Vision analysis — \`${target}\`\n\n${result}\n\nThat's a **real** multimodal read of your image, streamed straight from the server-side plugin — nothing scripted. Paste another screenshot and try *“what's in the new image?”*, or ask a pointed follow-up like *“any text visible in ${target.split('/').pop()}?”*`,
+            emitSafe,
+            signal,
+          );
+        }
+        emitSafe({ type: 'done', aborted: false });
+        return;
+      }
+    }
+
     /* ------------------------- route: web fetch (REAL) ------------------- */
     // Pairs with the web_search route: either an explicit URL in the message,
     // or an ordinal reference resolved from THIS session's last live search.
@@ -253,7 +315,7 @@ _Awaiting your approval to exit plan mode._`;
       let targetUrl: string | null = explicitUrl;
       if (!targetUrl && wantsFetch && /\b(web|result|link|url|page|article|site)\b/.test(text)) {
         const idx = ordinalIndex(text);
-        const stored = lastSearchUrls.get(opts.sessionId) ?? [];
+        const stored = opts.getSearchUrls?.() ?? [];
         if (idx >= 0 && stored[idx]) targetUrl = stored[idx];
         else if (/\b(?:first|top)\b/.test(text) && stored[0]) targetUrl = stored[0];
       }
@@ -416,8 +478,7 @@ Check them with the sidebar preview or \`cat LICENSE\` in the composer. With a r
         const failed = /^Error:/i.test(result) || /no results/i.test(result);
         // remember the real URLs so “fetch the first result” works next turn
         const urls = [...result.matchAll(/\((https?:\/\/[^)\s]+)\)/g)].map((m) => m[1]);
-        if (urls.length > 0) lastSearchUrls.set(opts.sessionId, urls);
-        else lastSearchUrls.delete(opts.sessionId);
+        opts.setSearchUrls?.(urls.length > 0 ? urls : []);
         await streamText(
           failed
             ? `\nThe search backend didn't return results here (${result.trim()}). On a deployed instance with the SDK configured this same call returns live results — and with an API key the agent would rank, fetch and synthesize them for you.`
@@ -617,6 +678,7 @@ Try one of these:
 - **“interview me about the greeting style”** — real \`ask_user_question\` bridge
 - **“search the web for deepseek models”** — real \`web_search\` via the server-side plugin (works even in demo)
 - **“fetch the first result”** — real \`web_fetch\` reads the page behind your last search's top hit
+- **Paste an image, then ask “describe the image”** — real \`vision_describe\` multimodal analysis
 - **Toggle Plan mode, then send any task** — research → drafted plan → \`exit_plan_mode\` approval card
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 

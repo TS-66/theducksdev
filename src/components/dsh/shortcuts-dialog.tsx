@@ -18,6 +18,7 @@ import { SLASH_COMMANDS } from "./composer";
 
 const SHORTCUTS: Array<{ keys: string[]; action: string; scope: string }> = [
   { keys: ["⌘", "K"], action: "New task", scope: "global" },
+  { keys: ["⌘", "P"], action: "Command palette — sessions, files, commands", scope: "global" },
   { keys: ["⌘", "E"], action: "Toggle activity timeline", scope: "global" },
   { keys: ["⌘", "/"], action: "Toggle this cheat sheet", scope: "global" },
   { keys: ["?"], action: "Toggle this cheat sheet", scope: "global" },

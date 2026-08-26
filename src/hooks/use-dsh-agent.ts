@@ -445,6 +445,9 @@ export function useDshAgent() {
           planModeActive: session.planMode,
           onPlanExit: onPlanExitBridge,
           setPlanDraft: (d) => useDshStore.getState().setPlanDraft(sid, d),
+          getSearchUrls: () =>
+            useDshStore.getState().sessions.find((s) => s.id === sid)?.lastSearchUrls ?? [],
+          setSearchUrls: (urls) => useDshStore.getState().setSessionSearchUrls(sid, urls),
           onEvent: handleEvent,
           signal: controller.signal,
         });

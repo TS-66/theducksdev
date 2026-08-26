@@ -163,6 +163,8 @@ interface DshActions {
   setTodos(sessionId: string, todos: TodoItem[]): void;
   setPlanMode(sessionId: string, on: boolean): void;
   setPlanDraft(sessionId: string, draft: string): void;
+  /** Persist the URL list of the last live web_search for ordinal fetches. */
+  setSessionSearchUrls(sessionId: string, urls: string[]): void;
   bumpStats(
     sessionId: string,
     patch: { promptTokens?: number; completionTokens?: number; toolCalls?: number },
@@ -420,6 +422,16 @@ export const useDshStore = create<DshStore>()(
 
       setPlanDraft(sessionId, draft) {
         set((st) => mapSession(st, sessionId, (s) => ({ ...s, planDraft: draft })));
+      },
+
+      setSessionSearchUrls(sessionId, urls) {
+        const capped = urls.slice(0, 20);
+        set((st) =>
+          mapSession(st, sessionId, (s) => ({
+            ...s,
+            lastSearchUrls: capped.length > 0 ? capped : undefined,
+          })),
+        );
       },
 
       bumpStats(sessionId, patch) {

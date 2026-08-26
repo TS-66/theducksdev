@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, FlaskConical, GitBranch, Hand, Plug, Wrench, Zap } from "lucide-react";
+import { Command, Eye, FlaskConical, GitBranch, Hand, Plug, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -36,9 +36,12 @@ const POLICY_META: Record<
 export function StatusBar({
   onOpenPlugins,
   onOpenActivity,
+  onOpenPalette,
 }: {
   onOpenPlugins: () => void;
   onOpenActivity?: () => void;
+  /** open the ⌘P command palette (status-bar affordance) */
+  onOpenPalette?: () => void;
 }) {
   const sessions = useDshStore((s) => s.sessions);
   const activeSessionId = useDshStore((s) => s.activeSessionId);
@@ -125,6 +128,23 @@ export function StatusBar({
             </TooltipTrigger>
             <TooltipContent side="top">
               Activity timeline — ledger of every prompt, tool call and file change (⌘E)
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {onOpenPalette && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onOpenPalette}
+                className="hidden items-center gap-1 rounded border border-border/70 bg-background px-1.5 py-px transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:flex"
+                aria-label="Open command palette (⌘P)"
+              >
+                <Command className="size-3" aria-hidden /> ⌘P
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Command palette — jump between sessions, files and commands
             </TooltipContent>
           </Tooltip>
         )}

@@ -121,10 +121,16 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
   const surface = (
     <div
       className={cn(
-        "relative mx-auto w-full max-w-3xl rounded-xl border bg-card shadow-sm transition-shadow focus-within:ring-1 focus-within:ring-ring",
+        "group/composer relative mx-auto w-full max-w-3xl rounded-xl border bg-card shadow-sm transition-all duration-200",
+        "focus-within:border-[#4D6BFE]/55 focus-within:shadow-[0_0_0_4px_rgba(77,107,254,0.10),0_8px_24px_-12px_rgba(77,107,254,0.25)]",
         disabledSurface && "opacity-70",
       )}
     >
+      {/* focus glow hairline (top edge) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#4D6BFE]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
+      />
       {/* top chip row */}
       <div className="flex items-center gap-1 px-2 pt-1.5">
         <Select

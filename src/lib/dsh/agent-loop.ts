@@ -28,6 +28,7 @@ import {
   type ToolExecutionContext,
 } from './plugins';
 import { webFetch, webSearch } from './tools-web';
+import { visionDescribe } from './tools-vision';
 import { useDshStore } from './store';
 
 /* ------------------------- extended loop options --------------------------- */
@@ -263,6 +264,7 @@ export function buildExecutors(
     setTodos: (todos) => useDshStore.getState().setTodos(opts.sessionId, todos),
     webSearch: (query, num) => webSearch(query, num),
     webFetch: (url) => webFetch(url),
+    visionDescribe: (imageDataUrl, question) => visionDescribe(imageDataUrl, question),
   };
 
   const executors: Record<string, (args: Record<string, unknown>) => Promise<string>> = {};

@@ -99,6 +99,16 @@ export const PLUGINS: PluginManifest[] = [
     defaultEnabled: true,
   },
   {
+    id: `${PLUGIN_PREFIX}dsh-tool-vision`,
+    name: 'dsh-tool-vision',
+    version: '1.0.0',
+    description:
+      'Multimodal perception for the harness: vision_describe sends workspace images (pasted screenshots, dropped photos — stored as data URLs) through a server-proxied vision model that returns a faithful description. The eyes plugin among the everything-is-a-plugin lineup.',
+    tools: ['vision_describe'],
+    category: 'interaction',
+    defaultEnabled: true,
+  },
+  {
     id: `${PLUGIN_PREFIX}dsh-tool-ask-user`,
     name: 'dsh-tool-ask-user',
     version: '1.0.0',
@@ -325,6 +335,19 @@ export function buildToolDefinitions(): ToolDefinition[] {
       parameters: obj({ url: str('Absolute http(s) URL to fetch.') }, ['url']),
     },
     {
+      name: 'vision_describe',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}dsh-tool-vision`).id,
+      description:
+        'Analyze an image stored in the workspace (e.g. a pasted screenshot under images/) with a multimodal model. Returns a plain-text description of subject, colors, composition and any visible text.',
+      parameters: obj(
+        {
+          path: str('Workspace-relative path of the image file to analyze.'),
+          prompt: str('Optional specific question about the image; defaults to a full description.'),
+        },
+        ['path'],
+      ),
+    },
+    {
       name: 'ask_user_question',
       pluginId: byPlugin(`${PLUGIN_PREFIX}dsh-tool-ask-user`).id,
       description:
@@ -404,6 +427,8 @@ export interface ToolExecutionContext {
   setTodos(todos: TodoItem[]): void;
   webSearch(query: string, num?: number): Promise<string>;
   webFetch(url: string): Promise<string>;
+  /** server-side multimodal description of a vFS image (data URL) */
+  visionDescribe(imageDataUrl: string, question?: string): Promise<string>;
 }
 
 export type ToolExecutor = (args: Record<string, unknown>) => Promise<string>;
@@ -554,5 +579,19 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
       const url = asString(args.url).trim();
       if (!/^https?:\/\//i.test(url)) throw new Error('web_fetch: "url" must be an absolute http(s) URL');
       return ctx.webFetch(url);
+    },
+
+  vision_describe:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      const content = p ? ctx.readFile(p) : null;
+      if (content === null) throw new Error(`File not found: ${p || '/'} (list images with glob "images/*")`);
+      const question = asString(args.prompt).trim() || undefined;
+      try {
+        return await ctx.visionDescribe(content, question);
+      } catch (e) {
+        throw new Error(`vision_describe failed on ${p}: ${(e as Error).message}`);
+      }
     },
 };

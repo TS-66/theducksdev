@@ -92,6 +92,7 @@ const TOOL_LABELS: Record<string, string> = {
   subagent: "delegated to subagent",
   web_search: "web search",
   web_fetch: "web fetch",
+  vision_describe: "vision",
 };
 
 function toolTitle(name: string): string {
@@ -119,6 +120,11 @@ function toolSubject(name: string, argsRaw: string): string {
     }
     if (name === "web_search" && typeof o.query === "string") return trunc(o.query, 72);
     if (name === "web_fetch" && typeof o.url === "string") return trunc(o.url, 72);
+    if (name === "vision_describe" && typeof o.path === "string") {
+      return typeof o.prompt === "string" && o.prompt.trim()
+        ? `${o.path} — ${trunc(o.prompt.trim(), 48)}`
+        : o.path;
+    }
     if (name === "subagent" && typeof o.task === "string") return trunc(o.task.split("\n")[0], 72);
   } catch {
     /* fall through */
