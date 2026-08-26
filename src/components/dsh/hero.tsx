@@ -3,20 +3,25 @@
 import { motion } from "framer-motion";
 import {
   BookOpenText,
+  ClipboardList,
   CloudUpload,
   FilePenLine,
   ListTodo,
+  MessageCircleQuestion,
   PlugZap,
   ShieldCheck,
   SquareTerminal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface Suggestion {
   icon: React.ReactNode;
   title: string;
   desc: string;
   prompt: string;
+  /** toggles session plan mode before sending (for the exit_plan_mode flow) */
+  planMode?: boolean;
 }
 
 const SUGGESTIONS: Suggestion[] = [
@@ -31,6 +36,19 @@ const SUGGESTIONS: Suggestion[] = [
     title: "Live edit + diff",
     desc: "Change the default greeting to Howdy",
     prompt: "Change the default greeting to Howdy",
+  },
+  {
+    icon: <ClipboardList className="size-4 text-violet-400" aria-hidden />,
+    title: "Plan mode + approval",
+    desc: "Drafts a plan, then exit_plan_mode asks for your sign-off",
+    prompt: "Refactor the greeting module to support i18n templates",
+    planMode: true,
+  },
+  {
+    icon: <MessageCircleQuestion className="size-4 text-orange-400" aria-hidden />,
+    title: "Interview me",
+    desc: "ask_user_question collects your greeting preferences",
+    prompt: "Interview me about the greeting style",
   },
   {
     icon: <ListTodo className="size-4 text-teal-400" aria-hidden />,
@@ -49,7 +67,7 @@ const SUGGESTIONS: Suggestion[] = [
 interface HeroProps {
   /** no session exists yet — swap CTA emphasis */
   variant?: "welcome" | "empty-session";
-  onPick: (prompt: string) => void;
+  onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
   onNewTask: () => void;
 }
 
@@ -113,8 +131,11 @@ export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
             <button
               key={s.title}
               type="button"
-              onClick={() => onPick(s.prompt)}
-              className="group flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left shadow-sm transition-all hover:border-ring hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onClick={() => onPick(s.prompt, s.planMode ? { planMode: true } : undefined)}
+              className={cn(
+                "group flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left shadow-sm transition-all hover:border-ring hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                s.planMode && "border-violet-500/30 hover:border-violet-400/60",
+              )}
             >
               <span className="mt-0.5 shrink-0">{s.icon}</span>
               <span className="min-w-0">

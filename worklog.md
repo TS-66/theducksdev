@@ -96,3 +96,27 @@ Stage Summary:
 - Workspace is user-creatable (new file dialog), closing the loop between human and agent state.
 - Risks: demo routing keyword-based; hero still slightly tall on short screens (suggestions below fold at <700px height — acceptable, scrolls).
 - Next: /plan demo variant with exit_plan_mode approval, drag-drop file upload to vFS, i18n zh, streaming markdown table alignment polish, session duplicate action.
+
+---
+Task ID: R3 (cron review round 3)
+Agent: coordinator
+Task: QA stability, plan-mode demo flow with exit_plan_mode approval, workspace file import (drag-drop + picker), session duplicate, jump-to-latest chip, styling polish.
+
+Work Log:
+- QA: page 200s, previous flows intact → stable, proceeded to features.
+- FEATURE plan-mode demo (demo-loop.ts): new intercepting route — while session.planMode is on, EVERY demo message goes research(bash tree + read README) → streams a full markdown implementation plan (objective/current state/phases/files-touched/risks, goal echoed from user text) → persists draft via new setPlanDraft bridge → emits exit_plan_mode tool events around the REAL onPlanExit bridge (hook's onPlanExitBridge). Approve → tool result "User approved the plan." + outro, plan mode flips off (existing bridge behavior); Keep planning → result "did NOT approve" + stay-in-plan-mode outro. Hook passes planModeActive/onPlanExit/setPlanDraft into runDemoTurn; approval card now receives the ACTUAL truncated plan draft as argsPreview (was a static hint string).
+- FEATURE violet plan-review card (approval-card.tsx): request.toolName === 'exit_plan_mode' renders a distinct ClipboardCheck violet card — "Plan ready for review", plan draft in a bordered pre, "Keep planning" / "Approve & proceed" buttons; amber permission card unchanged for other tools.
+- FEATURE workspace import (sidebar.tsx): Upload icon button opens hidden multi-file input; workspace file-tree block is now a drop zone (dragDepth counter, emerald ring + dashed overlay "drop to import → virtual FS" while hovering). importFiles(): text-like filter (mime + 40+ extension whitelist), 256 KB cap, 12-file batch, path de-collide (name → name-1.ext), toasts summary with skip count, auto-opens preview of last import. Hidden input value reset for re-picks.
+- FEATURE session duplicate: store.duplicateSession(id) deep-copies messages/workspace/todos/stats (planMode reset off, planDraft cleared), title "… (copy)", inserted at top + selected; sidebar dropdown "Duplicate" item (Copy icon) with toast.
+- FEATURE jump-to-latest chip (chat-stream.tsx): stream wrapped in `relative flex flex-col` container; viewport scroll listener toggles a floating "jump to latest" / "live — jump" (animated arrow while running) chip when >260px from bottom; click smooth-scrolls to bottom. Hero-branch untouched.
+- STYLING: markdown tables now zebra-striped (odd:bg-muted/20) with hover tint + transitions; hero suggestions expanded to 6 (2×3 grid) adding violet-bordered "Plan mode + approval" (auto-toggles plan mode via new onPick opts plumbing Hero→ChatStream→page pickPrompt) and orange "Interview me" (ask_user_question flow).
+- BUG found & fixed during QA: the new ChatStream wrapper div wasn't a flex container → ScrollArea blew out to content height and PAINTED OVER the approval deck/composer (Approve button unclickable, covered by message text). Fixed with `relative flex min-h-0 flex-1 flex-col`.
+- BUG fixed: over-escaped backticks in the demo plan draft template (stray \\' artifacts from editing) broke esbuild parse — rewrote the template line programmatically with correct \` escapes.
+- Browser QA all green: plan flow approve path (draft streamed → violet card with real plan → approve → "plan mode is now off", exit_plan_mode card 12.45s wait) AND decline path ("Plan kept open", mode stays on); import E2E (2 files uploaded → tree + toast + auto-preview with line counts); duplicate E2E (copy session, 9 files cloned incl. imports); jump chip appears on scroll-up, disappears on click; mobile 390px render clean. lint 0/0, tsc clean (project code).
+
+Stage Summary:
+- Demo mode now covers the FULL harness lifecycle: research → plan → exit_plan_mode approval → execute, plus todos and ask-user — zero-config showcase complete.
+- Workspace is now user-populatable from the outside (drag-drop/picker import), making the vFS feel like a real workspace rather than a fixed fixture.
+- Session management round-trip complete: create/rename/star/export/duplicate/delete.
+- Risks: plan route only in demo engine (live agent already had exit_plan_mode via loop); import limited to text files ≤256 KB by design; duplicated sessions reset plan mode (intentional).
+- Next: i18n zh, token-usage per-message tooltip expansion, workspace export as .zip/.tar, git-timeline style session event panel, paste-image-into-composer flow, demo route for /policy + /model slash commands.

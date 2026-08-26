@@ -294,10 +294,12 @@ export function useDshAgent() {
       });
 
     const onPlanExitBridge = async (): Promise<boolean> => {
+      const draftPreview =
+        useDshStore.getState().sessions.find((s) => s.id === sid)?.planDraft ?? '';
       const approved = await requestApprovalBridge({
         toolName: 'exit_plan_mode',
-        argsPreview: useDshStore.getState().sessions.find((s) => s.id === sid)?.planDraft
-          ? 'Plan draft available in session state.'
+        argsPreview: draftPreview.trim()
+          ? truncatePreview(draftPreview, 1200)
           : 'The plan was presented in the conversation above.',
         reason: 'Approving ends plan mode and unlocks write tools.',
       });
@@ -440,6 +442,9 @@ export function useDshAgent() {
           readFile: (p) => useDshStore.getState().getFile(sid, p),
           todos: session.todos,
           askUser: askUserBridge,
+          planModeActive: session.planMode,
+          onPlanExit: onPlanExitBridge,
+          setPlanDraft: (d) => useDshStore.getState().setPlanDraft(sid, d),
           onEvent: handleEvent,
           signal: controller.signal,
         });

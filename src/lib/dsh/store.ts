@@ -132,6 +132,8 @@ interface DshActions {
   deleteSession(id: string): void;
   renameSession(id: string, title: string): void;
   toggleStar(id: string): void;
+  /** Deep-copy messages/workspace/todos/stats into a fresh session; selects it. Returns the new id ("" if source missing). */
+  duplicateSession(id: string): string;
   clearAllSessions(): void;
   /** Compatibility alias expected by the UI side: clears messages + todos, keeps the session. */
   clearSession(sessionId: string): void;
@@ -244,6 +246,26 @@ export const useDshStore = create<DshStore>()(
 
       toggleStar(id) {
         set((st) => mapSession(st, id, (s) => ({ ...s, starred: !s.starred })));
+      },
+
+      duplicateSession(id) {
+        const src = get().sessions.find((s) => s.id === id);
+        if (!src) return '';
+        const copy = {
+          id: uid(),
+          title: `${src.title} (copy)`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          starred: false,
+          messages: src.messages.map((m) => ({ ...m })),
+          workspace: { ...src.workspace },
+          todos: src.todos.map((t) => ({ ...t })),
+          planMode: false, // duplicated session starts with write tools unlocked
+          planDraft: undefined as string | undefined,
+          stats: { ...src.stats },
+        };
+        set((st) => ({ sessions: [copy, ...st.sessions], activeSessionId: copy.id }));
+        return copy.id;
       },
 
       clearAllSessions() {

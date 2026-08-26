@@ -125,7 +125,11 @@ const components: Components = {
     );
   },
   tr({ children }) {
-    return <tr className="[&:not(:last-child)]:border-b">{children}</tr>;
+    return (
+      <tr className="transition-colors odd:bg-muted/20 hover:bg-muted/40 [&:not(:last-child)]:border-b">
+        {children}
+      </tr>
+    );
   },
 };
 

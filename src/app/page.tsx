@@ -161,9 +161,18 @@ export default function DshWebPage() {
     [doSend],
   );
 
-  /** hero suggestion path: stage text then auto-send */
+  /** hero suggestion path: stage text then auto-send (may flip plan mode on) */
   const pickPrompt = React.useCallback(
-    (prompt: string) => {
+    (prompt: string, opts?: { planMode?: boolean }) => {
+      if (opts?.planMode) {
+        const st = useDshStore.getState();
+        let sid = st.activeSessionId;
+        if (!sid || !st.sessions.some((s) => s.id === sid)) sid = st.newSession();
+        if (!st.sessions.find((s) => s.id === sid)?.planMode) {
+          st.setPlanMode(sid, true);
+          toast.success("Plan mode ON", { description: "Drafting a plan before any writes." });
+        }
+      }
       setInput(prompt);
       void doSend(prompt);
       setTimeout(() => setInput(""), 0);

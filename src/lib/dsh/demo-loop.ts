@@ -33,6 +33,12 @@ interface DemoTurnOptions {
     options?: Array<{ label: string; description?: string }>;
     multi_select?: boolean;
   }>) => Promise<string>;
+  /** whether the session currently has plan mode toggled on */
+  planModeActive?: boolean;
+  /** bridge that shows the plan-approval card; resolves with the user's decision */
+  onPlanExit?: () => Promise<boolean>;
+  /** persist the drafted plan into session state (shown later in approval cards) */
+  setPlanDraft?: (draft: string) => void;
   onEvent: (e: AgentEvent) => void;
   signal: AbortSignal;
 }
@@ -122,6 +128,77 @@ export async function runDemoTurn(opts: DemoTurnOptions): Promise<void> {
   const text = opts.userText.toLowerCase();
 
   try {
+    /* ------------------------- route: plan mode --------------------------- */
+    // Plan mode intercepts EVERYTHING: while active the harness must stay
+    // read-only, research, then hand a plan to exit_plan_mode for approval.
+    if (opts.planModeActive && can('exit_plan_mode')) {
+      await streamText(
+        `Demo mode — **plan mode is active**, so I'll stay read-only and draft an implementation plan first.\n\n`,
+        emitSafe,
+        signal,
+      );
+      if (can('bash')) await runTool('bash', { command: 'tree' });
+      if (can('read_file')) await runTool('read_file', { path: 'README.md', limit: 12 });
+
+      const goal =
+        opts.userText.length > 84 ? `${opts.userText.slice(0, 84)}…` : opts.userText;
+      const files = opts.listFiles();
+      const hasTests = files.some((f) => f.includes('test'));
+      const touchFiles = [
+        'src/greet.ts',
+        'src/index.ts',
+        ...(hasTests ? ['tests/greet.test.ts'] : []),
+        'README.md',
+      ];
+
+      const draft = `# Implementation plan — ${goal}
+
+## Objective
+${opts.userText}
+
+## Current state\n\n- Workspace \`greeting-service\` tracks ${files.length} files; entrypoint is \`src/index.ts\`.\n- Greeting copy lives in \`src/greet.ts\`; CLI flags are parsed inline.\n\n## Phases\n\n1. **Research** — read the touched modules and map call sites (read-only).\n2. **Implement** — apply focused edits via \`edit_file\`, one concern per diff.\n3. **Verify** — run the shell checks / tests and grep the result.\n4. **Document** — update the README section for behavior changes.\n\n## Files touched\n\n${touchFiles.map((f) => `- \`${f}\``).join('\n')}\n\n## Risks & mitigations\n\n- Template drift → keep fallbacks behind defaults, covered by unit tests.\n- CLI surface churn → additive flags only; deprecate before removing.
+
+_Awaiting your approval to exit plan mode._`;
+
+      opts.setPlanDraft?.(draft);
+      await streamText(`## Implementation plan\n\n${draft}\n\n`, emitSafe, signal);
+
+      const callId = `demo_plan_${Date.now()}`;
+      emitSafe({
+        type: 'tool-call-start',
+        callId,
+        name: 'exit_plan_mode',
+        argsRaw: JSON.stringify({ summary: goal }),
+      });
+      const started = Date.now();
+      let approved = false;
+      let ok = true;
+      try {
+        approved = (await opts.onPlanExit?.()) === true;
+      } catch {
+        ok = false;
+      }
+      emitSafe({
+        type: 'tool-call-end',
+        callId,
+        name: 'exit_plan_mode',
+        ok,
+        result: approved
+          ? 'User approved the plan.'
+          : 'The user did NOT approve the plan yet. Keep refining; stay read-only while in plan mode.',
+        durationMs: Date.now() - started,
+      });
+      await streamText(
+        approved
+          ? `\n✅ Plan approved — plan mode is now **off** and write tools are unlocked. With a real DeepSeek key I'd execute this plan with live diffs; in demo mode ask *“change the default greeting to Howdy”* to see the edit flow.`
+          : `\n⏸ Plan kept open — you're still in plan mode. Ask me to adjust any phase, or approve the card when you're ready to proceed.`,
+        emitSafe,
+        signal,
+      );
+      emitSafe({ type: 'done', aborted: false });
+      return;
+    }
+
     /* ------------------------- route: shell playground ------------------- */
     const shellMatch = text.match(
       /(?:^|\bbash\b|\brun\s+|\bexec\s+)[\s`'"“”]*\b(ls|cat|tree|find|grep|wc|head|tail|pwd|echo|mkdir|touch|rm|mv|cp|date|uname|whoami)\b([^\n]*)/i,
@@ -407,6 +484,7 @@ Try one of these:
 - **“change the default greeting to Howdy”** — real \`edit_file\` calls with live diff views
 - **“write a checklist for the refactor”** — real \`todo_write\`, rendered as the checklist card
 - **“interview me about the greeting style”** — real \`ask_user_question\` bridge
+- **Toggle Plan mode, then send any task** — research → drafted plan → \`exit_plan_mode\` approval card
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 
 Then paste your DeepSeek API key in **Settings → Models** to unlock the full agent loop with \`deepseek-chat\` / \`deepseek-reasoner\`.`;

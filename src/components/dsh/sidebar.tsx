@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  Copy,
   Download,
   FilePlus2,
   FolderTree,
@@ -12,6 +13,7 @@ import {
   Search,
   Star,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -62,6 +64,9 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
   const activeSessionId = useDshStore((s) => s.activeSessionId);
   const [query, setQuery] = React.useState("");
   const [newFileOpen, setNewFileOpen] = React.useState(false);
+  const [dragOver, setDragOver] = React.useState(false);
+  const dragDepth = React.useRef(0);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const sorted = React.useMemo(
     () =>
@@ -84,6 +89,62 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
     useDshStore.getState().newSession();
     toast.success("New task created");
     onAfterSelect?.();
+  };
+
+  /* ── workspace file import (drag-drop / picker) ─────────────────────── */
+  const importFiles = async (list: FileList | File[]) => {
+    if (!active) return;
+    const files = Array.from(list).slice(0, 12);
+    if (!files.length) return;
+    const store = useDshStore.getState();
+    const taken = new Set(store.listWorkspaceFiles(active.id));
+    const created: string[] = [];
+    let skipped = 0;
+
+    for (const f of files) {
+      const textLike =
+        f.type.startsWith("text/") ||
+        f.type === "application/json" ||
+        /\.(txt|md|markdown|json|jsonc|ts|tsx|js|jsx|mjs|cjs|css|scss|html|htm|xml|yml|yaml|toml|csv|tsv|sh|bash|zsh|env|ini|cfg|conf|gitignore|editorconfig|log|rs|py|rb|go|java|c|h|cpp|hpp|sql|graphql|prisma)$/i.test(
+          f.name,
+        );
+      if (!textLike || f.size > 256 * 1024) {
+        skipped++;
+        continue;
+      }
+      try {
+        const content = await f.text();
+        // de-collide against existing workspace entries and earlier imports
+        let path = f.name.replace(/^\/+/, "");
+        if (taken.has(path)) {
+          const dot = path.lastIndexOf(".");
+          const base = dot > 0 ? path.slice(0, dot) : path;
+          const ext = dot > 0 ? path.slice(dot) : "";
+          let n = 1;
+          while (taken.has(`${base}-${n}${ext}`)) n++;
+          path = `${base}-${n}${ext}`;
+        }
+        taken.add(path);
+        store.writeFile(active.id, path, content);
+        created.push(path);
+      } catch {
+        skipped++;
+      }
+    }
+
+    if (created.length > 0) {
+      toast.success(`Imported ${created.length} file${created.length === 1 ? "" : "s"}`, {
+        description:
+          skipped > 0
+            ? `${skipped} skipped (binary or >256 KB)`
+            : `${created.slice(0, 3).join(", ")}${created.length > 3 ? ` +${created.length - 3} more` : ""}`,
+      });
+      onPreviewFile(created[created.length - 1]);
+    } else {
+      toast.error("Nothing imported", {
+        description: "Only text-like files up to 256 KB can enter the virtual FS.",
+      });
+    }
   };
 
   return (
@@ -181,6 +242,21 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
               <Button
                 size="icon"
                 variant="ghost"
+                aria-label="Import workspace files"
+                disabled={!active}
+                onClick={() => fileInputRef.current?.click()}
+                className="size-6 rounded-sm"
+              >
+                <Upload className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Import files (or drop them below)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
                 aria-label="Reset workspace to seed files"
                 disabled={!active}
                 onClick={() => {
@@ -196,16 +272,69 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
             <TooltipContent>Reset to seed</TooltipContent>
           </Tooltip>
         </div>
-        <div className="custom-scrollbar max-h-56 overflow-y-auto rounded-md bg-muted/20 p-1">
-          {active ? (
-            <FileTree
-              workspace={active.workspace}
-              onOpenFile={(p) => onPreviewFile(p)}
-            />
-          ) : (
-            <p className="p-3 text-center text-xs text-muted-foreground">No active session.</p>
+        <div
+          className={cn(
+            "relative rounded-md transition-shadow",
+            active && dragOver && "ring-2 ring-emerald-500/70 ring-offset-1 ring-offset-background",
+          )}
+          aria-label={active ? "Workspace files — drop text files here to import" : undefined}
+          onDragEnter={(e) => {
+            if (!active) return;
+            e.preventDefault();
+            dragDepth.current += 1;
+            setDragOver(true);
+          }}
+          onDragOver={(e) => {
+            if (!active) return;
+            e.preventDefault();
+          }}
+          onDragLeave={() => {
+            dragDepth.current -= 1;
+            if (dragDepth.current <= 0) {
+              dragDepth.current = 0;
+              setDragOver(false);
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            dragDepth.current = 0;
+            setDragOver(false);
+            if (active && e.dataTransfer.files.length) void importFiles(e.dataTransfer.files);
+          }}
+        >
+          <div className="custom-scrollbar max-h-56 overflow-y-auto rounded-md bg-muted/20 p-1">
+            {active ? (
+              <FileTree
+                workspace={active.workspace}
+                onOpenFile={(p) => onPreviewFile(p)}
+              />
+            ) : (
+              <p className="p-3 text-center text-xs text-muted-foreground">No active session.</p>
+            )}
+          </div>
+          {active && dragOver && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-emerald-500/70 bg-background/80 backdrop-blur-[2px]"
+            >
+              <span className="flex items-center gap-1.5 font-mono text-[11px] font-medium text-emerald-500">
+                <Upload className="size-3.5" /> drop to import → virtual FS
+              </span>
+            </div>
           )}
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(e) => {
+            if (e.target.files?.length) void importFiles(e.target.files);
+            e.target.value = ""; // allow re-picking the same file later
+          }}
+        />
         <p className="mt-1 px-1 font-mono text-[10px] text-muted-foreground/70">
           {active ? Object.keys(active.workspace).length : 0} files · virtual FS in your browser
         </p>
@@ -390,6 +519,17 @@ function SessionRow({
         <DropdownMenuContent align="end" className="w-40">
           <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
             <Pencil className="mr-2 size-3.5" /> Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              const newId = useDshStore.getState().duplicateSession(session.id);
+              if (newId)
+                toast.success("Session duplicated", {
+                  description: `“${session.title} (copy)” — messages, workspace and todos cloned.`,
+                });
+            }}
+          >
+            <Copy className="mr-2 size-3.5" /> Duplicate
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => useDshStore.getState().toggleStar(session.id)}>
             <Star className="mr-2 size-3.5" /> {session.starred ? "Unstar" : "Star"}
