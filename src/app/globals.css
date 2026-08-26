@@ -184,3 +184,29 @@
  * flash-of-light-theme. Light :root tokens above remain valid if someone
  * removes the class manually.
  */
+
+/* Subtle dot-grid texture for the chat canvas — terminal blueprint feel */
+.dsh-grid-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--muted-foreground) 14%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, transparent, black 12%, black 82%, transparent);
+}
+
+/* Boot-log hero line shimmer */
+@keyframes dsh-boot-line {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dsh-boot-line {
+  animation: dsh-boot-line 0.5s ease-out both;
+}

@@ -46,7 +46,7 @@ export function ChatStream({ sessionRunning, onPick, onNewTask }: ChatStreamProp
   if (!session || visible.length === 0) {
     return (
       <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto min-h-full max-w-3xl px-4 py-6 md:px-8">
+        <div className="dsh-grid-bg mx-auto min-h-full max-w-3xl px-4 py-6 md:px-8">
           <Hero
             variant={session ? "welcome" : "empty-session"}
             onPick={onPick}
@@ -59,7 +59,7 @@ export function ChatStream({ sessionRunning, onPick, onNewTask }: ChatStreamProp
 
   return (
     <ScrollArea ref={rootRef} className="min-h-0 flex-1">
-      <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-8">
+      <div className="dsh-grid-bg mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-8">
         {visible.map((m) => (
           <MessageItem
             key={m.id}

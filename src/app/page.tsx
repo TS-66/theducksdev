@@ -14,6 +14,7 @@ import { HeaderBar } from "@/components/dsh/header-bar";
 import { PluginsSheet } from "@/components/dsh/plugins-sheet";
 import { SettingsSheet, type SettingsTab } from "@/components/dsh/settings-sheet";
 import { Sidebar } from "@/components/dsh/sidebar";
+import { ShortcutsDialog } from "@/components/dsh/shortcuts-dialog";
 import { StatusBar } from "@/components/dsh/status-bar";
 import { TodoCard } from "@/components/dsh/message-item";
 import { useDshAgent } from "@/hooks/use-dsh-agent";
@@ -33,6 +34,7 @@ export default function DshWebPage() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab | undefined>(undefined);
   const [pluginsOpen, setPluginsOpen] = React.useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
 
   const agent = useDshAgent();
@@ -46,6 +48,20 @@ export default function DshWebPage() {
         e.preventDefault();
         useDshStore.getState().newSession();
         toast.success("New task created");
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+        return;
+      }
+      if (
+        e.key === "?" &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -276,6 +292,7 @@ export default function DshWebPage() {
         initialTab={settingsTab}
       />
       <PluginsSheet open={pluginsOpen} onOpenChange={setPluginsOpen} />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <FilePreviewDialog
         path={previewPath}
         content={

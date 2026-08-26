@@ -60,6 +60,21 @@ export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
   const enabledCount = PLUGINS.length - disabledPlugins.length;
   const policy = settings.policy;
 
+  /** top 3 sessions by token usage, for the usage tooltip */
+  const topSessions = React.useMemo(
+    () =>
+      [...sessions]
+        .sort(
+          (a, b) =>
+            b.stats.promptTokens +
+            b.stats.completionTokens -
+            (a.stats.promptTokens + a.stats.completionTokens),
+        )
+        .slice(0, 3)
+        .filter((s) => s.stats.promptTokens + s.stats.completionTokens > 0),
+    [sessions],
+  );
+
   const cyclePolicy = () => {
     const idx = POLICY_ORDER.indexOf(policy);
     const next = POLICY_ORDER[(idx + 1) % POLICY_ORDER.length];
@@ -109,9 +124,6 @@ export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
         <span className="flex items-center gap-1" title="Tool calls executed">
           <Wrench className="size-3" aria-hidden /> {totals.toolCalls}
         </span>
-        <span className="flex items-center gap-1" title="Tokens used (all sessions)">
-          <Zap className="size-3" aria-hidden /> {fmtK(totals.tokens)}
-        </span>
         <button
           type="button"
           onClick={onOpenPlugins}
@@ -120,6 +132,33 @@ export function StatusBar({ onOpenPlugins }: { onOpenPlugins: () => void }) {
         >
           <Plug className="size-3" aria-hidden /> {enabledCount}/{PLUGINS.length}
         </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="flex cursor-help items-center gap-1 rounded px-1 transition-colors hover:text-foreground"
+              aria-label={`Token usage: ${totals.tokens} across ${sessions.length} sessions`}
+            >
+              <Zap className="size-3" aria-hidden /> {fmtK(totals.tokens)}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-64">
+            <p className="mb-1 font-semibold">Token usage (all sessions)</p>
+            {topSessions.length === 0 ? (
+              <p className="text-muted-foreground">No usage yet — send a message with a live key.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {topSessions.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3">
+                    <span className="max-w-40 truncate">{s.title}</span>
+                    <span className="font-mono text-[10px]">
+                      {fmtK(s.stats.promptTokens + s.stats.completionTokens)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* right */}

@@ -4,11 +4,11 @@ import { motion } from "framer-motion";
 import {
   BookOpenText,
   CloudUpload,
+  FilePenLine,
+  ListTodo,
   PlugZap,
-  Scale,
   ShieldCheck,
   SquareTerminal,
-  TestTube2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,22 +27,22 @@ const SUGGESTIONS: Suggestion[] = [
     prompt: "Summarize this repository and identify its main packages",
   },
   {
-    icon: <Scale className="size-4 text-[#4D6BFE]" aria-hidden />,
-    title: "Add licensing & deploy",
-    desc: "Add a LICENSE file and a deploy script",
-    prompt: "Add a LICENSE file and a deploy script",
+    icon: <FilePenLine className="size-4 text-amber-400" aria-hidden />,
+    title: "Live edit + diff",
+    desc: "Change the default greeting to Howdy",
+    prompt: "Change the default greeting to Howdy",
   },
   {
-    icon: <TestTube2 className="size-4 text-[#4D6BFE]" aria-hidden />,
-    title: "Write unit tests",
-    desc: "Write unit tests for src/greet.ts, run them conceptually",
-    prompt: "Write unit tests for src/greet.ts, run them conceptually",
+    icon: <ListTodo className="size-4 text-teal-400" aria-hidden />,
+    title: "Plan with todos",
+    desc: "Write a checklist for the refactor",
+    prompt: "Write a checklist for the refactor",
   },
   {
-    icon: <SquareTerminal className="size-4 text-[#4D6BFE]" aria-hidden />,
+    icon: <SquareTerminal className="size-4 text-emerald-400" aria-hidden />,
     title: "Try the shell",
-    desc: "What does bash 'ls -la && cat README.md | head -n 20' return?",
-    prompt: "What does bash 'ls -la && cat README.md | head -n 20' return?",
+    desc: "bash tree && head -n 12 README.md",
+    prompt: "bash tree && head -n 12 README.md",
   },
 ];
 
@@ -59,7 +59,7 @@ export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="flex min-h-full flex-col items-center justify-center py-10 text-center"
+      className="flex min-h-full flex-col items-center justify-center py-6 text-center"
     >
       <h1 className="bg-gradient-to-r from-[#4D6BFE] to-purple-500 bg-clip-text font-mono text-5xl font-bold tracking-tight text-transparent md:text-6xl">
         ▚ dsh
@@ -67,25 +67,44 @@ export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
       <p className="mt-3 text-sm italic text-muted-foreground md:text-base">
         Everything is a plugin.
       </p>
-      <p className="mt-3 max-w-md px-4 text-xs leading-relaxed text-muted-foreground md:text-[13px]">
+      <p className="mt-2 max-w-md px-4 text-xs leading-relaxed text-muted-foreground md:text-[13px]">
         A browser-native recreation of the deepseek-harness console — streaming DeepSeek models,
         a virtual workspace filesystem and permission gates, with your API key stored locally
         only.
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
         <BadgeMini icon={<ShieldCheck className="size-3" />} label="Key stays local" />
         <BadgeMini icon={<PlugZap className="size-3" />} label="8 plugins" />
         <BadgeMini icon={<CloudUpload className="size-3" />} label="Vercel-ready" />
       </div>
 
+      {/* boot log strip — pure decoration */}
+      <div
+        aria-hidden
+        className="mt-4 w-full max-w-md overflow-hidden rounded-md border bg-[#0d1117] px-3 py-2 text-left font-mono text-[10px] leading-relaxed text-muted-foreground"
+      >
+        <p className="dsh-boot-line" style={{ animationDelay: "0.05s" }}>
+          <span className="text-emerald-400">✓</span> cordis runtime ready
+        </p>
+        <p className="dsh-boot-line" style={{ animationDelay: "0.25s" }}>
+          <span className="text-emerald-400">✓</span> 8 plugins loaded · tools registered
+        </p>
+        <p className="dsh-boot-line" style={{ animationDelay: "0.45s" }}>
+          <span className="text-emerald-400">✓</span> virtual workspace mounted (/greeting-service)
+        </p>
+        <p className="dsh-boot-line text-[#4D6BFE]" style={{ animationDelay: "0.65s" }}>
+          ▸ awaiting your first task…
+        </p>
+      </div>
+
       {variant === "empty-session" && (
-        <Button onClick={onNewTask} className="mt-5">
+        <Button onClick={onNewTask} className="mt-4">
           Start a new task
         </Button>
       )}
 
-      <div className="mt-8 w-full max-w-xl px-4">
+      <div className="mt-5 w-full max-w-xl px-4">
         <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground/70">
           Try:
         </p>

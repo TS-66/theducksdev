@@ -76,3 +76,23 @@ Stage Summary:
 - Tool cards are tool-specific with diff previews for edits — closest yet to upstream's tool-owned presentation.
 - Known risk: demo regex routing is keyword-based (fine for golden paths); live agent path unchanged and still requires key or DEEPSEEK_API_KEY env.
 - Next suggestions: ask_user_question/exit_plan_mode demo variants, token-usage tooltip breakdown, i18n zh, keyboard shortcut help dialog, workspace file upload/paste-create.
+
+---
+Task ID: R2 (cron review round 2)
+Agent: coordinator
+Task: QA stability, showcase demo flows (diff/todos/ask), workspace file creation, shortcuts dialog, styling polish.
+
+Work Log:
+- QA: dev 200s, no page errors → stable, proceeded to features.
+- DEMO flows expanded (demo-loop.ts): ①edit flow ("change the default greeting to Howdy") — read src/greet.ts + two REAL edit_file calls + verification grep → showcases the diff cards (−1 +1 EDIT PREVIEW, auto-expand); ②todos flow ("write a checklist for the refactor") — REAL todo_write, TodoCard renders 1/5 state; ③ask flow ("interview me about the greeting style") — emits tool events around a DIRECT askUser bridge call (ask_user_question has no executor by design, mirrors live-loop special case), AskUserCard radio groups → answers echo back as JSON code block. Hero suggestions updated to feature all flows (Live edit + diff, Plan with todos, Try the shell). Capabilities intro lists 6 routes.
+- Bug found & fixed in QA: duplicate React keys in shortcuts-dialog (two entries shared action label "Toggle this cheat sheet") → key on keys.join("+"); verified clean console after fix.
+- FEATURE: NewFileDialog in sidebar workspace header (FilePlus2 button) — path validation (collision check, illegal chars), optional content textarea with chars/lines counter, creates real vFS entry + toast + auto-opens preview; file tree live-updates (docs/ dir appears).
+- FEATURE: ShortcutsDialog (⌘/ or "?" toggle) — terminal cheat sheet w/ kbd chips + scope badges (global/composer), Windows hint. Wired in page.tsx keyboard handler (⌘K, ⌘/, ?, guarded against typing in inputs).
+- STYLING: status-bar Zap count now hover-tooltip with per-session token breakdown (top 3); chat canvas gets .dsh-grid-bg subtle dot-grid texture w/ fade mask (globals.css); hero tightened (py-6, reduced margins) + animated boot-log strip (dsh-boot-line, staggered delays: cordis ready → plugins → workspace → awaiting task); suggestion icons color-coded per flow.
+- Browser QA: edit flow (2 diffs + grep output visible), ask flow (answered Ahoy/Two(!!) → JSON echo), todos flow (card 1/5), Ctrl+/ dialog, new-file dialog E2E (docs/architecture.md created+previewed), mobile 390px render. lint 0/0, tsc clean.
+
+Stage Summary:
+- Demo mode now covers every interactive surface: bash, reads, writes+diffs, todos, ask-user — the full harness experience works with zero config.
+- Workspace is user-creatable (new file dialog), closing the loop between human and agent state.
+- Risks: demo routing keyword-based; hero still slightly tall on short screens (suggestions below fold at <700px height — acceptable, scrolls).
+- Next: /plan demo variant with exit_plan_mode approval, drag-drop file upload to vFS, i18n zh, streaming markdown table alignment polish, session duplicate action.

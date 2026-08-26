@@ -25,6 +25,14 @@ interface DemoTurnOptions {
   listFiles: () => string[];
   readFile: (path: string) => string | null;
   todos: TodoItem[];
+  /** interactive question bridge (same wire format as the live loop) */
+  askUser?: (questions: Array<{
+    id: string;
+    question: string;
+    header?: string;
+    options?: Array<{ label: string; description?: string }>;
+    multi_select?: boolean;
+  }>) => Promise<string>;
   onEvent: (e: AgentEvent) => void;
   signal: AbortSignal;
 }
@@ -250,6 +258,142 @@ Run them with \`bun test\` — or ask the live agent to add them via \`edit_file
       return;
     }
 
+    /* ------------------------- route: live edit (diff demo) -------------- */
+    if (
+      /howdy|change .*greeting|default salutation|edit .*greet|rename .*greet|switch .*greeting/.test(
+        text,
+      )
+    ) {
+      await streamText(
+        `Demo mode — scripting a real **edit_file** call so you can see the diff view. First, reading the target file.\n\n`,
+        emitSafe,
+        signal,
+      );
+      if (can('read_file')) await runTool('read_file', { path: 'src/greet.ts' });
+      if (can('edit_file')) {
+        await runTool('edit_file', {
+          path: 'src/greet.ts',
+          old_str: `export interface GreetOptions {\n  /** Leading word, defaults to "Hello". */`,
+          new_str: `export interface GreetOptions {\n  /** Leading word, defaults to "Howdy". */`,
+        });
+        await runTool('edit_file', {
+          path: 'src/greet.ts',
+          old_str: `    this.salutation = options.salutation ?? 'Hello';`,
+          new_str: `    this.salutation = options.salutation ?? 'Howdy';`,
+        });
+      }
+      if (can('bash')) await runTool('bash', { command: "grep -n 'Howdy' src/greet.ts" });
+      const outro = `Done — two edits applied to \`src/greet.ts\` (check the diff cards above, and preview the file in the sidebar):
+
+1. \`GreetOptions\` docstring now documents the **\"Howdy\"** default
+2. \`GreetingService\` fallback is \`'Howdy'\` instead of \`'Hello'\`
+
+The edit cards show exactly what changed — that's the tool-owned presentation layer at work. Undo by asking the live agent (with an API key) to swap it back.`;
+      await streamText(`\n${outro}`, emitSafe, signal);
+      emitSafe({ type: 'done', aborted: false });
+      return;
+    }
+
+    /* ------------------------- route: todos / checklist ------------------ */
+    if (/(write|make|create|draft) .*(todo|checklist)|plan.*(refactor|release|work)|checklist/.test(text)) {
+      await streamText(
+        `Demo mode — scripting a \`todo_write\` call. The checklist below is real session state, rendered by the UI exactly like the harness.\n\n`,
+        emitSafe,
+        signal,
+      );
+      if (can('todo_write')) {
+        await runTool('todo_write', {
+          todos: [
+            { content: 'Extract greeting templates into i18n module', status: 'completed' },
+            { content: 'Add locale negotiation helper (accept-language)', status: 'in_progress' },
+            { content: 'Port CLI flags to yargs-style parser', status: 'pending' },
+            { content: 'Raise test coverage above 90%', status: 'pending' },
+            { content: 'Publish 0.2.0 with changelog', status: 'pending' },
+          ],
+        });
+      }
+      const outro = `Checklist written — ${5} items, 1 in progress, 3 pending. The TodoCard persists in the composer deck and stays visible while you work; the live agent updates it via \`todo_write\` as it progresses through real tasks.
+
+Ask me to *“edit the greeting defaults”* next and watch the todo flow hand off to a real file edit.`;
+      await streamText(`\n${outro}`, emitSafe, signal);
+      emitSafe({ type: 'done', aborted: false });
+      return;
+    }
+
+    /* ------------------------- route: ask the user ------------------------ */
+    if (/ask me|interview|my preference|survey me/.test(text)) {
+      await streamText(
+        `Demo mode — calling the real \`ask_user_question\` tool. Your answer comes back through the same bridge the live agent uses.\n\n`,
+        emitSafe,
+        signal,
+      );
+      if (can('ask_user_question') && opts.askUser) {
+        // ask_user_question is bridge-wired (like the live loop's special
+        // case), so emit tool events around the direct bridge call.
+        const callId = `demo_ask_${Date.now()}`;
+        const askArgs = {
+          questions: [
+            {
+              id: 'salutation_style',
+              header: 'Greeting style',
+              question: 'Which salutation should greeting-service default to?',
+              options: [
+                { label: 'Howdy (Recommended)', description: 'Friendly, western, great for demos.' },
+                { label: 'Hello', description: 'Neutral classic — current default.' },
+                { label: 'Ahoy', description: 'Nautical flair for the bold.' },
+              ],
+            },
+            {
+              id: 'enthusiasm',
+              header: 'Enthusiasm',
+              question: 'How many exclamation marks by default?',
+              options: [
+                { label: 'One (!)', description: 'Professional warmth.' },
+                { label: 'Two (!!) (Recommended)', description: 'The README example standard.' },
+                { label: 'Three (!!!)', description: 'Maximum energy.' },
+              ],
+            },
+          ],
+        };
+        emitSafe({
+          type: 'tool-call-start',
+          callId,
+          name: 'ask_user_question',
+          argsRaw: JSON.stringify(askArgs),
+        });
+        const started = Date.now();
+        let answer: string;
+        let ok = true;
+        try {
+          answer = await opts.askUser(askArgs.questions);
+        } catch (e) {
+          ok = false;
+          answer = `Error: ${(e as Error).message}`;
+        }
+        emitSafe({
+          type: 'tool-call-end',
+          callId,
+          name: 'ask_user_question',
+          ok,
+          result: `The user answered:\n${answer}`.slice(0, 4_000),
+          durationMs: Date.now() - started,
+        });
+        await streamText(
+          `\nGot it — the tool bridge returned:\n\n\`\`\`json\n${answer}\n\`\`\`\n\nWith a live key the agent would take this straight into an \`edit_file\` call and update \`src/greet.ts\` accordingly.`,
+          emitSafe,
+          signal,
+        );
+      } else if (can('ask_user_question')) {
+        await streamText(
+          `\n(This session runs without an interactive bridge connected — the live agent would pause here for your answer.)`,
+          emitSafe,
+          signal,
+        );
+      }
+      emitSafe({ type: 'done', aborted: false });
+      return;
+    }
+
     /* ------------------------- default: capabilities --------------------- */
     const files = opts.listFiles();
     const bytes = Object.values(opts.listFiles()).length;
@@ -260,7 +404,9 @@ Try one of these:
 
 - **“summarize this repository”** — runs \`tree\` + real file reads, then reports structure
 - **“add a LICENSE file and a deploy script”** — genuinely writes two files you can preview
-- **“review the unit tests”** — reads the test suite and suggests additions
+- **“change the default greeting to Howdy”** — real \`edit_file\` calls with live diff views
+- **“write a checklist for the refactor”** — real \`todo_write\`, rendered as the checklist card
+- **“interview me about the greeting style”** — real \`ask_user_question\` bridge
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 
 Then paste your DeepSeek API key in **Settings → Models** to unlock the full agent loop with \`deepseek-chat\` / \`deepseek-reasoner\`.`;

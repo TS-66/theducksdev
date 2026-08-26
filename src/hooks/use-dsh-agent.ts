@@ -439,6 +439,7 @@ export function useDshAgent() {
           listFiles: () => useDshStore.getState().listWorkspaceFiles(sid),
           readFile: (p) => useDshStore.getState().getFile(sid, p),
           todos: session.todos,
+          askUser: askUserBridge,
           onEvent: handleEvent,
           signal: controller.signal,
         });

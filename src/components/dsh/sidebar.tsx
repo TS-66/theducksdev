@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   Download,
+  FilePlus2,
   FolderTree,
   MoreHorizontal,
   Pencil,
@@ -28,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -39,6 +41,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
@@ -57,6 +61,7 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
   const sessions = useDshStore((s) => s.sessions);
   const activeSessionId = useDshStore((s) => s.activeSessionId);
   const [query, setQuery] = React.useState("");
+  const [newFileOpen, setNewFileOpen] = React.useState(false);
 
   const sorted = React.useMemo(
     () =>
@@ -161,6 +166,21 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
               <Button
                 size="icon"
                 variant="ghost"
+                aria-label="Create a new workspace file"
+                disabled={!active}
+                onClick={() => setNewFileOpen(true)}
+                className="size-6 rounded-sm"
+              >
+                <FilePlus2 className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>New file…</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
                 aria-label="Reset workspace to seed files"
                 disabled={!active}
                 onClick={() => {
@@ -190,7 +210,120 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
           {active ? Object.keys(active.workspace).length : 0} files · virtual FS in your browser
         </p>
       </div>
+
+      {/* New workspace file dialog */}
+      {active && (
+        <NewFileDialog
+          open={newFileOpen}
+          onOpenChange={setNewFileOpen}
+          existingPaths={Object.keys(active.workspace)}
+          onCreate={(path, content) => {
+            useDshStore.getState().writeFile(active.id, path, content);
+            toast.success("File created", { description: path });
+            onPreviewFile(path);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ─────────────────────────── NewFileDialog ──────────────────────────────── */
+
+function NewFileDialog({
+  open,
+  onOpenChange,
+  existingPaths,
+  onCreate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  existingPaths: string[];
+  onCreate: (path: string, content: string) => void;
+}) {
+  const [path, setPath] = React.useState("");
+  const [content, setContent] = React.useState("");
+
+  const trimmedPath = path.trim().replace(/^\/+/, "");
+  const collision = existingPaths.some((p) => p === trimmedPath);
+  const valid = trimmedPath.length > 0 && !collision && !/[\\*?"<>|]/.test(trimmedPath);
+
+  const submit = () => {
+    if (!valid) return;
+    onCreate(trimmedPath, content);
+    setPath("");
+    setContent("");
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          setPath("");
+          setContent("");
+        }
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New workspace file</DialogTitle>
+          <DialogDescription>
+            Written straight into this session&apos;s virtual FS — the agent can read and edit it
+            like any other workspace file.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="dsh-newfile-path" className="text-xs">
+              Path
+            </Label>
+            <Input
+              id="dsh-newfile-path"
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              placeholder="docs/notes.md"
+              autoFocus
+              spellCheck={false}
+              className="font-mono text-xs"
+              aria-invalid={collision}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+              }}
+            />
+            {collision && (
+              <p className="text-[11px] text-destructive">A file with this path already exists.</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="dsh-newfile-content" className="text-xs">
+              Content <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Textarea
+              id="dsh-newfile-content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder={"# Notes\n\nPaste or type file contents…"}
+              className="custom-scrollbar min-h-[140px] resize-y font-mono text-xs"
+              spellCheck={false}
+            />
+            <p className="text-right font-mono text-[10px] text-muted-foreground">
+              {content.length} chars · {content.split("\n").length} lines
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={!valid} onClick={submit}>
+            <FilePlus2 className="mr-1.5 size-3.5" /> Create file
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
