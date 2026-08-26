@@ -153,6 +153,8 @@ interface DshActions {
   listWorkspaceFiles(sessionId: string): string[];
   readWorkspaceSnapshot(sessionId: string): Record<string, string>;
   replaceWorkspace(sessionId: string, workspace: Record<string, string>): void;
+  /** hard-replace the message array (continue-from-here ledger action) */
+  truncateSessionFrom(sessionId: string, messages: ChatMessage[]): void;
   deleteFileEntry(sessionId: string, path: string): boolean;
   /** Move a workspace file to a new path atomically (returns false when from-path missing or to-path collides). */
   renameFileEntry(sessionId: string, from: string, to: string): boolean;
@@ -355,6 +357,15 @@ export const useDshStore = create<DshStore>()(
 
       replaceWorkspace(sessionId, workspace) {
         set((st) => mapSession(st, sessionId, (s) => ({ ...s, workspace: { ...workspace } })));
+      },
+
+      truncateSessionFrom(sessionId, messages) {
+        set((st) =>
+          mapSession(st, sessionId, (s) => {
+            s.messages = messages;
+            s.updatedAt = Date.now();
+          }),
+        );
       },
 
       deleteFileEntry(sessionId, path) {

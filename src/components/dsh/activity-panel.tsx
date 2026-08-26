@@ -23,6 +23,7 @@ import {
   History,
   Loader2,
   RotateCcw,
+  Scissors,
   Search,
   TriangleAlert,
   X,
@@ -58,6 +59,7 @@ import {
   buildTimeline,
   clampDiffInput,
   lineDelta,
+  planConversationTruncate,
   reconstructWorkspaceAt,
   workspaceChangeSets,
   workspaceDelta,
@@ -374,42 +376,83 @@ function LedgerView({
 }) {
   // newest commit first, like `git log`, with day separators between groups
   const ordered = [...entries].reverse();
+
+  /** entries the conversation can truncate after — computed once per render */
+  const truncatable = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (planConversationTruncate(session, e.id)) set.add(e.id);
+    }
+    return set;
+  }, [entries, session]);
+
   return (
-    <ol className="relative space-y-1" aria-label="Session activity ledger">
-      {/* rail */}
-      <span
-        aria-hidden
-        className="absolute bottom-3 left-[13px] top-3 w-px bg-gradient-to-b from-border via-border to-transparent"
-      />
-      {ordered.map((e, i) => {
-        const prev = i > 0 ? ordered[i - 1] : undefined;
-        const newDay = !prev || dayLabel(prev.ts) !== dayLabel(e.ts);
-        // stagger caps at 12 rows so long ledgers don't feel sluggish
-        const delay = Math.min(i, 12) * 24;
-        return (
-          <React.Fragment key={e.id}>
-            {newDay && (
-              <li className="relative z-10 flex items-center gap-2 py-1.5" aria-hidden>
-                <span className="flex size-[27px] shrink-0 items-center justify-center">
-                  <GitCommitHorizontal className="size-3.5 text-muted-foreground/40" />
-                </span>
-                <span className="rounded border border-dashed border-border/70 bg-muted/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                  {dayLabel(e.ts)}
-                </span>
-                <span className="h-px min-w-4 flex-1 bg-border/40" />
-              </li>
-            )}
-            <LedgerRow
-              entry={e}
-              session={session}
-              onPreviewFile={onPreviewFile}
-              running={running}
-              staggerDelay={delay}
-            />
-          </React.Fragment>
-        );
-      })}
-    </ol>
+    <>
+      <ol className="relative space-y-1" aria-label="Session activity ledger">
+        {/* rail */}
+        <span
+          aria-hidden
+          className="absolute bottom-3 left-[13px] top-3 w-px bg-gradient-to-b from-border via-border to-transparent"
+        />
+        {ordered.map((e, i) => {
+          const prev = i > 0 ? ordered[i - 1] : undefined;
+          const newDay = !prev || dayLabel(prev.ts) !== dayLabel(e.ts);
+          // stagger caps at 12 rows so long ledgers don't feel sluggish
+          const delay = Math.min(i, 12) * 24;
+          return (
+            <React.Fragment key={e.id}>
+              {newDay && (
+                <li className="relative z-10 flex items-center gap-2 py-1.5" aria-hidden>
+                  <span className="flex size-[27px] shrink-0 items-center justify-center">
+                    <GitCommitHorizontal className="size-3.5 text-muted-foreground/40" />
+                  </span>
+                  <span className="rounded border border-dashed border-border/70 bg-muted/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                    {dayLabel(e.ts)}
+                  </span>
+                  <span className="h-px min-w-4 flex-1 bg-border/40" />
+                </li>
+              )}
+              <LedgerRow
+                entry={e}
+                session={session}
+                onPreviewFile={onPreviewFile}
+                running={running}
+                staggerDelay={delay}
+                isHead={i === 0}
+                truncatable={truncatable.has(e.id)}
+              />
+            </React.Fragment>
+          );
+        })}
+      </ol>
+      <ShortlogFooter entries={ordered} />
+    </>
+  );
+}
+
+/** `git shortlog` vibes — quiet one-line summary under the ledger rail. */
+function ShortlogFooter({ entries }: { entries: TimelineEntry[] }) {
+  const prompts = entries.filter((e) => e.kind === "user").length;
+  const replies = entries.filter((e) => e.kind === "assistant").length;
+  const calls = entries.filter((e) => e.kind === "tool").length;
+  const newest = entries[0];
+  if (entries.length === 0) return null;
+  return (
+    <div
+      className="mt-3 flex items-center justify-between gap-2 border-t border-dashed pt-2 font-mono text-[9.5px] text-muted-foreground/60"
+      aria-hidden
+    >
+      <span>
+        {prompts} prompt{prompts === 1 ? "" : "s"} · {replies} repl{replies === 1 ? "y" : "ies"} ·{"\n" && " "}
+        {calls} tool call{calls === 1 ? "" : "s"}
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="text-sky-400/80">you</span>·<span className="text-[#7c8dfd]/90">dsh</span>
+        {newest && (
+          <span className="ml-1 opacity-70">@ {hhmm(newest.ts)}</span>
+        )}
+      </span>
+    </div>
   );
 }
 
@@ -419,12 +462,16 @@ function LedgerRow({
   onPreviewFile,
   running,
   staggerDelay = 0,
+  isHead = false,
+  truncatable = false,
 }: {
   entry: TimelineEntry;
   session: Session;
   onPreviewFile: (path: string) => void;
   running: boolean;
   staggerDelay?: number;
+  isHead?: boolean;
+  truncatable?: boolean;
 }) {
   const meta = e.toolName ? getToolMeta(e.toolName) : null;
   const dur = fmtDur(e.durationMs);
@@ -485,6 +532,15 @@ function LedgerRow({
         >
           {e.sha}
         </button>
+        {isHead && (
+          <span
+            aria-label="Current tip of this conversation"
+            title="latest commit — HEAD of this conversation"
+            className="hidden shrink-0 rounded-sm bg-amber-500/15 px-1 py-px font-mono text-[8.5px] font-bold uppercase tracking-wider text-amber-400 sm:inline-block"
+          >
+            head
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate font-mono text-xs leading-relaxed">
           {meta && (
             <span className={cn("mr-1 font-semibold", meta.tint)}>{meta.label}</span>
@@ -496,6 +552,9 @@ function LedgerRow({
           {e.title}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 pt-0.5">
+          {truncatable && !running && (
+            <ContinueFromHereButton entry={e} session={session} />
+          )}
           {e.kind === "tool" && e.ok === true && RESTORE_TOOLS.has(e.toolName ?? "") && (
             <RestorePointButton entry={e} session={session} />
           )}

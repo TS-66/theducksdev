@@ -76,6 +76,33 @@ function fmtNum(n: number): string {
 }
 
 /**
+ * Recent web_search results per session, so a follow-up like
+ * “fetch the first result” can resolve against the REAL last search.
+ * Client-side demo memory only — deliberately ephemeral.
+ */
+const lastSearchUrls = new Map<string, string[]>();
+
+const ORDINALS: Array<[RegExp, number]> = [
+  [/\b(?:first|top|1st|leading|best)\b/, 0],
+  [/\b(?:second|2nd)\b/, 1],
+  [/\b(?:third|3rd)\b/, 2],
+  [/\b(?:fourth|4th)\b/, 3],
+  [/\b(?:fifth|5th)\b/, 4],
+];
+
+function ordinalIndex(text: string): number {
+  for (const [re, idx] of ORDINALS) if (re.test(text)) return idx;
+  return -1;
+}
+
+function extractUrl(raw: string): string | null {
+  const m = raw.match(/https?:\/\/[^\s`'"<>）)]+/i);
+  if (!m) return null;
+  // trim trailing sentence punctuation that often glues onto URLs
+  return m[0].replace(/[.,;:!?…]+$/, '');
+}
+
+/**
  * Pull the actual search topic out of a natural-language request:
  * "search the web for deepseek models" → "deepseek models".
  */
@@ -214,6 +241,63 @@ _Awaiting your approval to exit plan mode._`;
       return;
     }
 
+    /* ------------------------- route: web fetch (REAL) ------------------- */
+    // Pairs with the web_search route: either an explicit URL in the message,
+    // or an ordinal reference resolved from THIS session's last live search.
+    // Like web_search above, this hits our serverless proxy — no key needed.
+    {
+      const explicitUrl = extractUrl(opts.userText);
+      const wantsFetch =
+        /\b(fetch|open|read|download|pull|get contents? of|scrape)\b/.test(text) ||
+        explicitUrl !== null;
+      let targetUrl: string | null = explicitUrl;
+      if (!targetUrl && wantsFetch && /\b(web|result|link|url|page|article|site)\b/.test(text)) {
+        const idx = ordinalIndex(text);
+        const stored = lastSearchUrls.get(opts.sessionId) ?? [];
+        if (idx >= 0 && stored[idx]) targetUrl = stored[idx];
+        else if (/\b(?:first|top)\b/.test(text) && stored[0]) targetUrl = stored[0];
+      }
+      if (
+        can('web_fetch') &&
+        wantsFetch &&
+        targetUrl &&
+        /^https?:\/\//i.test(targetUrl)
+      ) {
+        await streamText(
+          `Demo mode — running a **real** \`web_fetch\` through the server-side plugin proxy on:${'\n'}${targetUrl}\n\n`,
+          emitSafe,
+          signal,
+        );
+        const content = await runTool('web_fetch', { url: targetUrl });
+        const failedFetch = /^Error:/i.test(content);
+        if (!failedFetch) {
+          const title = /^# (.+)$/m.exec(content)?.[1] ?? targetUrl;
+          // quote the first meaningful lines of the extracted page text
+          const bodyLines = content
+            .split('\n')
+            .filter((l) => l.trim().length > 40)
+            .slice(0, 6)
+            .map((l) => `> ${l.trim().slice(0, 160)}`)
+            .join('\n');
+          await streamText(
+            `## Fetched — ${title}\n\n${bodyLines || '> (the extractor returned no long prose paragraphs — likely a JS-heavy page)'}` +
+              `\n\nThat's the genuine page text pulled server-side by \`web_fetch\` — pair it with another “fetch the second result”, or run a new “search the web for …”.`,
+            emitSafe,
+            signal,
+          );
+        } else {
+          await streamText(
+            `The fetch didn't complete here (${content.trim()}). The plugin validates absolute http(s) URLs and streams sanitized text; some pages block automated readers. Try pasting a different URL or fetching one of the earlier search results.`,
+            emitSafe,
+            signal,
+          );
+        }
+        emitSafe({ type: 'done', aborted: false });
+        return;
+      }
+      void wantsFetch;
+    }
+
     /* ------------------------- route: shell playground ------------------- */
     const shellMatch = text.match(
       /(?:^|\bbash\b|\brun\s+|\bexec\s+)[\s`'"“”]*\b(ls|cat|tree|find|grep|wc|head|tail|pwd|echo|mkdir|touch|rm|mv|cp|date|uname|whoami)\b([^\n]*)/i,
@@ -330,10 +414,14 @@ Check them with the sidebar preview or \`cat LICENSE\` in the composer. With a r
         );
         const result = await runTool('web_search', { query: q, num: 6 });
         const failed = /^Error:/i.test(result) || /no results/i.test(result);
+        // remember the real URLs so “fetch the first result” works next turn
+        const urls = [...result.matchAll(/\((https?:\/\/[^)\s]+)\)/g)].map((m) => m[1]);
+        if (urls.length > 0) lastSearchUrls.set(opts.sessionId, urls);
+        else lastSearchUrls.delete(opts.sessionId);
         await streamText(
           failed
             ? `\nThe search backend didn't return results here (${result.trim()}). On a deployed instance with the SDK configured this same call returns live results — and with an API key the agent would rank, fetch and synthesize them for you.`
-            : `\nThose are **live results** fetched by the harness plugin — nothing scripted. In a full session the agent would rank them, \`web_fetch\` the promising links and synthesize an answer with citations.\n\nTry another topic anytime: “search the web for …”.`,
+            : `\nThose are **live results** fetched by the harness plugin — nothing scripted. In a full session the agent would now rank them and read promising links.\n\n→ Try **“fetch the first result”** — I'll run a real \`web_fetch\` on the top link and quote what it actually says.\n\nOr search another topic anytime: “search the web for …”.`,
           emitSafe,
           signal,
         );
@@ -528,6 +616,7 @@ Try one of these:
 - **“write a checklist for the refactor”** — real \`todo_write\`, rendered as the checklist card
 - **“interview me about the greeting style”** — real \`ask_user_question\` bridge
 - **“search the web for deepseek models”** — real \`web_search\` via the server-side plugin (works even in demo)
+- **“fetch the first result”** — real \`web_fetch\` reads the page behind your last search's top hit
 - **Toggle Plan mode, then send any task** — research → drafted plan → \`exit_plan_mode\` approval card
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 

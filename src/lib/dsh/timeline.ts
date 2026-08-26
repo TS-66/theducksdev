@@ -424,3 +424,78 @@ export function workspaceChangeSets(
   }
   return { added, removed, modified };
 }
+
+/* ────────────────────────── continue-from-here ──────────────────────────── */
+
+/**
+ * Plan that keeps the conversation up to & including the message owning a
+ * ledger entry ("continue from here"). Protocol-safe:
+ *  - user/text entries cut cleanly at message boundaries;
+ *  - tool-call entries trim the owning assistant's `toolCalls` to end at the
+ *    target and retain ONLY the paired result messages, so every kept call
+ *    still has its response (the live loop's wire format stays valid).
+ */
+export interface ConversationTruncation {
+  messages: ChatMessage[];
+  keptCount: number;
+  droppedCount: number;
+}
+
+export function planConversationTruncate(
+  session: Session,
+  entryId: string,
+): ConversationTruncation | null {
+  const msgs = session.messages;
+
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+
+    // standalone prompt entry — drop everything after it
+    if (m.role === "user" && m.id === entryId) {
+      const keep = msgs.slice(0, i + 1);
+      return {
+        messages: keep,
+        keptCount: keep.length,
+        droppedCount: msgs.length - keep.length,
+      };
+    }
+
+    if (m.role !== "assistant") continue;
+
+    // response text entry — keep this bubble and its sibling tool results
+    if (entryId === `${m.id}:text`) {
+      const calls = new Set((m.toolCalls ?? []).map((c) => c.id));
+      let j = i + 1;
+      while (j < msgs.length && msgs[j].role === "tool" && calls.has(msgs[j].toolCallId ?? "")) j++;
+      const keep = msgs.slice(0, j);
+      return {
+        messages: keep,
+        keptCount: keep.length,
+        droppedCount: msgs.length - keep.length,
+      };
+    }
+
+    // specific tool call entry — trim calls to the target + pair only its result
+    const callIdx = (m.toolCalls ?? []).findIndex(
+      (c) => entryId === `${m.id}:${c.id}`,
+    );
+    if (callIdx >= 0) {
+      const target = m.toolCalls![callIdx];
+      const trimmed: ChatMessage = { ...m, toolCalls: m.toolCalls!.slice(0, callIdx + 1) };
+      const head = [...msgs.slice(0, i), trimmed];
+      const tail: ChatMessage[] = [];
+      for (let j = i + 1; j < msgs.length; j++) {
+        const mj = msgs[j];
+        if (mj.role === "tool" && mj.toolCallId === target.id) tail.push(mj);
+      }
+      const keep = [...head, ...tail];
+      return {
+        messages: keep,
+        keptCount: keep.length,
+        droppedCount: msgs.length - keep.length,
+      };
+    }
+  }
+
+  return null;
+}
