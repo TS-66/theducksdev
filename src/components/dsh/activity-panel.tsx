@@ -22,6 +22,8 @@ import {
   GitCommitHorizontal,
   History,
   Loader2,
+  Search,
+  X,
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,8 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useDshStore } from "@/lib/dsh/store";
 import { SEED_WORKSPACE } from "@/lib/dsh/workspace-seed";
@@ -106,14 +110,7 @@ export function ActivityTimelinePanel({
               {!hasMessages ? (
                 <EmptyLedger />
               ) : (
-                <LedgerSummaryStrip session={session!} entries={buildTimeline(session!)} />
-              )}
-              {hasMessages && (
-                <LedgerView
-                  entries={buildTimeline(session!)}
-                  onPreviewFile={onPreviewFile}
-                  running={running}
-                />
+                <LedgerBrowser session={session!} onPreviewFile={onPreviewFile} running={running} />
               )}
             </TabsContent>
 
@@ -138,6 +135,148 @@ function fmtDur(ms?: number): string | null {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
 }
 
+type LedgerFilter = "all" | "prompts" | "replies" | "tools" | "files";
+
+const LEDGER_FILTERS: Array<{ id: LedgerFilter; label: string }> = [
+  { id: "all", label: "all" },
+  { id: "prompts", label: "prompts" },
+  { id: "replies", label: "replies" },
+  { id: "tools", label: "tools" },
+  { id: "files", label: "files" },
+];
+
+function entryMatchesFilter(e: TimelineEntry, f: LedgerFilter): boolean {
+  switch (f) {
+    case "all":
+      return true;
+    case "prompts":
+      return e.kind === "user";
+    case "replies":
+      return e.kind === "assistant";
+    case "tools":
+      return e.kind === "tool" || e.kind === "plan" || e.kind === "todo";
+    case "files":
+      return (e.files?.length ?? 0) > 0;
+  }
+}
+
+/**
+ * Summary strip + filter chips + search + ledger — all client-side over the
+ * derived timeline.
+ */
+function LedgerBrowser({
+  session,
+  onPreviewFile,
+  running,
+}: {
+  session: Session;
+  onPreviewFile: (path: string) => void;
+  running: boolean;
+}) {
+  const entries = React.useMemo(() => buildTimeline(session), [session]);
+  const [filter, setFilter] = React.useState<LedgerFilter>("all");
+  const [query, setQuery] = React.useState("");
+
+  const counts = React.useMemo(() => {
+    const c: Record<LedgerFilter, number> = {
+      all: entries.length,
+      prompts: 0,
+      replies: 0,
+      tools: 0,
+      files: 0,
+    };
+    for (const e of entries) {
+      if (e.kind === "user") c.prompts++;
+      else if (e.kind === "assistant") c.replies++;
+      else if (e.kind === "tool" || e.kind === "plan" || e.kind === "todo") c.tools++;
+      if ((e.files?.length ?? 0) > 0) c.files++;
+    }
+    return c;
+  }, [entries]);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return entries.filter((e) => {
+      if (!entryMatchesFilter(e, filter)) return false;
+      if (!q) return true;
+      return (
+        e.title.toLowerCase().includes(q) ||
+        (e.detail ?? "").toLowerCase().includes(q) ||
+        (e.toolName ?? "").toLowerCase().includes(q) ||
+        (e.files ?? []).some((f) => f.toLowerCase().includes(q))
+      );
+    });
+  }, [entries, filter, query]);
+
+  return (
+    <>
+      <LedgerSummaryStrip session={session} entries={entries} />
+      <div
+        className="mb-2 flex flex-wrap items-center gap-1"
+        role="group"
+        aria-label="Filter ledger entries"
+      >
+        {LEDGER_FILTERS.map((f) => {
+          const selected = filter === f.id;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => setFilter(f.id)}
+              className={cn(
+                "rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                selected
+                  ? "border-[#4D6BFE]/60 bg-[#4D6BFE]/15 text-[#9dabff]"
+                  : "border-border/60 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground",
+              )}
+            >
+              {f.label}
+              <span className={cn("ml-1", selected ? "text-[#4D6BFE]" : "text-muted-foreground/60")}>
+                {counts[f.id]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="relative mb-3">
+        <Search
+          className="pointer-events-none absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground/60"
+          aria-hidden
+        />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="grep the ledger… (title, tool, path)"
+          aria-label="Search ledger entries"
+          className="h-7 border-border/60 bg-muted/20 pl-7 pr-7 font-mono text-[11px] placeholder:text-muted-foreground/50 focus-visible:ring-1"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label="Clear ledger search"
+            onClick={() => setQuery("")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <X className="size-3" aria-hidden />
+          </button>
+        )}
+      </div>
+      {filtered.length === 0 ? (
+        <p className="py-10 text-center font-mono text-xs text-muted-foreground">
+          {entries.length === 0
+            ? "no entries yet."
+            : query
+              ? `no matches for “${query}” under “${filter}”.`
+              : `no entries match “${filter}”.`}
+        </p>
+      ) : (
+        <LedgerView entries={filtered} onPreviewFile={onPreviewFile} running={running} />
+      )}
+    </>
+  );
+}
+
 /** git-log diffstat vibes: one quiet strip of what this session's ledger holds. */
 function LedgerSummaryStrip({
   session,
@@ -160,7 +299,7 @@ function LedgerSummaryStrip({
 
   return (
     <div
-      className="mb-4 grid grid-cols-4 gap-1.5"
+      className="mb-3 grid grid-cols-4 gap-1.5"
       aria-label="Ledger summary"
     >
       {stats.map((s) => (
@@ -224,6 +363,8 @@ function LedgerView({
       {ordered.map((e, i) => {
         const prev = i > 0 ? ordered[i - 1] : undefined;
         const newDay = !prev || dayLabel(prev.ts) !== dayLabel(e.ts);
+        // stagger caps at 12 rows so long ledgers don't feel sluggish
+        const delay = Math.min(i, 12) * 24;
         return (
           <React.Fragment key={e.id}>
             {newDay && (
@@ -237,7 +378,12 @@ function LedgerView({
                 <span className="h-px min-w-4 flex-1 bg-border/40" />
               </li>
             )}
-            <LedgerRow entry={e} onPreviewFile={onPreviewFile} running={running} />
+            <LedgerRow
+              entry={e}
+              onPreviewFile={onPreviewFile}
+              running={running}
+              staggerDelay={delay}
+            />
           </React.Fragment>
         );
       })}
@@ -249,10 +395,12 @@ function LedgerRow({
   entry: e,
   onPreviewFile,
   running,
+  staggerDelay = 0,
 }: {
   entry: TimelineEntry;
   onPreviewFile: (path: string) => void;
   running: boolean;
+  staggerDelay?: number;
 }) {
   const meta = e.toolName ? getToolMeta(e.toolName) : null;
   const dur = fmtDur(e.durationMs);
@@ -277,15 +425,42 @@ function LedgerRow({
 
   const body = (
     <div
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? `Inspect ${e.files![0]} (${e.toolName})` : undefined}
+      onKeyDown={
+        clickable
+          ? (ev) => {
+              if (ev.key === "Enter" || ev.key === " ") {
+                ev.preventDefault();
+                onPreviewFile(e.files![0]);
+              }
+            }
+          : undefined
+      }
+      onClick={clickable ? () => onPreviewFile(e.files![0]) : undefined}
       className={cn(
         "ml-2 min-w-0 flex-1 rounded-md border border-transparent px-2.5 py-1.5 transition-colors",
-        clickable && "cursor-pointer hover:border-border hover:bg-muted/40",
+        clickable &&
+          "cursor-pointer hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       )}
     >
       <div className="flex items-baseline gap-2">
-        <span className="shrink-0 font-mono text-[10px] tracking-tight text-violet-400/80 group-hover:text-violet-300">
+        <button
+          type="button"
+          aria-label={`Copy commit sha ${e.sha}`}
+          onClick={(ev) => {
+            ev.stopPropagation();
+            void navigator.clipboard?.writeText(e.sha).then(
+              () => toast.success(`Copied ${e.sha}`, { description: "commit sha → clipboard" }),
+              () => toast.error("Clipboard unavailable"),
+            );
+          }}
+          title="Copy sha"
+          className="shrink-0 rounded-sm font-mono text-[10px] tracking-tight text-violet-400/80 underline-offset-2 transition-colors hover:text-violet-300 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
           {e.sha}
-        </span>
+        </button>
         <span className="min-w-0 flex-1 truncate font-mono text-xs leading-relaxed">
           {meta && (
             <span className={cn("mr-1 font-semibold", meta.tint)}>{meta.label}</span>
@@ -322,27 +497,13 @@ function LedgerRow({
     </div>
   );
 
-  const rowInner = (
-    <>
+  return (
+    <li
+      className="group dsh-commit-in flex items-start gap-1"
+      style={staggerDelay > 0 ? { animationDelay: `${staggerDelay}ms` } : undefined}
+    >
       {node}
       {body}
-    </>
-  );
-
-  return (
-    <li className="group flex items-start gap-1">
-      {clickable ? (
-        <button
-          type="button"
-          onClick={() => onPreviewFile(e.files![0])}
-          aria-label={`Inspect ${e.files![0]} (${e.toolName})`}
-          className="flex w-full items-start rounded-md text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          {rowInner}
-        </button>
-      ) : (
-        rowInner
-      )}
     </li>
   );
 }

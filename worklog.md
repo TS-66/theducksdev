@@ -142,3 +142,23 @@ Stage Summary:
 - Workspace CRUD is now fully reachable without the agent: create (dialog), import (drag/picker), rename/move, download, delete, reset-to-seed.
 - Risks: demo routing still keyword-based; tokens stat shows "—" for demo-only sessions (by design — no API usage); rename dialog allows subdir paths but no dir auto-expand after move (tree rebuilds collapsed-by-default, cosmetic).
 - Next priorities: i18n zh; ledger filter box (by tool/kind) + copy-sha; session-level "workspace export as .zip"; paste-image-into-composer; demo routes for /policy + /model feedback; per-message token tooltip already exists — consider a session totals tooltip on status bar Zap count instead.
+
+---
+Task ID: R6 (cron review round 6)
+Agent: coordinator
+Task: QA stability, ledger filter box (chips + grep search) + copy-sha, workspace .zip export (dependency-free zip writer + sidebar button + /zip command), commit-in stagger animation.
+
+Work Log:
+- QA: lint clean, page renders, R5 ledger regression green (summary strip / TODAY separator / result bodies / deep-links). Console errors seen on load were stale pre-reload history, not current. Mid-round the dev server died (log shows clean 200s then silence; process reaped) — restarted detached via `(setsid bun run dev ... &)`; two earlier nohup attempts died with the shell session, subshell-detach is the reliable pattern here. Recovered and continued QA.
+- FEATURE workspace .zip export: new src/lib/dsh/zip.ts — dependency-free STORE-method zip writer (CRC32 table, DOS timestamps, UTF-8 flag 0x0800, explicit dir entries derived from file parents only so an empty extensionless FILE like LICENSE is never misclassified, dirs-first stable order). Two real bugs caught by validating with python zipfile + unzip before shipping: ①total buffer missing raw data bytes (RangeError), ②entry offsets didn't include prior entries' data ("Bad magic number"). Final archive validates clean in python + unzip, content round-trips exact. downloadWorkspaceZip(session) + workspaceZipName() (slugified title + timestamp); buildZipBlob exported for reuse.
+- WIRING: sidebar workspace header gained FolderDown "Export .zip" button (disabled when 0 files, toast with file count); page.tsx /zip command (same, empty-workspace guard); composer SLASH_COMMANDS + cheat sheet list it. Browser QA: /zip and sidebar button both fire "Workspace exported — 7 files zipped".
+- FEATURE ledger filter box: LedgerBrowser now owns state — 5 filter chips with live counts (all/prompts/replies/tools/files, aria-pressed, brand-blue selected style) + "grep the ledger…" mono search input (matches title/detail/toolName/files, clear × button, contextual empty states). QA: tools filter → 3 rows only; "greet" search → 3 matches; no-match message; clear restores.
+- FEATURE copy-sha: ledger sha is now a real button (nested-button HTML violation avoided by demoting the row wrapper from <button> to role="button" div with full keyboard handling — Enter/Space still deep-link to file preview; sha click stopPropagation → clipboard + "Copied 80674bd" toast).
+- STYLING: dsh-commit-in keyframe (opacity + 5px rise + 0.5% scale, 0.24s) with 24ms/row stagger capped at 12 rows; prefers-reduced-motion honored. Filter chips + grep box follow the terminal mono aesthetic.
+- REGRESSION: fresh demo session (bash tree && head) end-to-end intact, its ledger populated correctly (3 entries, shell body shows real tree output); mobile 390px clean. lint 0/0, tsc clean, server 200.
+
+Stage Summary:
+- The activity panel is now a full ledger browser: filter by kind, grep across titles/bodies/paths, copy shas, deep-link into files — git-log UX complete.
+- Workspaces export as a genuinely valid .zip (validated against two independent unzip implementations) with zero dependencies added.
+- Risks: zip writer is STORE-only (fine for text ≤256KB vFS cap); dev-server auto-restart by the sandbox remains flaky — if GET / fails, re-run the setsid pattern from this entry rather than plain nohup.
+- Next priorities: i18n zh; paste-image-into-composer; demo routes for /policy + /model feedback; ledger entry → "restore workspace to this point" (time-travel from timeline); sessions sidebar folder/group by day; hook up /api/web-search to demo web_search flow.

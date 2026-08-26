@@ -39,6 +39,7 @@ export const SLASH_COMMANDS = [
   { cmd: "/plugins", desc: "Open the plugin manager" },
   { cmd: "/activity", desc: "Open the activity timeline (⌘E)" },
   { cmd: "/export", desc: "Download the session as a Markdown transcript" },
+  { cmd: "/zip", desc: "Download this session's workspace as a .zip" },
   { cmd: "/backup", desc: "Download all sessions as a JSON backup" },
 ] as const;
 

@@ -141,6 +141,20 @@ export default function DshWebPage() {
         });
         break;
       }
+      case "/zip": {
+        if (!sid) return toast.info("Select a session first");
+        const target = st.sessions.find((s) => s.id === sid);
+        if (!target) return toast.error("Session not found");
+        const fileCount = Object.keys(target.workspace).length;
+        if (fileCount === 0) return toast.info("Workspace is empty — nothing to zip");
+        import("@/lib/dsh/zip").then(({ downloadWorkspaceZip }) => {
+          downloadWorkspaceZip(target);
+          toast.success("Workspace exported", {
+            description: `${fileCount} files zipped — opens in any archive tool.`,
+          });
+        });
+        break;
+      }
       case "/activity": {
         setActivityOpen(true);
         break;

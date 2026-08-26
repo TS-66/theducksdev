@@ -5,6 +5,7 @@ import {
   Copy,
   Download,
   FilePlus2,
+  FolderDown,
   FolderTree,
   MoreHorizontal,
   Pencil,
@@ -251,6 +252,35 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Import files (or drop them below)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Export workspace as zip"
+                disabled={!active || Object.keys(active?.workspace ?? {}).length === 0}
+                onClick={() => {
+                  if (!active) return;
+                  import("@/lib/dsh/zip")
+                    .then(({ downloadWorkspaceZip }) => {
+                      downloadWorkspaceZip(active);
+                      toast.success("Workspace exported", {
+                        description: `${Object.keys(active.workspace).length} files zipped — opens in any archive tool.`,
+                      });
+                    })
+                    .catch((e) =>
+                      toast.error("Export failed", {
+                        description: e instanceof Error ? e.message : String(e),
+                      }),
+                    );
+                }}
+                className="size-6 rounded-sm"
+              >
+                <FolderDown className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export .zip</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
