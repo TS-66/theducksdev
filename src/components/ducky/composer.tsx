@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { fileToPastedImage } from "@/lib/ducky/images";
+import { ProjectPickerRow } from "@/components/ducky/project-picker";
 import type { PermissionPolicy } from "@/lib/ducky/types";
 
 export const SLASH_COMMANDS = [
@@ -64,6 +65,8 @@ interface ComposerProps {
   hasSession: boolean;
   /** "docked" = bottom bar surface · "hero" = centered zcode-style surface */
   variant?: "docked" | "hero";
+  /** open the create-project dialog (hero picker hands off to it) */
+  onNewProject?: () => void;
 }
 
 const POLICY_META: Record<
@@ -96,16 +99,14 @@ export function Composer({
   locked,
   hasSession,
   variant = "docked",
+  onNewProject,
 }: ComposerProps) {
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
-  const sessions = useDuckyStore((s) => s.sessions);
   const policy = useDuckyStore((s) => s.settings.policy);
   const disabledSurface = !hasSession;
   const hero = variant === "hero";
-  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
-  const fileCount = activeSession ? Object.keys(activeSession.workspace).length : 7;
 
   /** hero surface may run with no session yet — create one on demand */
   const ensureSession = React.useCallback((): string | null => {
@@ -212,31 +213,8 @@ export function Composer({
             className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#FDC00A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
           />
 
-          {/* workspace selector row */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label="Select workspace"
-                className="flex w-full items-center gap-2 rounded-t-2xl border-b px-4 py-2.5 text-left text-[13px] text-foreground/90 transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <FolderGit2 className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
-                <span className="truncate">greeting-service</span>
-                <span className="ml-1 hidden font-mono text-[10px] text-muted-foreground sm:inline">
-                  {fileCount} files
-                </span>
-                <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-72 p-3">
-              <p className="text-xs font-semibold">Virtual workspace</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                A sandboxed filesystem scoped to your session — {fileCount} files seeded,
-                stored only in this browser. <span className="font-mono">bash / read / write /
-                grep</span> all operate on it.
-              </p>
-            </PopoverContent>
-          </Popover>
+          {/* workspace row — real project picker (list / create / rename / delete) */}
+          <ProjectPickerRow onNewProject={onNewProject ?? (() => {})} />
 
           {/* textarea */}
           <Textarea

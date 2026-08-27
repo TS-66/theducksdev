@@ -13,6 +13,7 @@ import { Composer } from "@/components/ducky/composer";
 import { CommandPalette } from "@/components/ducky/command-palette";
 import { FilePreviewDialog } from "@/components/ducky/file-preview-dialog";
 import { HeaderBar } from "@/components/ducky/header-bar";
+import { NewProjectDialog } from "@/components/ducky/project-picker";
 import { PluginsSheet } from "@/components/ducky/plugins-sheet";
 import { SettingsSheet, type SettingsTab } from "@/components/ducky/settings-sheet";
 import { Sidebar } from "@/components/ducky/sidebar";
@@ -31,6 +32,8 @@ export default function DuckyCoderPage() {
   const hydrated = useDuckyStore((s) => s.hydrated);
   const sessions = useDuckyStore((s) => s.sessions);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
+  const projects = useDuckyStore((s) => s.projects);
+  const activeProjectId = useDuckyStore((s) => s.activeProjectId);
 
   const [input, setInput] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
@@ -41,10 +44,12 @@ export default function DuckyCoderPage() {
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [activityOpen, setActivityOpen] = React.useState(false);
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
+  const [newProjectOpen, setNewProjectOpen] = React.useState(false);
 
   const agent = useDuckyAgent();
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
 
   /* ── server capability probe (booleans only) ─────────────────────── */
   React.useEffect(() => {
@@ -255,6 +260,26 @@ export default function DuckyCoderPage() {
     setSettingsOpen(true);
   }, []);
 
+  /** one-click sample project — the greeting-service repo, only when asked for */
+  const useSampleProject = React.useCallback(() => {
+    const st = useDuckyStore.getState();
+    const existing = st.projects.find((p) => p.name === "greeting-service");
+    if (existing) {
+      st.selectProject(existing.id);
+      toast.info("Sample project selected", {
+        description: "greeting-service already exists — new tasks start from it.",
+      });
+      return;
+    }
+    void import("@/lib/ducky/workspace-seed").then(({ SEED_WORKSPACE }) => {
+      const st2 = useDuckyStore.getState();
+      st2.createProject("greeting-service", { ...SEED_WORKSPACE });
+      toast.success("Sample project created", {
+        description: `greeting-service · ${Object.keys(SEED_WORKSPACE).length} files — new tasks start from it.`,
+      });
+    });
+  }, []);
+
   /* ── hydration splash ─────────────────────────────────────────────────── */
   if (!hydrated) {
     return (
@@ -323,6 +348,12 @@ export default function DuckyCoderPage() {
           <ChatStream
             sessionRunning={agent.running}
             onPick={pickPrompt}
+            heroProps={{
+              projectName: activeProject?.name ?? null,
+              projectFileCount: activeProject ? Object.keys(activeProject.files).length : 0,
+              onNewProject: () => setNewProjectOpen(true),
+              onUseSample: useSampleProject,
+            }}
             composerSlot={
               <Composer
                 variant="hero"
@@ -336,6 +367,7 @@ export default function DuckyCoderPage() {
                 running={agent.running}
                 locked={Boolean(agent.pendingApproval)}
                 hasSession={Boolean(activeSessionId)}
+                onNewProject={() => setNewProjectOpen(true)}
               />
             }
           />
@@ -407,6 +439,7 @@ export default function DuckyCoderPage() {
       />
       <PluginsSheet open={pluginsOpen} onOpenChange={setPluginsOpen} />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <NewProjectDialog open={newProjectOpen} onOpenChange={setNewProjectOpen} />
       <ActivityTimelinePanel
         open={activityOpen}
         onOpenChange={setActivityOpen}

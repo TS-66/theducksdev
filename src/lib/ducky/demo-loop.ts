@@ -25,6 +25,8 @@ interface DemoTurnOptions {
   /** workspace file list + reader for composing summaries */
   listFiles: () => string[];
   readFile: (path: string) => string | null;
+  /** display label of the project the session started from (null = empty sandbox) */
+  projectName?: string | null;
   todos: TodoItem[];
   /** interactive question bridge (same wire format as the live loop) */
   askUser?: (questions: Array<{
@@ -173,6 +175,12 @@ export async function runDemoTurn(opts: DemoTurnOptions): Promise<void> {
   };
 
   const text = opts.userText.toLowerCase();
+  /** human label for the project behind this session */
+  const projLabel = opts.projectName?.trim() || "workspace";
+
+  /** friendly guidance shown when a file-dependent flow hits an empty sandbox */
+  const emptyWorkspaceHint =
+    `This session's workspace is **empty** — no project is attached yet. Two ways to fix that:\n\n1. Open the **project row** above the input and pick **New project…** — start empty, use the sample repo, or **import a folder from your disk**.\n2. Or just describe what to build and I'll scaffold it with real write tools right here.\n\nOnce files exist, flows like *“summarize this repository”*, shell commands and edits operate on the real content.`;
 
   try {
     /* ------------------------- route: plan mode --------------------------- */
@@ -184,26 +192,30 @@ export async function runDemoTurn(opts: DemoTurnOptions): Promise<void> {
         emitSafe,
         signal,
       );
+      const files = opts.listFiles();
       if (can('bash')) await runTool('bash', { command: 'tree' });
-      if (can('read_file')) await runTool('read_file', { path: 'README.md', limit: 12 });
+      if (can('read_file') && files.includes('README.md')) {
+        await runTool('read_file', { path: 'README.md', limit: 12 });
+      }
 
       const goal =
         opts.userText.length > 84 ? `${opts.userText.slice(0, 84)}…` : opts.userText;
-      const files = opts.listFiles();
       const hasTests = files.some((f) => f.includes('test'));
-      const touchFiles = [
-        'src/greet.ts',
-        'src/index.ts',
-        ...(hasTests ? ['tests/greet.test.ts'] : []),
-        'README.md',
-      ];
+      const codeFiles = files.filter((f) => /\.(ts|tsx|js|jsx|py|go|rs|java)$/.test(f));
+      const touchFiles = files.length
+        ? [...codeFiles.slice(0, 3), ...(hasTests ? [files.find((f) => f.includes('test'))!] : []), ...(files.includes('README.md') ? ['README.md'] : [])].slice(0, 5)
+        : [];
+
+      const currentState = files.length
+        ? `- Workspace \`${projLabel}\` tracks ${files.length} files${codeFiles.length ? ` (${codeFiles.length} code modules)` : ''}.\n- I read the tree above; edits will be applied with focused \`edit_file\` diffs.`
+        : `- Workspace \`${projLabel}\` is **empty** (0 files) — phase 0 scaffolds the initial structure with real write tools.`;
 
       const draft = `# Implementation plan — ${goal}
 
 ## Objective
 ${opts.userText}
 
-## Current state\n\n- Workspace \`greeting-service\` tracks ${files.length} files; entrypoint is \`src/index.ts\`.\n- Greeting copy lives in \`src/greet.ts\`; CLI flags are parsed inline.\n\n## Phases\n\n1. **Research** — read the touched modules and map call sites (read-only).\n2. **Implement** — apply focused edits via \`edit_file\`, one concern per diff.\n3. **Verify** — run the shell checks / tests and grep the result.\n4. **Document** — update the README section for behavior changes.\n\n## Files touched\n\n${touchFiles.map((f) => `- \`${f}\``).join('\n')}\n\n## Risks & mitigations\n\n- Template drift → keep fallbacks behind defaults, covered by unit tests.\n- CLI surface churn → additive flags only; deprecate before removing.
+## Current state\n\n${currentState}\n\n## Phases\n\n1. **Research** — read the touched modules and map call sites (read-only).\n2. **Implement** — apply focused edits via \`edit_file\`, one concern per diff.\n3. **Verify** — run the shell checks / tests and grep the result.\n4. **Document** — update the README section for behavior changes.\n\n## Files touched\n\n${touchFiles.length ? touchFiles.map((f) => `- \`${f}\``).join('\n') : '- (to be created — nothing exists yet)'}\n\n## Risks & mitigations\n\n- Template drift → keep fallbacks behind defaults, covered by unit tests.\n- Scope creep → additive changes first; deprecate before removing.
 
 _Awaiting your approval to exit plan mode._`;
 
@@ -384,10 +396,19 @@ _Awaiting your approval to exit plan mode._`;
     /* ------------------------- route: summarize repo --------------------- */
     if (/summar|overview|repository|packages|structure|explore/.test(text)) {
       const files = opts.listFiles();
+      if (files.length === 0) {
+        await streamText(
+          `Demo mode — happy to summarize a repository, but **${projLabel} has no files yet**.\n\n${emptyWorkspaceHint}`,
+          emitSafe,
+          signal,
+        );
+        emitSafe({ type: 'done', aborted: false });
+        return;
+      }
       const tsFiles = files.filter((f) => f.endsWith('.ts'));
       const readme = opts.readFile('README.md') ?? '';
       const pkgRaw = opts.readFile('package.json');
-      let pkgName = 'greeting-service';
+      let pkgName = projLabel;
       let scripts: string[] = [];
       try {
         const pkg = JSON.parse(pkgRaw ?? '{}') as {
@@ -407,8 +428,21 @@ _Awaiting your approval to exit plan mode._`;
         signal,
       );
       if (can('bash')) await runTool('bash', { command: 'tree' });
-      if (can('read_file')) await runTool('read_file', { path: 'README.md', limit: 20 });
-      if (can('read_file')) await runTool('read_file', { path: 'package.json' });
+      if (can('read_file') && files.includes('README.md')) {
+        await runTool('read_file', { path: 'README.md', limit: 20 });
+      }
+      if (can('read_file') && pkgRaw !== null) {
+        await runTool('read_file', { path: 'package.json' });
+      }
+
+      // layout bullets from the REAL tree (top-level entries, up to 6)
+      const top = new Set<string>();
+      for (const f of files) {
+        const segs = f.split('/');
+        top.add(segs.length > 1 ? `${segs[0]}/` : f);
+        if (top.size >= 6) break;
+      }
+      const layoutBullets = [...top].map((t) => `- \`${t}\``).join('\n');
 
       const summary = `## Workspace summary
 
@@ -422,12 +456,9 @@ _Awaiting your approval to exit plan mode._`;
 
 ### Layout
 
-- \`src/index.ts\` — CLI entrypoint that prints greetings for a demo list of names
-- \`src/greet.ts\` — the core \`greet()\` helper (template + punctuation handling)
-- \`src/utils/format.ts\` — casing/spacing utilities shared by the CLI
-- \`tests/greet.test.ts\` — unit tests covering plain names, trimmed input and punctuation
+${layoutBullets}
 
-The repository is intentionally tiny: it exists so the harness tools have something real to read, edit and run while you evaluate Ducky Coder.
+Everything above is read live from the virtual workspace — the tree, the file reads and these counts are real tool results, not canned text.
 
 > Once this deployment configures its server-side key (AI_API_KEY env), I'll analyze anything you ask with the full Ducky 3.5 Coder loop.`;
       await streamText(`\n${summary}`, emitSafe, signal);
@@ -443,8 +474,9 @@ The repository is intentionally tiny: it exists so the harness tools have someth
         signal,
       );
       const year = new Date().getFullYear();
-      const license = `MIT License\n\nCopyright (c) ${year} greeting-service contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n`;
-      const deploy = `#!/usr/bin/env bash\n# deploy.sh — build & package greeting-service for release\nset -euo pipefail\n\necho "▸ building..."\nbun run build\n\necho "▸ running tests..."\nbun test\n\necho "▸ packaging dist/ → greeting-service.tar.gz"\ntar -czf greeting-service.tar.gz dist/ README.md package.json\n\necho "✓ release artifact ready: greeting-service.tar.gz"\n`;
+      const license = `MIT License\n\nCopyright (c) ${year} ${projLabel} contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n`;
+      const pkgSlug = projLabel.toLowerCase().replace(/[^a-z0-9-_]+/g, '-') || 'project';
+      const deploy = `#!/usr/bin/env bash\n# deploy.sh — build & package ${projLabel} for release\nset -euo pipefail\n\necho "▸ building..."\nbun run build\n\necho "▸ running tests..."\nbun test\n\necho "▸ packaging dist/ → ${pkgSlug}.tar.gz"\ntar -czf ${pkgSlug}.tar.gz dist/ README.md package.json\n\necho "✓ release artifact ready: ${pkgSlug}.tar.gz"\n`;
       if (can('write_file')) {
         await runTool('write_file', { path: 'LICENSE', content: license });
         await runTool('write_file', { path: 'scripts/deploy.sh', content: deploy });
@@ -494,30 +526,42 @@ Check them with the sidebar preview or \`cat LICENSE\` in the composer. With a r
     /* ------------------------- route: unit tests ------------------------- */
     // word-boundary guarded: "latest" must NOT trigger the test review
     if (/\btests?\b|\btesting\b|unit test|test suite|test review/.test(text)) {
+      const files = opts.listFiles();
+      const testFile = files.find((f) => /\.(test|spec)\.[jt]sx?$/.test(f)) ?? null;
+      const hasGreet = files.includes('src/greet.ts');
+      if (!testFile && !hasGreet) {
+        await streamText(
+          `Demo mode — I review test suites, but **${projLabel} has no test files** (and no sample repo) to review.\n\n${emptyWorkspaceHint}`,
+          emitSafe,
+          signal,
+        );
+        emitSafe({ type: 'done', aborted: false });
+        return;
+      }
       await streamText(
         `Demo mode — scripted test review, but the reads are real.\n\n`,
         emitSafe,
         signal,
       );
-      if (can('read_file')) await runTool('read_file', { path: 'src/greet.ts' });
-      if (can('read_file')) await runTool('read_file', { path: 'tests/greet.test.ts' });
-      const review = `### Test review — \`tests/greet.test.ts\`
+      if (can('read_file') && hasGreet) await runTool('read_file', { path: 'src/greet.ts' });
+      if (can('read_file') && testFile) await runTool('read_file', { path: testFile });
+      const review = `### Test review — \`${testFile ?? 'tests/'}\`
 
 **Coverage looks solid for the happy paths:**
 
-1. ✅ plain name → \`Hello, Ada!\`
-2. ✅ whitespace is trimmed before greeting
-3. ✅ empty input surfaces a validation error
+1. ✅ plain input → canonical output
+2. ✅ whitespace is trimmed before processing
+3. ✅ edge cases surfaced as explicit assertions
 
 **Suggested additions** (the agent would write these with a real key):
 
 \`\`\`ts
-it('greets unicode names without mangling', () => {
-  expect(greet('Müsli')).toBe('Hello, Müsli!')
+it('handles unicode input without mangling', () => {
+  expect(transform('Müsli')).toBe('Müsli')
 })
 
 it('collapses internal whitespace runs', () => {
-  expect(greet('Grace   Hopper')).toBe('Hello, Grace Hopper!')
+  expect(transform('Grace   Hopper')).toBe('Grace Hopper')
 })
 \`\`\`
 
@@ -533,6 +577,16 @@ Run them with \`bun test\` — or ask the live agent to add them via \`edit_file
         text,
       )
     ) {
+      const files = opts.listFiles();
+      if (!files.includes('src/greet.ts')) {
+        await streamText(
+          `Demo mode — the **edit + diff** flow targets \`src/greet.ts\` from the sample repo, which isn't in this workspace.\n\n${emptyWorkspaceHint}\n\nWith your own project imported, just tell me *“change X to Y in <file>”* and the live agent edits it with the same diff cards.`,
+          emitSafe,
+          signal,
+        );
+        emitSafe({ type: 'done', aborted: false });
+        return;
+      }
       await streamText(
         `Demo mode — scripting a real **edit_file** call so you can see the diff view. First, reading the target file.\n\n`,
         emitSafe,
@@ -605,7 +659,7 @@ Ask me to *“edit the greeting defaults”* next and watch the todo flow hand o
             {
               id: 'salutation_style',
               header: 'Greeting style',
-              question: 'Which salutation should greeting-service default to?',
+              question: 'Which salutation should the default greeter use?',
               options: [
                 { label: 'Howdy (Recommended)', description: 'Friendly, western, great for demos.' },
                 { label: 'Hello', description: 'Neutral classic — current default.' },
@@ -667,8 +721,12 @@ Ask me to *“edit the greeting defaults”* next and watch the todo flow hand o
     const files = opts.listFiles();
     const bytes = Object.values(opts.listFiles()).length;
     void bytes;
-    const intro = `**Demo mode** — no API key is configured, so I'm running on a scripted engine. Tool execution is still 100% real: everything happens against the virtual workspace in your browser (${fmtNum(files.length)} files currently tracked).
-
+    const emptyLine =
+      files.length === 0
+        ? `\n**Heads-up:** ${projLabel === 'workspace' ? 'your workspace' : `\`${projLabel}\``} is empty right now — use the **project row** above the input → *New project…* to start blank, load the sample repo, or import your own folder.\n`
+        : '';
+    const intro = `**Demo mode** — no API key is configured, so I'm running on a scripted engine. Tool execution is still 100% real: everything happens against the virtual workspace in your browser (${fmtNum(files.length)} files currently tracked in \`${projLabel}\`).
+${emptyLine}
 Try one of these:
 
 - **“summarize this repository”** — runs \`tree\` + real file reads, then reports structure

@@ -2,11 +2,12 @@
  * Ducky AI | Coder — activity timeline derivation.
  *
  * Builds a git-log style event ledger for a session from its persisted
- * messages (no extra state needed), plus a workspace delta against the seed
- * tree (added / modified / removed). Pure functions — safe on the client.
+ * messages (no extra state needed), plus a workspace delta against the
+ * session's starting tree (added / modified / removed). Pure functions — safe
+ * on the client.
  */
 
-import type { ChatMessage, Session } from "./types";
+import type { ChatMessage, Project, Session } from "./types";
 import { SEED_WORKSPACE } from "./workspace-seed";
 
 /** local mini-truncate (keeps lib free of UI imports) */
@@ -277,10 +278,10 @@ export interface WorkspaceDelta {
   removed: string[];
 }
 
-/** Diff current workspace paths/content against the seed tree. */
+/** Diff current workspace paths/content against a starting tree. */
 export function workspaceDelta(
   current: Record<string, string>,
-  base: Record<string, string> = SEED_WORKSPACE,
+  base: Record<string, string> = {},
 ): WorkspaceDelta {
   const added: string[] = [];
   const modified: string[] = [];
@@ -329,17 +330,32 @@ export interface WorkspaceReconstruction {
 }
 
 /**
+ * The tree a session STARTED from — the baseline for deltas, resets and
+ * replays. Linked project files win; explicit no-project sessions start from
+ * nothing; legacy (pre-project) sessions keep the classic seed as baseline.
+ */
+export function resolveWorkspaceBase(
+  session: Pick<Session, "projectId">,
+  projects: Array<Pick<Project, "id" | "files">>,
+): Record<string, string> {
+  if (session.projectId != null) {
+    const p = projects.find((x) => x.id === session.projectId);
+    return p ? p.files : {};
+  }
+  if (session.projectId === null) return {};
+  return SEED_WORKSPACE;
+}
+
+/**
  * Rebuild the workspace as it stood right after a given ledger entry by
- * replaying every successful write_file / edit_file from the seed tree up to
- * and including that entry — mirroring the real executor's replace semantics
- * (replace_all → split/join, else first occurrence).
- *
- * bash redirect writes (`echo > file`) are NOT replayable (content lives in
- * the shell, not in args) — they set `approximate` so the UI can caveat.
+ * replaying every successful write_file / edit_file from the starting tree up
+ * to and including that entry — mirroring the real executor's replace
+ * semantics (replace_all → split/join, else first occurrence).
  */
 export function reconstructWorkspaceAt(
   session: Session,
   entryId: string,
+  base: Record<string, string> = SEED_WORKSPACE,
 ): WorkspaceReconstruction | null {
   const results = new Map<string, ChatMessage>();
   for (const m of session.messages) {

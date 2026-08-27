@@ -262,8 +262,8 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
       <div className="border-t p-2">
         <div className="mb-1 flex items-center gap-1.5 px-1">
           <FolderTree className="size-3.5 text-muted-foreground" aria-hidden />
-          <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            workspace: greeting-service
+          <h3 className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            workspace: {active?.projectName ?? (active ? (Object.keys(active.workspace).length > 0 ? "files" : "empty") : "no session")}
           </h3>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -329,19 +329,23 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
               <Button
                 size="icon"
                 variant="ghost"
-                aria-label="Reset workspace to seed files"
+                aria-label="Reset workspace to its starting files"
                 disabled={!active}
                 onClick={() => {
                   if (!active) return;
                   useDuckyStore.getState().resetWorkspace(active.id);
-                  toast.success("Workspace restored to seed");
+                  toast.success("Workspace reset", {
+                    description: active.projectName
+                      ? `Restored to the starting files of “${active.projectName}”.`
+                      : "Restored to this session's starting files.",
+                  });
                 }}
                 className="size-6 rounded-sm"
               >
                 <RotateCcw className="size-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Reset to seed</TooltipContent>
+            <TooltipContent>Reset to starting files</TooltipContent>
           </Tooltip>
         </div>
         <div

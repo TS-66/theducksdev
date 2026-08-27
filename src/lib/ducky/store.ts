@@ -15,6 +15,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import type {
   ApprovalRequest,
   ChatMessage,
+  Project,
   Session,
   Settings,
   StoredState,
@@ -37,14 +38,21 @@ const uid = (): string =>
 
 export const cloneSeedWorkspace = (): Record<string, string> => ({ ...SEED_WORKSPACE });
 
-const newSessionObj = () => ({
+/**
+ * Build a fresh session. When a project is provided the session STARTS from a
+ * copy of its files (and records the linkage); without one the workspace is
+ * born EMPTY — no hidden sample repo, by design.
+ */
+const newSessionObj = (project: Project | null) => ({
   id: uid(),
   title: 'New task',
   createdAt: Date.now(),
   updatedAt: Date.now(),
   starred: false,
   messages: [] as ChatMessage[],
-  workspace: cloneSeedWorkspace(),
+  workspace: project ? { ...project.files } : ({} as Record<string, string>),
+  projectId: project ? project.id : (null as string | null | undefined),
+  projectName: project?.name as string | undefined,
   todos: [] as TodoItem[],
   planMode: false,
   planDraft: undefined as string | undefined,
@@ -145,6 +153,16 @@ interface DshActions {
   /** Compatibility alias for {@link resetWorkspaceToSeed}. */
   resetWorkspace(sessionId: string): void;
 
+  /** Create a project; selects it as the active project. Returns the id. */
+  createProject(name: string, files?: Record<string, string>): string;
+  /** Point new sessions at this project. */
+  selectProject(id: string | null): void;
+  renameProject(id: string, name: string): void;
+  /** Remove a project. Sessions keep their workspace copies (historical). */
+  deleteProject(id: string): void;
+  /** Merge files into a project (import / agent writes back). */
+  addFilesToProject(id: string, files: Record<string, string>): void;
+
   addMessage(sessionId: string, msg: ChatMessage): void;
   patchMessage(sessionId: string, id: string, patch: Partial<ChatMessage>): void;
   appendMessageText(sessionId: string, id: string, delta: string): void;
@@ -213,15 +231,58 @@ const mapSession = (
 /** Local mutable view used inside update recipes. */
 type SessionMutable = StoredState['sessions'][number];
 
+/**
+ * The workspace a session started with — the baseline "reset" restores to.
+ * Resolution order: linked project files → empty (explicit no-project) →
+ * classic seed (legacy sessions created before projects existed).
+ */
+function startingWorkspace(
+  s: Pick<Session, 'projectId'>,
+  projects: Project[],
+): Record<string, string> {
+  if (s.projectId != null) {
+    const p = projects.find((x) => x.id === s.projectId);
+    return p ? { ...p.files } : {};
+  }
+  if (s.projectId === null) return {};
+  return cloneSeedWorkspace();
+}
+
 const touchMessageList = (s: SessionMutable, id: string, fn: (m: ChatMessage) => ChatMessage): void => {
   s.messages = s.messages.map((m) => (m.id === id ? fn(m) : m));
 };
+
+/**
+ * Hero flow: an untouched active session (0 messages) instantly rebinds to
+ * the given project (or none) so "pick/create project → type → send" starts
+ * from ITS files. Conversations with history keep their workspace.
+ */
+function rebindEmptyActiveSession(
+  st: StoredState,
+  nextId: string | null,
+): Session[] {
+  const active = st.sessions.find((s) => s.id === st.activeSessionId);
+  if (!active || active.messages.length > 0) return st.sessions;
+  const project = nextId ? st.projects.find((p) => p.id === nextId) ?? null : null;
+  return st.sessions.map((s) =>
+    s.id === active.id
+      ? {
+          ...s,
+          workspace: project ? { ...project.files } : {},
+          projectId: project ? project.id : null,
+          projectName: project?.name,
+        }
+      : s,
+  );
+}
 
 export const useDuckyStore = create<DshStore>()(
   persist(
     (set, get) => ({
       sessions: [],
       activeSessionId: null,
+      projects: [],
+      activeProjectId: null,
       settings: DEFAULT_SETTINGS,
       disabledPlugins: [],
 
@@ -230,8 +291,71 @@ export const useDuckyStore = create<DshStore>()(
       pendingAsk: null,
       hydrated: false,
 
+      /* ------------------------------ projects ---------------------------- */
+
+      createProject(name, files) {
+        const cleanName = name.trim() || 'my-project';
+        const p: Project = {
+          id: uid(),
+          name: cleanName,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          files: files ? { ...files } : {},
+        };
+        set((st) => ({
+          projects: [p, ...st.projects],
+          activeProjectId: p.id,
+          sessions: rebindEmptyActiveSession(st, p.id),
+        }));
+        return p.id;
+      },
+
+      selectProject(id) {
+        const exists = id === null || get().projects.some((p) => p.id === id);
+        const nextId = exists ? id : null;
+        set((st) => ({
+          activeProjectId: nextId,
+          sessions: rebindEmptyActiveSession(st, nextId),
+        }));
+      },
+
+      renameProject(id, name) {
+        const clean = name.trim();
+        if (!clean) return;
+        set((st) => ({
+          projects: st.projects.map((p) =>
+            p.id === id ? { ...p, name: clean, updatedAt: Date.now() } : p,
+          ),
+          // keep session display snapshots in sync so labels never lie
+          sessions: st.sessions.map((s) =>
+            s.projectId === id ? { ...s, projectName: clean } : s,
+          ),
+        }));
+      },
+
+      deleteProject(id) {
+        set((st) => ({
+          projects: st.projects.filter((p) => p.id !== id),
+          activeProjectId: st.activeProjectId === id ? null : st.activeProjectId,
+        }));
+      },
+
+      addFilesToProject(id, files) {
+        set((st) => ({
+          projects: st.projects.map((p) =>
+            p.id === id
+              ? { ...p, files: { ...p.files, ...files }, updatedAt: Date.now() }
+              : p,
+          ),
+        }));
+      },
+
+      /* ------------------------------ sessions ----------------------------- */
+
       newSession(): string {
-        const s = newSessionObj();
+        const pid = get().activeProjectId;
+        const project = pid ? get().projects.find((p) => p.id === pid) ?? null : null;
+        const s = newSessionObj(project);
         set((st) => ({
           sessions: [s, ...st.sessions],
           activeSessionId: s.id,
@@ -270,6 +394,8 @@ export const useDuckyStore = create<DshStore>()(
           starred: false,
           messages: src.messages.map((m) => ({ ...m })),
           workspace: { ...src.workspace },
+          projectId: src.projectId,
+          projectName: src.projectName,
           todos: src.todos.map((t) => ({ ...t })),
           planMode: false, // duplicated session starts with write tools unlocked
           planDraft: undefined as string | undefined,
@@ -299,8 +425,15 @@ export const useDuckyStore = create<DshStore>()(
         );
       },
 
+      /**
+       * Restore the session's workspace to its starting point: the linked
+       * project's files when one is attached, nothing for empty-start
+       * sessions, and the classic seed for legacy (pre-projects) sessions.
+       */
       resetWorkspace(sessionId) {
-        set((st) => mapSession(st, sessionId, (s) => ({ ...s, workspace: cloneSeedWorkspace() })));
+        set((st) =>
+          mapSession(st, sessionId, (s) => ({ ...s, workspace: startingWorkspace(s, st.projects) })),
+        );
       },
 
       addMessage(sessionId, msg) {
@@ -411,7 +544,9 @@ export const useDuckyStore = create<DshStore>()(
       },
 
       resetWorkspaceToSeed(sessionId) {
-        set((st) => mapSession(st, sessionId, (s) => ({ ...s, workspace: cloneSeedWorkspace() })));
+        set((st) =>
+          mapSession(st, sessionId, (s) => ({ ...s, workspace: startingWorkspace(s, st.projects) })),
+        );
       },
 
       setTodos(sessionId, todos) {
@@ -479,14 +614,26 @@ export const useDuckyStore = create<DshStore>()(
     }),
     {
       name: 'ducky-coder-store-v1',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => createThrottledWindowStorage()),
       partialize: (state) => ({
         sessions: state.sessions,
         activeSessionId: state.activeSessionId,
+        projects: state.projects,
+        activeProjectId: state.activeProjectId,
         settings: state.settings,
         disabledPlugins: state.disabledPlugins,
       }),
+      /** v1 → v2: introduce projects (none are auto-created — no hidden sample). */
+      migrate: (persisted) => {
+        const p = (persisted ?? {}) as Partial<StoredState>;
+        return {
+          ...p,
+          projects: Array.isArray(p.projects) ? p.projects : [],
+          activeProjectId:
+            typeof p.activeProjectId === 'string' ? p.activeProjectId : null,
+        } as StoredState;
+      },
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<StoredState>;
         const settings = { ...DEFAULT_SETTINGS, ...(p.settings ?? {}) };
@@ -495,12 +642,42 @@ export const useDuckyStore = create<DshStore>()(
         if (settings.model !== MODEL_ID) settings.model = MODEL_ID;
         // Drop stale plugin ids that no longer exist in the registry.
         const knownIds = new Set(PLUGINS.map((pl) => pl.id));
+        const projects = Array.isArray(p.projects)
+          ? p.projects.filter(
+              (x) =>
+                x &&
+                typeof x.id === 'string' &&
+                typeof x.name === 'string' &&
+                x.files &&
+                typeof x.files === 'object',
+            )
+          : [];
+        const sessions = Array.isArray(p.sessions) ? p.sessions : [];
+        // Legacy stamping: pre-project sessions still carrying the sample repo
+        // get a readable display name (no project entity is created).
+        for (const s of sessions) {
+          if (
+            s &&
+            s.projectId === undefined &&
+            s.projectName === undefined &&
+            s.workspace &&
+            typeof s.workspace === 'object' &&
+            Object.prototype.hasOwnProperty.call(s.workspace, 'src/greet.ts')
+          ) {
+            s.projectName = 'greeting-service';
+          }
+        }
         return {
           ...current,
-          sessions: Array.isArray(p.sessions) ? p.sessions : [],
+          sessions,
           activeSessionId:
-            typeof p.activeSessionId === 'string' && p.sessions?.some((s) => s.id === p.activeSessionId)
+            typeof p.activeSessionId === 'string' && sessions.some((s) => s.id === p.activeSessionId)
               ? p.activeSessionId
+              : null,
+          projects,
+          activeProjectId:
+            typeof p.activeProjectId === 'string' && projects.some((x) => x.id === p.activeProjectId)
+              ? p.activeProjectId
               : null,
           settings,
           disabledPlugins: Array.isArray(p.disabledPlugins)

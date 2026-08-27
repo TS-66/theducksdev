@@ -54,13 +54,13 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
-import { SEED_WORKSPACE } from "@/lib/ducky/workspace-seed";
 import {
   buildTimeline,
   clampDiffInput,
   lineDelta,
   planConversationTruncate,
   reconstructWorkspaceAt,
+  resolveWorkspaceBase,
   workspaceChangeSets,
   workspaceDelta,
   type TimelineEntry,
@@ -82,9 +82,15 @@ export function ActivityTimelinePanel({
   session,
   onPreviewFile,
 }: ActivityPanelProps) {
+  const projects = useDuckyStore((s) => s.projects);
+  /** the tree this session started from (project files / empty / legacy seed) */
+  const base = React.useMemo(
+    () => (session ? resolveWorkspaceBase(session, projects) : {}),
+    [session, projects],
+  );
   const delta = React.useMemo(
-    () => workspaceDelta(session?.workspace ?? {}),
-    [session?.workspace],
+    () => workspaceDelta(session?.workspace ?? {}, base),
+    [session?.workspace, base],
   );
   const deltaCount = delta.added.length + delta.modified.length + delta.removed.length;
   // subscribed once at the top — hooks never live inside conditional JSX
@@ -102,7 +108,7 @@ export function ActivityTimelinePanel({
             <GitBranch className="size-3.5 rotate-90 text-muted-foreground" aria-hidden />
             activity log
             <Badge variant="outline" className="font-mono text-[10px] font-normal text-muted-foreground">
-              HEAD · greeting-service
+              HEAD · {session?.projectName ?? (session ? (Object.keys(session.workspace).length > 0 ? "workspace" : "empty") : "no session")}
             </Badge>
           </SheetTitle>
           <SheetDescription className="text-[11px]">
@@ -134,7 +140,7 @@ export function ActivityTimelinePanel({
               {deltaCount === 0 ? (
                 <CleanWorkspace />
               ) : (
-                <WorkspaceDiffView delta={delta} current={session?.workspace ?? {}} onPreviewFile={onPreviewFile} />
+                <WorkspaceDiffView delta={delta} current={session?.workspace ?? {}} base={base} onPreviewFile={onPreviewFile} />
               )}
             </TabsContent>
           </div>
@@ -698,10 +704,13 @@ const RESTORE_TOOLS = new Set(["write_file", "edit_file", "bash"]);
 
 function RestorePointButton({ entry: e, session }: { entry: TimelineEntry; session: Session }) {
   const [open, setOpen] = React.useState(false);
+  const projects = useDuckyStore((s) => s.projects);
+  // replay baseline = the tree this session started from (project/empty/legacy seed)
+  const base = React.useMemo(() => resolveWorkspaceBase(session, projects), [session, projects]);
 
   const reconstruction = React.useMemo(
-    () => (open ? reconstructWorkspaceAt(session, e.id) : null),
-    [open, session, e.id],
+    () => (open ? reconstructWorkspaceAt(session, e.id, base) : null),
+    [open, session, e.id, base],
   );
 
   const changes = React.useMemo(
@@ -916,17 +925,20 @@ function DeltaChip({ n, tone }: { n: number; tone: "add" | "mod" | "del" }) {
 function WorkspaceDiffView({
   delta,
   current,
+  base,
   onPreviewFile,
 }: {
   delta: ReturnType<typeof workspaceDelta>;
   current: Record<string, string>;
+  /** the tree this session started from ("old" side of modified diffs) */
+  base: Record<string, string>;
   onPreviewFile: (path: string) => void;
 }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-          vs seed tree:
+          vs start tree:
         </span>
         {delta.added.length > 0 && <DeltaChip n={delta.added.length} tone="add" />}
         {delta.modified.length > 0 && <DeltaChip n={delta.modified.length} tone="mod" />}
@@ -969,7 +981,7 @@ function WorkspaceDiffView({
               <ModifiedFileDiff
                 key={p}
                 path={p}
-                oldStr={seedOf(p)}
+                oldStr={base[p] ?? ""}
                 newStr={current[p] ?? ""}
                 onPreviewFile={onPreviewFile}
               />
@@ -998,11 +1010,6 @@ function WorkspaceDiffView({
       )}
     </div>
   );
-}
-
-/** seed lookup straight from the module singleton */
-function seedOf(path: string): string {
-  return Object.prototype.hasOwnProperty.call(SEED_WORKSPACE, path) ? SEED_WORKSPACE[path] : "";
 }
 
 function ModifiedFileDiff({

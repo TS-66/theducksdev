@@ -76,6 +76,20 @@ export interface ChatMessage {
   createdAt: number;
 }
 
+/**
+ * A named project (workspace snapshot) the user owns. New sessions START from
+ * a project's files; the session then evolves its own copy. No project is
+ * created automatically — an install is born empty by design.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  /** path -> content map (same shape as a session workspace) */
+  files: Record<string, string>;
+}
+
 export interface Session {
   id: string;
   title: string;
@@ -85,6 +99,10 @@ export interface Session {
   messages: ChatMessage[];
   /** virtual workspace filesystem: absolute-ish path -> content */
   workspace: Record<string, string>;
+  /** project this session started from · null = deliberately empty · undefined = legacy (pre-projects) */
+  projectId?: string | null;
+  /** display snapshot of the project name at attach time */
+  projectName?: string;
   todos: TodoItem[];
   planMode: boolean;
   planDraft?: string;
@@ -179,6 +197,10 @@ export interface RunLoopOptions {
 export interface StoredState {
   sessions: Session[];
   activeSessionId: string | null;
+  /** user-owned projects; empty by default (no hidden sample) */
+  projects: Project[];
+  /** project new sessions start from */
+  activeProjectId: string | null;
   settings: Settings;
   disabledPlugins: string[];
 }

@@ -14,9 +14,11 @@ interface ChatStreamProps {
   onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
   /** centered zcode-style composer rendered inside the hero */
   composerSlot?: React.ReactNode;
+  /** extra props forwarded into the hero (project state + callbacks); onPick is provided here */
+  heroProps?: Omit<React.ComponentProps<typeof Hero>, "onPick" | "children">;
 }
 
-export function ChatStream({ sessionRunning, onPick, composerSlot }: ChatStreamProps) {
+export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: ChatStreamProps) {
   const sessions = useDuckyStore((s) => s.sessions);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
 
@@ -71,7 +73,7 @@ export function ChatStream({ sessionRunning, onPick, composerSlot }: ChatStreamP
          wrapper would let the hero's intrinsic width stretch the viewport */
       <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
         <div className="ducky-grid-bg mx-auto min-h-full w-full max-w-5xl px-4 py-6 md:px-8">
-          <Hero onPick={onPick}>{composerSlot}</Hero>
+          <Hero onPick={onPick} {...heroProps}>{composerSlot}</Hero>
         </div>
       </div>
     );

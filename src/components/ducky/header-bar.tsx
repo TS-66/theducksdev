@@ -27,8 +27,19 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const sessions = useDuckyStore((s) => s.sessions);
   const settings = useDuckyStore((s) => s.settings);
+  const projects = useDuckyStore((s) => s.projects);
+  const activeProjectId = useDuckyStore((s) => s.activeProjectId);
 
   const session = sessions.find((s) => s.id === activeSessionId) ?? null;
+  const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
+  /** the session's project wins; else the next session's project; else nothing */
+  const workspaceLabel =
+    session?.projectName ??
+    (session
+      ? Object.keys(session.workspace).length > 0
+        ? "workspace"
+        : "empty"
+      : (activeProject?.name ?? "no project"));
 
   return (
     <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur">
@@ -74,7 +85,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
               className="mr-1 hidden items-center gap-1.5 rounded-md border border-transparent px-2 py-1 font-mono text-[11px] text-muted-foreground md:flex"
             >
               <FolderGit2 className="size-3.5" aria-hidden />
-              <span className="truncate">workspace: greeting-service</span>
+              <span className="truncate">workspace: {workspaceLabel}</span>
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Virtual sandboxed FS stored in your browser</TooltipContent>

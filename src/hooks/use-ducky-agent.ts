@@ -98,6 +98,7 @@ export function toWireMessages(messages: ChatMessage[]): WireMessage[] {
 function buildSystemPrompt(opts: {
   files: string[];
   workspaceTree: string;
+  projectName?: string | null;
   todos: Array<{ content: string; status: string }>;
   planMode: boolean;
   planDraft?: string;
@@ -107,7 +108,9 @@ function buildSystemPrompt(opts: {
   const enabled = PLUGINS.filter((p) => !useDuckyStore.getState().disabledPlugins.includes(p.id));
   const lines: string[] = [
     'You are Ducky, the Ducky AI coder agent — an everything-is-a-plugin coding harness running entirely in the browser.',
-    'You operate against a virtual workspace seeded with a sample repository. Prefer tools over prose for any file inspection or mutation.',
+    opts.files.length > 0
+      ? `You operate against a virtual workspace${opts.projectName ? ` for the project “${opts.projectName}”` : ''} (${opts.files.length} files). Prefer tools over prose for any file inspection or mutation.`
+      : 'You operate against an EMPTY virtual workspace (no project attached). Offer to scaffold files with write tools, or suggest creating/importing a project.',
     `Today is ${now.toISOString()} . OS: simulated linux x86_64 (shell is a safe mini-bash over the workspace).`,
     '',
     '# Enabled plugins',
@@ -222,6 +225,7 @@ export function useDuckyAgent() {
     const sysPrompt = buildSystemPrompt({
       files: Object.keys(session.workspace),
       workspaceTree: renderTree(session.workspace, '/'),
+      projectName: session.projectName ?? null,
       todos: session.todos,
       planMode: session.planMode,
       planDraft: session.planDraft,
@@ -440,6 +444,12 @@ export function useDuckyAgent() {
           enabledToolNames: demoEnabledToolNames(disabledPlugins),
           listFiles: () => useDuckyStore.getState().listWorkspaceFiles(sid),
           readFile: (p) => useDuckyStore.getState().getFile(sid, p),
+          projectName:
+            session.projectName ??
+            useDuckyStore
+              .getState()
+              .projects.find((p) => p.id === session.projectId)?.name ??
+            null,
           todos: session.todos,
           askUser: askUserBridge,
           planModeActive: session.planMode,

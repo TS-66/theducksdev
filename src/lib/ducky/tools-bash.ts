@@ -588,7 +588,10 @@ function execCommand(ctx: ExecContext, inv: SimpleInvocation): CommandOutcome {
     case 'tree': {
       const base = args.find((a) => !a.startsWith('-')) ?? '.';
       const abs = resolveWsPath(ctx.cwd.value, base);
-      if (!dirExists(ctx.ws, abs)) return fail(`ducky: tree: ${base}: No such file or directory`, 1);
+      // an empty workspace is a valid (empty) tree — fail only on a real miss
+      if (Object.keys(ctx.ws).length > 0 && !dirExists(ctx.ws, abs)) {
+        return fail(`ducky: tree: ${base}: No such file or directory`, 1);
+      }
       const prefix = abs ? `${abs}/` : '';
       const subtree: Record<string, string> = {};
       for (const k of Object.keys(ctx.ws)) {
