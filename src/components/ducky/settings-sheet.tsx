@@ -52,8 +52,6 @@ import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
 import {
   DEFAULT_BASE_URL,
-  KEY_PORTAL_LABEL,
-  KEY_PORTAL_URL,
   MODEL_BLURB,
   MODEL_DISPLAY,
   MODEL_ID,
@@ -128,7 +126,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
             <TabsContent value="models" className="mt-0 space-y-5">
               <section className="space-y-1.5">
                 <Label htmlFor="ducky-api-key" className="flex items-center gap-1.5 text-xs">
-                  <KeyRound className="size-3 text-[#FDC00A]" aria-hidden /> AIHUBMIX API key
+                  <KeyRound className="size-3 text-[#FDC00A]" aria-hidden /> API key
                 </Label>
                 <div className="relative">
                   <Input
@@ -152,16 +150,8 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Stored only in this browser&apos;s localStorage — requests are proxied
-                  serverlessly without persistence. Get a key at{" "}
-                  <a
-                    href={KEY_PORTAL_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary underline underline-offset-2"
-                  >
-                    {KEY_PORTAL_LABEL}
-                  </a>
-                  . Ducky 3.5 Coder is served through AIHUBMIX.
+                  serverlessly without persistence. Leave empty if the deployment
+                  already provides a key on the server (AI_API_KEY env).
                 </p>
               </section>
 
@@ -178,10 +168,14 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   id="ducky-base-url"
                   value={draft.baseUrl}
                   onChange={(e) => patch({ baseUrl: e.target.value })}
-                  placeholder="https://aihubmix.com/v1"
+                  placeholder="https://your-endpoint.example.com/v1"
                   className="h-8 font-mono text-xs"
                   spellCheck={false}
                 />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  OpenAI-compatible chat-completions endpoint. Leave empty to use
+                  the server-configured one (AI_BASE_URL env).
+                </p>
               </section>
 
               <section className="space-y-1.5">
@@ -193,12 +187,9 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                     title={MODEL_DISPLAY}
                     icon={<Sparkles className="size-4 text-[#FDC00A]" aria-hidden />}
                     desc={MODEL_BLURB}
-                    blurb="550B · flagship coder"
+                    blurb="flagship coder"
                   />
                 </div>
-                <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/70">
-                  upstream: nvidia/neutron-3-ultra-550b · gateway: aihubmix.com/v1
-                </p>
               </section>
 
               <section className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
@@ -342,10 +333,9 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                 </div>
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                   A browser-native coding agent console — plugin-based harness, virtual
-                  workspace FS and permission gates, built with Next.js. Behind the scenes,
-                  <span className="text-foreground/80"> {MODEL_DISPLAY}</span> runs on{" "}
-                  <span className="text-foreground/80">NVIDIA Neutron 3 Ultra (550B)</span> served
-                  via the AIHUBMIX gateway.
+                  workspace FS and permission gates, built with Next.js. Every chat
+                  streams through <span className="text-foreground/80">{MODEL_DISPLAY}</span> via a
+                  stateless, serverless proxy — no database, no server-side session state.
                 </p>
               </section>
 

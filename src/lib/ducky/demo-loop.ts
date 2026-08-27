@@ -1,7 +1,7 @@
 /**
  * Ducky AI | Coder — scripted demo engine.
  *
- * When no AIHUBMIX API key is configured (or demo mode is forced), this
+ * When no API key is configured (or demo mode is forced), this
  * engine stands in for the model: it routes the user's message to one of a
  * few golden-path flows and drives the REAL tool executors against the real
  * virtual workspace — files are genuinely read/written, bash genuinely runs.
@@ -237,7 +237,7 @@ _Awaiting your approval to exit plan mode._`;
       });
       await streamText(
         approved
-          ? `\n✅ Plan approved — plan mode is now **off** and write tools are unlocked. With a real AIHUBMIX key I'd execute this plan with live diffs; in demo mode ask *“change the default greeting to Howdy”* to see the edit flow.`
+          ? `\n✅ Plan approved — plan mode is now **off** and write tools are unlocked. With a real API key I'd execute this plan with live diffs; in demo mode ask *“change the default greeting to Howdy”* to see the edit flow.`
           : `\n⏸ Plan kept open — you're still in plan mode. Ask me to adjust any phase, or approve the card when you're ready to proceed.`,
         emitSafe,
         signal,
@@ -373,7 +373,7 @@ _Awaiting your approval to exit plan mode._`;
       );
       await runTool('bash', { command: cmd });
       await streamText(
-        `\n> Every tool result in demo mode is executed for real against the virtual workspace — only the agent's decisions are scripted. Add an AIHUBMIX API key in Settings to unlock the full agent.`,
+        `\n> Every tool result in demo mode is executed for real against the virtual workspace — only the agent's decisions are scripted. Add an API key in Settings to unlock the full agent.`,
         emitSafe,
         signal,
       );
@@ -429,7 +429,7 @@ _Awaiting your approval to exit plan mode._`;
 
 The repository is intentionally tiny: it exists so the harness tools have something real to read, edit and run while you evaluate Ducky Coder.
 
-> Add your AIHUBMIX API key in **Settings → Models** and I'll analyze anything you ask with the full Ducky 3.5 Coder loop.`;
+> Add your API key in **Settings → Models** and I'll analyze anything you ask with the full Ducky 3.5 Coder loop.`;
       await streamText(`\n${summary}`, emitSafe, signal);
       emitSafe({ type: 'done', aborted: false });
       return;
@@ -667,7 +667,7 @@ Ask me to *“edit the greeting defaults”* next and watch the todo flow hand o
     const files = opts.listFiles();
     const bytes = Object.values(opts.listFiles()).length;
     void bytes;
-    const intro = `**Demo mode** — no AIHUBMIX API key is configured, so I'm running on a scripted engine. Tool execution is still 100% real: everything happens against the virtual workspace in your browser (${fmtNum(files.length)} files currently tracked).
+    const intro = `**Demo mode** — no API key is configured, so I'm running on a scripted engine. Tool execution is still 100% real: everything happens against the virtual workspace in your browser (${fmtNum(files.length)} files currently tracked).
 
 Try one of these:
 
@@ -682,7 +682,7 @@ Try one of these:
 - **Toggle Plan mode, then send any task** — research → drafted plan → \`exit_plan_mode\` approval card
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 
-Then paste your AIHUBMIX API key in **Settings → Models** to unlock the full agent loop with **Ducky 3.5 Coder**.`;
+Then paste your API key in **Settings → Models** to unlock the full agent loop with **Ducky 3.5 Coder**.`;
     await streamText(intro, emitSafe, signal);
     emitSafe({ type: 'done', aborted: false });
   } catch (e) {

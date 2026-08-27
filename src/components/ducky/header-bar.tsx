@@ -123,7 +123,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            {MODEL_DISPLAY} · NVIDIA Neutron 3 Ultra 550B via AIHUBMIX — opens Settings → Models
+            {MODEL_DISPLAY} — opens Settings → Models
           </TooltipContent>
         </Tooltip>
 

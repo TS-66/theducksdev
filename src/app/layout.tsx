@@ -17,12 +17,10 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://ducky-ai-coder.local"),
   title: "Ducky AI | Coder",
   description:
-    "Ducky AI | Coder — a browser-native coding agent console. Plugin-based tools, a virtual workspace filesystem, permission gates and the Ducky 3.5 Coder model, powered by NVIDIA Neutron 3 Ultra (550B) via AIHUBMIX.",
+    "Ducky AI | Coder — a browser-native coding agent console. Plugin-based tools, a virtual workspace filesystem, permission gates and the Ducky 3.5 Coder model.",
   keywords: [
     "Ducky AI",
     "Ducky 3.5 Coder",
-    "AIHUBMIX",
-    "Neutron 3 Ultra",
     "coding agent",
     "agent harness",
     "AI agent",
@@ -32,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Ducky AI | Coder",
     description:
-      "A browser-native coding agent console running Ducky 3.5 Coder — powered by NVIDIA Neutron 3 Ultra (550B) via AIHUBMIX.",
+      "A browser-native coding agent console running Ducky 3.5 Coder.",
     images: ["/ducky-logo.png"],
   },
 };

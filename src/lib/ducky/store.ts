@@ -53,7 +53,7 @@ const newSessionObj = () => ({
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
-  baseUrl: 'https://aihubmix.com/v1',
+  baseUrl: '', // empty = use the server-configured endpoint (AI_BASE_URL env)
   model: MODEL_ID,
   temperature: 1,
   maxTokens: 8192,

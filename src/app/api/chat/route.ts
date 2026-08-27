@@ -1,22 +1,22 @@
 /**
- * Ducky AI | Coder — stateless SSE pass-through proxy to the AIHUBMIX
- * OpenAI-compatible chat-completions gateway. Serverless-safe: pure fetch,
- * no Node APIs (only `process.env` for the optional server-side key/model).
+ * Ducky AI | Coder — stateless SSE pass-through proxy.
+ *
+ * Serverless-safe: pure fetch, no Node APIs (only `process.env`). The
+ * endpoint, credentials and backend model id are **deployment secrets** that
+ * live exclusively in server environment variables — they are never sent to,
+ * stored by, or visible from the client.
+ *
+ * Environment variables (set these in your hosting dashboard):
+ *   AI_BASE_URL   – OpenAI-compatible base URL  (e.g. https://api.example.com/v1)
+ *   AI_API_KEY    – bearer key for that endpoint
+ *   AI_MODEL_ID   – upstream model id that powers "Ducky 3.5 Coder"
  *
  * The user-facing model id is always `ducky-3.5-coder` (Ducky 3.5 Coder).
- * Server-side it is mapped to the real backend model — NVIDIA Neutron 3
- * Ultra 550B — via `AIHUBMIX_MODEL` (default `neutron-3-ultra-550b`).
+ * It is translated to `AI_MODEL_ID` server-side so the upstream name never
+ * reaches the client.
  */
 
 export const maxDuration = 60;
-
-const DEFAULT_BASE_URL = 'https://aihubmix.com/v1';
-const DEFAULT_UPSTREAM_MODEL = 'neutron-3-ultra-550b';
-
-/** Public model id → upstream AIHUBMIX model id. */
-function resolveUpstreamModel(publicModel: unknown): string {
-  return process.env.AIHUBMIX_MODEL || DEFAULT_UPSTREAM_MODEL;
-}
 
 interface ChatProxyBody {
   baseUrl?: string;
@@ -42,34 +42,39 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError(400, 'Invalid JSON body.');
   }
 
-  const apiKey = body.apiKey || process.env.AIHUBMIX_API_KEY || '';
+  // Resolution order: client-provided (Settings, dev convenience) → server env.
+  const apiKey = body.apiKey || process.env.AI_API_KEY || '';
   if (!apiKey) {
     return jsonError(
       400,
-      'No API key configured. Open Settings and add your AIHUBMIX API key.',
+      'No API key configured. Add one in Settings → Models, or set AI_API_KEY in the server environment.',
     );
   }
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return jsonError(400, 'Missing required field: messages.');
   }
 
-  const base = (body.baseUrl || process.env.AIHUBMIX_BASE_URL || DEFAULT_BASE_URL).replace(
-    /\/+$/,
-    '',
-  );
+  const rawBase = body.baseUrl || process.env.AI_BASE_URL || '';
+  if (!rawBase) {
+    return jsonError(
+      400,
+      'No endpoint configured. Set AI_BASE_URL in the server environment (or Base URL in Settings → Models).',
+    );
+  }
+  const base = rawBase.replace(/\/+$/, '');
   const endpoint = `${base}/chat/completions`;
 
   // Forward everything verbatim except our own proxy-control fields; force
   // streaming with usage accounting when tools are in play. The public
-  // "ducky-3.5-coder" id is translated to the real backend model here so the
-  // upstream name never reaches the client.
+  // "ducky-3.5-coder" id is translated to the configured backend model here
+  // so the upstream id never reaches the client.
   const { baseUrl: _b, apiKey: _k, ...forward } = body;
   void _b;
   void _k;
 
   const payload = {
     ...forward,
-    model: resolveUpstreamModel(body.model),
+    model: process.env.AI_MODEL_ID || 'ducky-3.5-coder',
     stream: true,
     ...(Array.isArray(body.tools) && body.tools.length > 0
       ? { stream_options: { include_usage: true } }
@@ -105,7 +110,7 @@ export async function POST(req: Request): Promise<Response> {
       // keep generic message
     }
     if (upstream.status === 401) {
-      message = `${message} — check your AIHUBMIX API key in Settings.`;
+      message = `${message} — check your API key in Settings → Models (or AI_API_KEY on the server).`;
     }
     return jsonError(upstream.status, message);
   }

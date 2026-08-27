@@ -120,7 +120,7 @@ export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
       <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
         <BadgeMini icon={<ShieldCheck className="size-3" />} label="Key stays local" />
         <BadgeMini icon={<PlugZap className="size-3" />} label="9 plugins" />
-        <BadgeMini icon={<ServerCog className="size-3" />} label="AIHUBMIX-powered" />
+        <BadgeMini icon={<ServerCog className="size-3" />} label="Serverless proxy" />
       </div>
 
       {/* boot log strip — pure decoration */}
@@ -138,7 +138,7 @@ export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
           <span className="text-emerald-400">✓</span> virtual workspace mounted (/greeting-service)
         </p>
         <p className="ducky-boot-line" style={{ animationDelay: "0.55s" }}>
-          <span className="text-emerald-400">✓</span> model: ducky-3.5-coder · neutron-3-ultra-550b @ aihubmix
+          <span className="text-emerald-400">✓</span> model: ducky-3.5-coder · endpoint ready
         </p>
         <p className="ducky-boot-line text-[#FDC00A]" style={{ animationDelay: "0.75s" }}>
           ▸ awaiting your first task… quack

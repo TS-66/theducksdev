@@ -8,7 +8,7 @@ A browser-native coding agent console. The everything-is-a-plugin harness experi
 
 Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 
-- **One model: Ducky 3.5 Coder** — behind the scenes it runs on **NVIDIA Neutron 3 Ultra (550B params)**, served through the [AIHUBMIX](https://aihubmix.com) OpenAI-compatible gateway. The upstream model name never leaks to the client; `/api/chat` maps `ducky-3.5-coder` → the real backend id server-side.
+- **One model: Ducky 3.5 Coder** — the only model you'll ever see. Which endpoint serves it is a pure deployment concern: `/api/chat` maps the public id to a server-side `AI_MODEL_ID` so the upstream name never reaches the client.
 - **Streaming chat with tools** — the model calls tools across multiple iterations; results stream back as tool cards (per-tool icons, diff previews for edits, live output).
 - **Virtual workspace** — a sandboxed filesystem stored in your browser (seeded with a sample repo). `read_file`, `write_file`, `edit_file`, `glob`, `grep` and a simulated `bash` (pipes, redirects, `&&` chains) all operate on it. Paste or import images, preview them, export everything as a valid `.zip`.
 - **Everything is a plugin** — the plugin manager mirrors package-style ids (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-todo`, …). Toggling a plugin unloads its tools from the model's schema.
@@ -21,15 +21,23 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 
 ## Configuration
 
-Everything lives in the browser's `localStorage` — no database, no server state. Add an **AIHUBMIX API key** in **Settings → Models** to unlock the full agent loop with Ducky 3.5 Coder.
+Everything lives in the browser's `localStorage` — no database, no server state. Add an **API key** in **Settings → Models** to unlock the full agent loop with Ducky 3.5 Coder — or configure the server once (below) and leave Settings empty.
 
 ### Environment variables (optional)
 
+Copy `.env.example` to `.env.local` for local dev, or set them in your hosting dashboard:
+
 | Variable | Required | Description |
 | --- | --- | --- |
-| `AIHUBMIX_API_KEY` | No | Server-side fallback key. A key entered in Settings takes precedence. |
-| `AIHUBMIX_BASE_URL` | No | Gateway base URL. Default: `https://aihubmix.com/v1`. |
-| `AIHUBMIX_MODEL` | No | Real backend model id behind Ducky 3.5 Coder. Default: `neutron-3-ultra-550b`. |
+| `AI_BASE_URL` | See note | OpenAI-compatible chat-completions base URL. Required unless users supply their own Base URL in Settings. |
+| `AI_API_KEY` | See note | Bearer key for the endpoint above. Required unless users paste their own key in Settings. |
+| `AI_MODEL_ID` | No | Upstream model id that powers Ducky 3.5 Coder. Defaults to passing the public id through. |
+
+> Note: at least one of (server env, user Settings) must provide the base URL and key, otherwise `/api/chat` returns an actionable 400.
+
+### Deploying (e.g. Vercel)
+
+The app is serverless-ready out of the box. Push the repo to Git, import it into your platform, and add `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL_ID` as (Production) environment variables — no database, no blob storage, no extra services. Stream function durations are already tuned via the route's `maxDuration`.
 
 ### Run anywhere
 
@@ -47,17 +55,17 @@ bun run build && bun run start   # production
 Browser (client)                          Server (stateless)
 ┌────────────────────────────┐            ┌─────────────────────┐
 │  zustand + localStorage    │            │  /api/chat          │
-│   sessions · workspace ·   │  fetch()   │   SSE pass-through  │──▶ AIHUBMIX gateway
+│   sessions · workspace ·   │  fetch()   │   SSE pass-through  │──▶ your OpenAI-compatible
 │   settings · plugins       │───────────▶│  /api/web-search    │──▶ search backend
-│  agent loop                │            │  /api/web-fetch     │──▶ NVIDIA Neutron 3
-│   (src/lib/ducky/          │            │  /api/vision        │    Ultra 550B
+│  agent loop                │            │  /api/web-fetch     │    endpoint (env-configured)
+│   (src/lib/ducky/          │            │  /api/vision        │
 │    agent-loop.ts)          │            └─────────────────────┘
 │  tool executors on vFS     │
 └────────────────────────────┘
 ```
 
 - `src/lib/ducky/types.ts` — canonical wire/UI contract.
-- `src/lib/ducky/models.ts` — model registry (`ducky-3.5-coder` → Neutron 3 Ultra 550B @ AIHUBMIX).
+- `src/lib/ducky/models.ts` — model registry (single public model: `ducky-3.5-coder`).
 - `src/lib/ducky/plugins.ts` — plugin manifests + tool schemas.
 - `src/lib/ducky/agent-loop.ts` — multi-iteration loop, SSE parsing, policy gate, subagent.
 - `src/lib/ducky/demo-loop.ts` — zero-config scripted demo engine (real tool execution).

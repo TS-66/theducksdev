@@ -125,7 +125,7 @@ export type PermissionPolicy = "auto" | "ask" | "readonly";
 
 export interface Settings {
   apiKey: string;
-  /** default: https://aihubmix.com/v1 (AIHUBMIX gateway) */
+  /** default: server-configured endpoint (AI_BASE_URL env) */
   baseUrl: string;
   model: string;
   temperature: number;

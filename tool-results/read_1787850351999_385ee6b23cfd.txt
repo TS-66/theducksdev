@@ -1,0 +1,802 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import {
+     5→  Check,
+     6→  Copy,
+     7→  DatabaseBackup,
+     8→  Download,
+     9→  Eye,
+    10→  EyeOff,
+    11→  FileJson,
+    12→  FlaskConical,
+    13→  Hand,
+    14→  HardDrive,
+    15→  Image as ImageIcon,
+    16→  KeyRound,
+    17→  Sparkles,
+    18→  TerminalSquare,
+    19→  TriangleAlert,
+    20→  Upload,
+    21→  Zap,
+    22→} from "lucide-react";
+    23→import { toast } from "sonner";
+    24→import {
+    25→  AlertDialog,
+    26→  AlertDialogAction,
+    27→  AlertDialogCancel,
+    28→  AlertDialogContent,
+    29→  AlertDialogDescription,
+    30→  AlertDialogFooter,
+    31→  AlertDialogHeader,
+    32→  AlertDialogTitle,
+    33→  AlertDialogTrigger,
+    34→} from "@/components/ui/alert-dialog";
+    35→import { Badge } from "@/components/ui/badge";
+    36→import { Button } from "@/components/ui/button";
+    37→import { Input } from "@/components/ui/input";
+    38→import { Label } from "@/components/ui/label";
+    39→import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+    40→import {
+    41→  Sheet,
+    42→  SheetContent,
+    43→  SheetDescription,
+    44→  SheetHeader,
+    45→  SheetTitle,
+    46→} from "@/components/ui/sheet";
+    47→import { Slider } from "@/components/ui/slider";
+    48→import { Switch } from "@/components/ui/switch";
+    49→import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+    50→import { Textarea } from "@/components/ui/textarea";
+    51→import { cn } from "@/lib/utils";
+    52→import { useDuckyStore } from "@/lib/ducky/store";
+    53→import {
+    54→  DEFAULT_BASE_URL,
+    55→  KEY_PORTAL_LABEL,
+    56→  KEY_PORTAL_URL,
+    57→  MODEL_BLURB,
+    58→  MODEL_DISPLAY,
+    59→  MODEL_ID,
+    60→} from "@/lib/ducky/models";
+    61→import {
+    62→  downloadSessionsBackup,
+    63→  parseBackupFile,
+    64→} from "@/lib/ducky/session-backup";
+    65→import type { PermissionPolicy, Settings } from "@/lib/ducky/types";
+    66→
+    67→export type SettingsTab = "models" | "behavior" | "data" | "about";
+    68→
+    69→const FALLBACK_DEFAULTS: Settings = {
+    70→  apiKey: "",
+    71→  baseUrl: DEFAULT_BASE_URL,
+    72→  model: MODEL_ID,
+    73→  temperature: 0.7,
+    74→  maxTokens: 4096,
+    75→  policy: "ask",
+    76→  systemPromptExtra: "",
+    77→  maxToolIterations: 6,
+    78→  showReasoning: true,
+    79→  demoMode: false,
+    80→};
+    81→
+    82→interface SettingsSheetProps {
+    83→  open: boolean;
+    84→  onOpenChange: (open: boolean) => void;
+    85→  initialTab?: SettingsTab;
+    86→}
+    87→
+    88→export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetProps) {
+    89→  const storeSettings = useDuckyStore((s) => s.settings);
+    90→  const [tab, setTab] = React.useState<SettingsTab>(initialTab ?? "models");
+    91→  const [draft, setDraft] = React.useState<Settings>(storeSettings);
+    92→  const [showKey, setShowKey] = React.useState(false);
+    93→
+    94→  // re-seed draft whenever the sheet opens / forced tab changes
+    95→  React.useEffect(() => {
+    96→    if (!open) return;
+    97→    setDraft(useDuckyStore.getState().settings);
+    98→    if (initialTab) setTab(initialTab);
+    99→  }, [open, initialTab]);
+   100→
+   101→  const patch = (p: Partial<Settings>) => setDraft((d) => ({ ...d, ...p }));
+   102→
+   103→  const save = () => {
+   104→    useDuckyStore.getState().updateSettings(draft);
+   105→    toast.success("Settings saved", { description: `model=${draft.model} · policy=${draft.policy}` });
+   106→  };
+   107→
+   108→  return (
+   109→    <Sheet open={open} onOpenChange={onOpenChange}>
+   110→      <SheetContent side="right" className="flex w-[420px] max-w-[94vw] flex-col gap-0 sm:max-w-[420px]">
+   111→        <SheetHeader className="border-b">
+   112→          <SheetTitle>Settings</SheetTitle>
+   113→          <SheetDescription>
+   114→            Everything lives in this browser&apos;s localStorage.
+   115→          </SheetDescription>
+   116→        </SheetHeader>
+   117→
+   118→        <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)} className="flex min-h-0 flex-1 flex-col gap-0">
+   119→          <TabsList className="mx-4 mt-3 grid grid-cols-4">
+   120→            <TabsTrigger value="models">Models</TabsTrigger>
+   121→            <TabsTrigger value="behavior">Behavior</TabsTrigger>
+   122→            <TabsTrigger value="data">Data</TabsTrigger>
+   123→            <TabsTrigger value="about">About</TabsTrigger>
+   124→          </TabsList>
+   125→
+   126→          <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
+   127→            {/* ── Models ─────────────────────────────────────────────── */}
+   128→            <TabsContent value="models" className="mt-0 space-y-5">
+   129→              <section className="space-y-1.5">
+   130→                <Label htmlFor="ducky-api-key" className="flex items-center gap-1.5 text-xs">
+   131→                  <KeyRound className="size-3 text-[#FDC00A]" aria-hidden /> AIHUBMIX API key
+   132→                </Label>
+   133→                <div className="relative">
+   134→                  <Input
+   135→                    id="ducky-api-key"
+   136→                    type={showKey ? "text" : "password"}
+   137→                    value={draft.apiKey}
+   138→                    onChange={(e) => patch({ apiKey: e.target.value })}
+   139→                    placeholder="sk-…"
+   140→                    autoComplete="off"
+   141→                    spellCheck={false}
+   142→                    className="pr-9 font-mono text-xs"
+   143→                  />
+   144→                  <button
+   145→                    type="button"
+   146→                    onClick={() => setShowKey((v) => !v)}
+   147→                    aria-label={showKey ? "Hide API key" : "Show API key"}
+   148→                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
+   149→                  >
+   150→                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+   151→                  </button>
+   152→                </div>
+   153→                <p className="text-[11px] leading-relaxed text-muted-foreground">
+   154→                  Stored only in this browser&apos;s localStorage — requests are proxied
+   155→                  serverlessly without persistence. Get a key at{" "}
+   156→                  <a
+   157→                    href={KEY_PORTAL_URL}
+   158→                    target="_blank"
+   159→                    rel="noopener noreferrer"
+   160→                    className="text-primary underline underline-offset-2"
+   161→                  >
+   162→                    {KEY_PORTAL_LABEL}
+   163→                  </a>
+   164→                  . Ducky 3.5 Coder is served through AIHUBMIX.
+   165→                </p>
+   166→              </section>
+   167→
+   168→              <section className="space-y-1.5">
+   169→                <div className="flex items-baseline justify-between">
+   170→                  <Label htmlFor="ducky-base-url" className="text-xs">
+   171→                    Base URL
+   172→                  </Label>
+   173→                  <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/60">
+   174→                    advanced
+   175→                  </span>
+   176→                </div>
+   177→                <Input
+   178→                  id="ducky-base-url"
+   179→                  value={draft.baseUrl}
+   180→                  onChange={(e) => patch({ baseUrl: e.target.value })}
+   181→                  placeholder="https://aihubmix.com/v1"
+   182→                  className="h-8 font-mono text-xs"
+   183→                  spellCheck={false}
+   184→                />
+   185→              </section>
+   186→
+   187→              <section className="space-y-1.5">
+   188→                <Label className="text-xs">Model</Label>
+   189→                <div role="radiogroup" aria-label="Choose model" className="grid gap-2">
+   190→                  <ModelCard
+   191→                    active={draft.model === MODEL_ID}
+   192→                    onSelect={() => patch({ model: MODEL_ID })}
+   193→                    title={MODEL_DISPLAY}
+   194→                    icon={<Sparkles className="size-4 text-[#FDC00A]" aria-hidden />}
+   195→                    desc={MODEL_BLURB}
+   196→                    blurb="550B · flagship coder"
+   197→                  />
+   198→                </div>
+   199→                <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/70">
+   200→                  upstream: nvidia/neutron-3-ultra-550b · gateway: aihubmix.com/v1
+   201→                </p>
+   202→              </section>
+   203→
+   204→              <section className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+   205→                <div className="flex items-center justify-between gap-3">
+   206→                  <div className="min-w-0">
+   207→                    <Label className="flex items-center gap-1.5 text-xs">
+   208→                      <FlaskConical className="size-3 text-amber-400" aria-hidden /> Demo mode
+   209→                    </Label>
+   210→                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+   211→                      Scripted agent flows with <strong>real</strong> tool execution — no key
+   212→                      required. Implied automatically while the API key is empty.
+   213→                    </p>
+   214→                  </div>
+   215→                  <Switch
+   216→                    checked={draft.demoMode}
+   217→                    onCheckedChange={(v) => patch({ demoMode: v })}
+   218→                    aria-label="Force demo mode"
+   219→                  />
+   220→                </div>
+   221→              </section>
+   222→            </TabsContent>
+   223→
+   224→            {/* ── Behavior ───────────────────────────────────────────── */}
+   225→            <TabsContent value="behavior" className="mt-0 space-y-6">
+   226→              <SliderRow
+   227→                label="Temperature"
+   228→                hint="Randomness of sampling"
+   229→                min={0}
+   230→                max={2}
+   231→                step={0.1}
+   232→                value={[draft.temperature]}
+   233→                onChange={([v]) => patch({ temperature: Math.round(v * 10) / 10 })}
+   234→                format={(v) => v.toFixed(1)}
+   235→              />
+   236→              <SliderRow
+   237→                label="Max tokens"
+   238→                hint="Response length cap"
+   239→                min={512}
+   240→                max={16384}
+   241→                step={512}
+   242→                value={[draft.maxTokens]}
+   243→                onChange={([v]) => patch({ maxTokens: v })}
+   244→                format={(v) => String(v)}
+   245→              />
+   246→              <SliderRow
+   247→                label="Max tool iterations"
+   248→                hint="Agent-loop tool rounds per turn"
+   249→                min={2}
+   250→                max={16}
+   251→                step={1}
+   252→                value={[draft.maxToolIterations]}
+   253→                onChange={([v]) => patch({ maxToolIterations: v })}
+   254→                format={(v) => `${v}×`}
+   255→              />
+   256→
+   257→              <div className="flex items-center justify-between rounded-md border p-3">
+   258→                <div>
+   259→                  <Label htmlFor="ducky-show-reasoning" className="text-xs">
+   260→                    Show reasoning
+   261→                  </Label>
+   262→                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+   263→                    Render chain-of-thought as a “Thinking…” card when the model streams it.
+   264→                  </p>
+   265→                </div>
+   266→                <Switch
+   267→                  id="ducky-show-reasoning"
+   268→                  checked={draft.showReasoning}
+   269→                  onCheckedChange={(v) => patch({ showReasoning: Boolean(v) })}
+   270→                />
+   271→              </div>
+   272→
+   273→              <section className="space-y-1.5">
+   274→                <Label className="text-xs">Permission policy</Label>
+   275→                <RadioGroup
+   276→                  value={draft.policy}
+   277→                  onValueChange={(v) => patch({ policy: v as PermissionPolicy })}
+   278→                  className="gap-1.5"
+   279→                >
+   280→                  <PolicyOption
+   281→                    value="readonly"
+   282→                    current={draft.policy}
+   283→                    onSelect={() => patch({ policy: "readonly" })}
+   284→                    icon={<Eye className="size-3.5" aria-hidden />}
+   285→                    title="readOnly"
+   286→                    desc="The agent can read and search, never write or run commands."
+   287→                  />
+   288→                  <PolicyOption
+   289→                    value="ask"
+   290→                    current={draft.policy}
+   291→                    onSelect={() => patch({ policy: "ask" })}
+   292→                    icon={<Hand className="size-3.5" aria-hidden />}
+   293→                    title="ask"
+   294→                    desc="Ask before every side-effecting tool call — you approve inline."
+   295→                  />
+   296→                  <PolicyOption
+   297→                    value="auto"
+   298→                    current={draft.policy}
+   299→                    onSelect={() => patch({ policy: "auto" })}
+   300→                    icon={<Zap className="size-3.5" aria-hidden />}
+   301→                    title="auto"
+   302→                    desc="Full autonomy — tools run without confirmation. Fastest, least safe."
+   303→                  />
+   304→                </RadioGroup>
+   305→              </section>
+   306→
+   307→              <section className="space-y-1.5">
+   308→                <Label htmlFor="ducky-sys-extra" className="text-xs">
+   309→                  Extra system instructions
+   310→                </Label>
+   311→                <Textarea
+   312→                  id="ducky-sys-extra"
+   313→                  value={draft.systemPromptExtra}
+   314→                  onChange={(e) => patch({ systemPromptExtra: e.target.value })}
+   315→                  placeholder="Extra instructions appended to the ducky system prompt…"
+   316→                  className="min-h-24 font-mono text-xs"
+   317→                />
+   318→              </section>
+   319→            </TabsContent>
+   320→
+   321→            {/* ── Data ───────────────────────────────────────────────── */}
+   322→            <TabsContent value="data" className="mt-0 space-y-5">
+   323→              <BackupSection />
+   324→              <StorageUsageSection />
+   325→            </TabsContent>
+   326→
+   327→            {/* ── About ──────────────────────────────────────────────── */}
+   328→            <TabsContent value="about" className="mt-0 space-y-5">
+   329→              <section className="rounded-md border p-3">
+   330→                <div className="flex items-center gap-2">
+   331→                            <img
+   332→                    src="/ducky-mark.png"
+   333→                    alt="Ducky AI logo"
+   334→                    className="size-8 rounded-md border border-[#FDC00A]/25 bg-black"
+   335→                  />
+   336→                  <div className="min-w-0">
+   337→                    <p className="text-sm font-semibold leading-tight">Ducky AI | Coder</p>
+   338→                    <p className="font-mono text-[10px] text-muted-foreground">
+   339→                      v1.0 · model: {MODEL_DISPLAY}
+   340→                    </p>
+   341→                  </div>
+   342→                </div>
+   343→                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+   344→                  A browser-native coding agent console — plugin-based harness, virtual
+   345→                  workspace FS and permission gates, built with Next.js. Behind the scenes,
+   346→                  <span className="text-foreground/80"> {MODEL_DISPLAY}</span> runs on{" "}
+   347→                  <span className="text-foreground/80">NVIDIA Neutron 3 Ultra (550B)</span> served
+   348→                  via the AIHUBMIX gateway.
+   349→                </p>
+   350→              </section>
+   351→
+   352→              <section className="rounded-md border p-3">
+   353→                <h3 className="flex items-center gap-1.5 text-xs font-semibold">
+   354→                  <TerminalSquare className="size-3.5 text-[#FDC00A]" aria-hidden /> Run anywhere
+   355→                </h3>
+   356→                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+   357→                  The app is fully stateless client-side — self-host it on any Node/Bun runtime:
+   358→                </p>
+   359→                <div className="mt-2 flex items-center gap-2 rounded-md bg-muted/60 px-2 py-1.5">
+   360→                  <code className="min-w-0 flex-1 truncate font-mono text-xs text-primary">
+   361→                    bun run build && bun run start
+   362→                  </code>
+   363→                  <Button
+   364→                    size="icon"
+   365→                    variant="ghost"
+   366→                    aria-label="Copy run command"
+   367→                    className="size-7 shrink-0"
+   368→                    onClick={async () => {
+   369→                      try {
+   370→                        await navigator.clipboard.writeText("bun run build && bun run start");
+   371→                        toast.success("Copied", { description: "bun run build && bun run start" });
+   372→                      } catch {
+   373→                        /* noop */
+   374→                      }
+   375→                    }}
+   376→                  >
+   377→                    <Copy className="size-3.5" />
+   378→                  </Button>
+   379→                </div>
+   380→              </section>
+   381→
+   382→              <section className="rounded-md border border-destructive/50 p-3">
+   383→                <h3 className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
+   384→                  <TriangleAlert className="size-3.5" aria-hidden /> Danger zone
+   385→                </h3>
+   386→                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+   387→                  Wipe all sessions, workspace files and reset preferences.
+   388→                </p>
+   389→                <AlertDialog>
+   390→                  <AlertDialogTrigger asChild>
+   391→                    <Button variant="destructive" size="sm" className="mt-2">
+   392→                      Reset everything…
+   393→                    </Button>
+   394→                  </AlertDialogTrigger>
+   395→                  <AlertDialogContent>
+   396→                    <AlertDialogHeader>
+   397→                      <AlertDialogTitle>Reset all local data?</AlertDialogTitle>
+   398→                      <AlertDialogDescription>
+   399→                        This deletes every session (including messages and virtual workspaces)
+   400→                        and restores default settings. Your API key will be cleared too. This
+   401→                        cannot be undone.
+   402→                      </AlertDialogDescription>
+   403→                    </AlertDialogHeader>
+   404→                    <AlertDialogFooter>
+   405→                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+   406→                      <AlertDialogAction
+   407→                        className="bg-destructive text-white hover:bg-destructive/90"
+   408→                        onClick={() => {
+   409→                          useDuckyStore.getState().clearAllSessions();
+   410→                          useDuckyStore.getState().updateSettings(FALLBACK_DEFAULTS);
+   411→                          toast.success("All local data cleared");
+   412→                        }}
+   413→                      >
+   414→                        Reset everything
+   415→                      </AlertDialogAction>
+   416→                    </AlertDialogFooter>
+   417→                  </AlertDialogContent>
+   418→                </AlertDialog>
+   419→              </section>
+   420→            </TabsContent>
+   421→          </div>
+   422→        </Tabs>
+   423→
+   424→        {/* footer */}
+   425→        <div className="border-t p-3">
+   426→          <Button onClick={save} className="w-full gap-2">
+   427→            <Check className="size-4" /> Save settings
+   428→          </Button>
+   429→        </div>
+   430→      </SheetContent>
+   431→    </Sheet>
+   432→  );
+   433→}
+   434→
+   435→/* ─────────────────────────── sub-pieces ─────────────────────────────────── */
+   436→
+   437→/** Data tab — full backup export/import of every session as one JSON file. */
+   438→function BackupSection() {
+   439→  const sessions = useDuckyStore((s) => s.sessions);
+   440→  const fileInputRef = React.useRef<HTMLInputElement>(null);
+   441→
+   442→  const totalMessages = React.useMemo(
+   443→    () => sessions.reduce((n, s) => n + s.messages.length, 0),
+   444→    [sessions],
+   445→  );
+   446→  const totalFiles = React.useMemo(
+   447→    () => sessions.reduce((n, s) => n + Object.keys(s.workspace).length, 0),
+   448→    [sessions],
+   449→  );
+   450→
+   451→  const exportBackup = () => {
+   452→    if (sessions.length === 0) {
+   453→      toast.info("Nothing to back up yet", { description: "Create a session first." });
+   454→      return;
+   455→    }
+   456→    downloadSessionsBackup(sessions);
+   457→    toast.success("Backup downloaded", {
+   458→      description: `${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${totalMessages} messages. API key never included.`,
+   459→    });
+   460→  };
+   461→
+   462→  const onImportFile = async (file: File) => {
+   463→    try {
+   464→      const res = parseBackupFile(await file.text());
+   465→      const imported = useDuckyStore.getState().importSessions(res.sessions);
+   466→      if (imported === 0) throw new Error("No valid sessions found in this backup.");
+   467→      toast.success(`Imported ${imported} session${imported === 1 ? "" : "s"}`, {
+   468→        description:
+   469→          res.skipped > 0
+   470→            ? `${res.skipped} malformed entr${res.skipped === 1 ? "y" : "ies"} skipped. Ids were regenerated — no collisions.`
+   471→            : "Ids regenerated — safe to import repeatedly.",
+   472→      });
+   473→    } catch (e) {
+   474→      toast.error("Import failed", {
+   475→        description: e instanceof Error ? e.message : String(e),
+   476→      });
+   477→    }
+   478→  };
+   479→
+   480→  return (
+   481→    <section className="space-y-3 rounded-md border p-3">
+   482→      <div className="flex items-center gap-2">
+   483→        <span className="flex size-8 items-center justify-center rounded-md border border-[#FDC00A]/40 bg-[#FDC00A]/10">
+   484→          <DatabaseBackup className="size-4 text-[#FDC00A]" aria-hidden />
+   485→        </span>
+   486→        <div className="min-w-0">
+   487→          <h3 className="text-xs font-semibold">Local backup</h3>
+   488→          <p className="text-[11px] text-muted-foreground">
+   489→            All sessions with messages, virtual workspaces and todos in one JSON file.
+   490→          </p>
+   491→        </div>
+   492→      </div>
+   493→
+   494→      {/* stat strip */}
+   495→      <div className="grid grid-cols-3 gap-2" aria-label="Backup scope">
+   496→        {[
+   497→          { label: "sessions", value: sessions.length },
+   498→          { label: "messages", value: totalMessages },
+   499→          { label: "v-files", value: totalFiles },
+   500→        ].map((stat) => (
+   501→          <div
+   502→            key={stat.label}
+   503→            className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5 text-center"
+   504→          >
+   505→            <p className="font-mono text-sm font-semibold">{stat.value}</p>
+   506→            <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+   507→              {stat.label}
+   508→            </p>
+   509→          </div>
+   510→        ))}
+   511→      </div>
+   512→
+   513→      <div className="grid grid-cols-2 gap-2">
+   514→        <Button variant="outline" size="sm" onClick={exportBackup} disabled={sessions.length === 0}>
+   515→          <Download className="mr-1.5 size-3.5" /> Export .json
+   516→        </Button>
+   517→        <Button
+   518→          variant="outline"
+   519→          size="sm"
+   520→          onClick={() => fileInputRef.current?.click()}
+   521→        >
+   522→          <Upload className="mr-1.5 size-3.5" /> Import…
+   523→        </Button>
+   524→      </div>
+   525→
+   526→      <input
+   527→        ref={fileInputRef}
+   528→        type="file"
+   529→        accept="application/json,.json"
+   530→        className="hidden"
+   531→        tabIndex={-1}
+   532→        aria-hidden="true"
+   533→        onChange={(e) => {
+   534→          const f = e.target.files?.[0];
+   535→          if (f) void onImportFile(f);
+   536→          e.target.value = "";
+   537→        }}
+   538→      />
+   539→
+   540→      <ul className="space-y-1 border-t pt-2 text-[11px] leading-relaxed text-muted-foreground">
+   541→        <li className="flex items-start gap-1.5">
+   542→          <FileJson className="mt-0.5 size-3 shrink-0 text-muted-foreground/70" aria-hidden />
+   543→          Imports are sanitized and ids regenerated, so re-importing never duplicates or collides.
+   544→        </li>
+   545→        <li className="flex items-start gap-1.5">
+   546→          <TriangleAlert className="mt-0.5 size-3 shrink-0 text-amber-400" aria-hidden />
+   547→          Your API key is deliberately never written to backups.
+   548→        </li>
+   549→      </ul>
+   550→    </section>
+   551→  );
+   552→}
+   553→
+   554→/* ───────────────────────── storage usage (Data tab) ─────────────────────── */
+   555→
+   556→const STORE_KEY = "ducky-coder-store-v1";
+   557→/** Chrome/Firefox grant ~5 MB per origin for localStorage — treat as the budget. */
+   558→const LS_QUOTA = 5 * 1024 * 1024;
+   559→
+   560→function fmtBytes(n: number): string {
+   561→  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+   562→  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
+   563→  return `${n} B`;
+   564→}
+   565→
+   566→/**
+   567→ * Live read of what Ducky Coder actually occupies in localStorage, with a quota
+   568→ * meter and the heaviest sessions called out — pasted images live here too.
+   569→ */
+   570→function StorageUsageSection() {
+   571→  const sessions = useDuckyStore((s) => s.sessions);
+   572→
+   573→  const usage = React.useMemo(() => {
+   574→    try {
+   575→      const raw = localStorage.getItem(STORE_KEY) ?? "";
+   576→      const total = new Blob([raw]).size;
+   577→      let persisted: Array<Record<string, unknown>> = [];
+   578→      try {
+   579→        persisted =
+   580→          (JSON.parse(raw) as { state?: { sessions?: Array<Record<string, unknown>> } })
+   581→            .state?.sessions ?? [];
+   582→      } catch {
+   583→        /* degraded measurements only */
+   584→      }
+   585→      const byId = new Map(
+   586→        persisted.map((p) => [String(p.id ?? ""), p] as const),
+   587→      );
+   588→      const rows = sessions
+   589→        .map((s) => ({
+   590→          id: s.id,
+   591→          title: s.title,
+   592→          bytes: (() => {
+   593→            const p = byId.get(s.id);
+   594→            return p ? new Blob([JSON.stringify(p)]).size : 0;
+   595→          })(),
+   596→          files: Object.keys(s.workspace).length,
+   597→          images: Object.values(s.workspace).filter((c) => typeof c === "string" && isDataUrlImage(c)).length,
+   598→        }))
+   599→        .sort((a, b) => b.bytes - a.bytes);
+   600→      return { total, rows };
+   601→    } catch {
+   602→      return { total: 0, rows: [] };
+   603→    }
+   604→  }, [sessions]);
+   605→
+   606→  const pct = Math.min(100, (usage.total / LS_QUOTA) * 100);
+   607→  const tone = pct >= 85 ? "bg-red-500" : pct >= 60 ? "bg-amber-500" : "bg-emerald-500";
+   608→  const topRows = usage.rows.filter((r) => r.bytes > 0).slice(0, 4);
+   609→
+   610→  return (
+   611→    <section className="space-y-3 rounded-md border p-3">
+   612→      <div className="flex items-center gap-2">
+   613→        <span className="flex size-8 items-center justify-center rounded-md border border-violet-500/40 bg-violet-500/10">
+   614→          <HardDrive className="size-4 text-violet-400" aria-hidden />
+   615→        </span>
+   616→        <div className="min-w-0">
+   617→          <h3 className="text-xs font-semibold">Storage usage</h3>
+   618→          <p className="text-[11px] text-muted-foreground">
+   619→            Everything lives in this browser&apos;s localStorage — messages, workspaces and pasted
+   620→            images.
+   621→          </p>
+   622→        </div>
+   623→      </div>
+   624→
+   625→      {/* quota meter */}
+   626→      <div>
+   627→        <div className="mb-1 flex items-baseline justify-between font-mono text-[10px] text-muted-foreground">
+   628→          <span>
+   629→            {fmtBytes(usage.total)} used · {fmtBytes(Math.max(0, LS_QUOTA - usage.total))} free
+   630→          </span>
+   631→          <span>{pct.toFixed(pct < 10 ? 1 : 0)}%</span>
+   632→        </div>
+   633→        <div
+   634→          role="progressbar"
+   635→          aria-valuenow={Math.round(pct)}
+   636→          aria-valuemin={0}
+   637→          aria-valuemax={100}
+   638→          aria-label="localStorage quota used"
+   639→          className="h-1.5 overflow-hidden rounded-full bg-muted"
+   640→        >
+   641→          <div
+   642→            className={cn("h-full rounded-full transition-all duration-500", tone)}
+   643→            style={{ width: `${Math.max(pct, usage.total > 0 ? 2 : 0)}%` }}
+   644→          />
+   645→        </div>
+   646→      </div>
+   647→
+   648→      {topRows.length > 0 ? (
+   649→        <ul className="space-y-1 border-t pt-2">
+   650→          {topRows.map((r) => (
+   651→            <li key={r.id} className="flex items-center gap-2 font-mono text-[10px]">
+   652→              <span className="min-w-0 flex-1 truncate text-muted-foreground">{r.title}</span>
+   653→              {r.images > 0 && (
+   654→                <span
+   655→                  className="flex shrink-0 items-center gap-0.5 rounded bg-pink-500/10 px-1 py-px text-pink-300"
+   656→                  title={`${r.images} image${r.images === 1 ? "" : "s"} in workspace`}
+   657→                >
+   658→                  <ImageIcon className="size-2.5" aria-hidden /> {r.images}
+   659→                </span>
+   660→              )}
+   661→              <span className="w-16 shrink-0 text-right text-foreground/80">{fmtBytes(r.bytes)}</span>
+   662→            </li>
+   663→          ))}
+   664→        </ul>
+   665→      ) : (
+   666→        <p className="border-t pt-2 font-mono text-[10px] text-muted-foreground">
+   667→          no measurable sessions yet.
+   668→        </p>
+   669→      )}
+   670→
+   671→      {pct >= 60 && (
+   672→        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-400">
+   673→          <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
+   674→          Storage is filling up — export a backup, then delete heavy sessions (large pasted images
+   675→          are usually the culprit).
+   676→        </p>
+   677→      )}
+   678→    </section>
+   679→  );
+   680→}
+   681→
+   682→function isDataUrlImage(content: string): boolean {
+   683→  return /^data:image\//i.test(content.slice(0, 40));
+   684→}
+   685→
+   686→function ModelCard({
+   687→  active,
+   688→  onSelect,
+   689→  title,
+   690→  desc,
+   691→  blurb,
+   692→  icon,
+   693→}: {
+   694→  active: boolean;
+   695→  onSelect: () => void;
+   696→  title: string;
+   697→  desc: string;
+   698→  blurb: string;
+   699→  icon: React.ReactNode;
+   700→}) {
+   701→  return (
+   702→    <button
+   703→      type="button"
+   704→      role="radio"
+   705→      aria-checked={active}
+   706→      onClick={onSelect}
+   707→      className={cn(
+   708→        "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors",
+   709→        active ? "border-ring bg-accent ring-1 ring-ring" : "hover:bg-muted/50",
+   710→        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+   711→      )}
+   712→    >
+   713→      <span className="mt-0.5">{icon}</span>
+   714→      <span className="min-w-0 flex-1">
+   715→        <span className="block font-mono text-[13px] font-semibold">{title}</span>
+   716→        <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{desc}</span>
+   717→        <span className="mt-1 inline-block rounded-full bg-muted px-1.5 py-px font-mono text-[10px] text-muted-foreground">
+   718→          {blurb}
+   719→        </span>
+   720→      </span>
+   721→      {active && <Check className="size-4 shrink-0 text-primary" aria-hidden />}
+   722→    </button>
+   723→  );
+   724→}
+   725→
+   726→function PolicyOption({
+   727→  value,
+   728→  current,
+   729→  onSelect,
+   730→  icon,
+   731→  title,
+   732→  desc,
+   733→}: {
+   734→  value: PermissionPolicy;
+   735→  current: PermissionPolicy;
+   736→  onSelect: () => void;
+   737→  icon: React.ReactNode;
+   738→  title: string;
+   739→  desc: string;
+   740→}) {
+   741→  return (
+   742→    <Label
+   743→      htmlFor={`policy-${value}`}
+   744→      className={cn(
+   745→        "flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5 transition-colors",
+   746→        current === value ? "border-ring bg-accent" : "hover:bg-muted/50",
+   747→      )}
+   748→    >
+   749→      <RadioGroupItem id={`policy-${value}`} value={value} className="mt-0.5" />
+   750→      <span className="min-w-0">
+   751→        <span className="flex items-center gap-1.5 font-mono text-xs font-semibold">
+   752→          <span className="text-[#FDC00A]">{icon}</span>
+   753→          {title}
+   754→        </span>
+   755→        <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{desc}</span>
+   756→      </span>
+   757→    </Label>
+   758→  );
+   759→}
+   760→
+   761→function SliderRow({
+   762→  label,
+   763→  hint,
+   764→  min,
+   765→  max,
+   766→  step,
+   767→  value,
+   768→  onChange,
+   769→  format,
+   770→}: {
+   771→  label: string;
+   772→  hint: string;
+   773→  min: number;
+   774→  max: number;
+   775→  step: number;
+   776→  value: number[];
+   777→  onChange: (v: number[]) => void;
+   778→  format: (v: number) => string;
+   779→}) {
+   780→  return (
+   781→    <section className="space-y-2">
+   782→      <div className="flex items-center justify-between">
+   783→        <div>
+   784→          <Label className="text-xs">{label}</Label>
+   785→          <p className="text-[11px] text-muted-foreground">{hint}</p>
+   786→        </div>
+   787→        <Badge variant="secondary" className="font-mono text-[11px]">
+   788→          {format(value[0])}
+   789→        </Badge>
+   790→      </div>
+   791→      <Slider
+   792→        min={min}
+   793→        max={max}
+   794→        step={step}
+   795→        value={value}
+   796→        onValueChange={onChange}
+   797→        aria-label={`${label} slider`}
+   798→      />
+   799→    </section>
+   800→  );
+   801→}
+   802→

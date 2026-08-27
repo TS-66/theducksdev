@@ -125,7 +125,7 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
       />
       {/* top chip row */}
       <div className="flex items-center gap-1 px-2 pt-1.5">
-        {/* single-model chip — Ducky 3.5 Coder (Neutron 3 Ultra 550B @ AIHUBMIX) */}
+        {/* single-model chip — the one and only Ducky 3.5 Coder */}
         <Tooltip>
           <TooltipTrigger asChild>
             <span
@@ -136,7 +136,7 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
             </span>
           </TooltipTrigger>
           <TooltipContent side="top">
-            {MODEL_DISPLAY} — powered by NVIDIA Neutron 3 Ultra (550B) via AIHUBMIX
+            {MODEL_DISPLAY} — the one model, tuned for agentic coding
           </TooltipContent>
         </Tooltip>
 
