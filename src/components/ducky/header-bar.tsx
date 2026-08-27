@@ -19,7 +19,7 @@ import { useDuckyStore } from "@/lib/ducky/store";
 
 interface HeaderBarProps {
   onMenu: () => void;
-  onOpenSettings: (tab?: "models" | "behavior" | "about") => void;
+  onOpenSettings: (tab?: "behavior" | "about") => void;
   onOpenPlugins: () => void;
 }
 
@@ -114,7 +114,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onOpenSettings("models")}
+              onClick={() => onOpenSettings("about")}
               className="gap-1.5 px-2 font-mono text-xs text-muted-foreground"
               aria-label={`Model ${MODEL_DISPLAY}. Open settings.`}
             >

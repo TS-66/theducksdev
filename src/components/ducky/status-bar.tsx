@@ -159,7 +159,8 @@ export function StatusBar({
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              No API key — scripted engine with real tool execution. Add a key in Settings for the full agent.
+              No credentials yet — scripted engine with real tool execution. The full agent
+              unlocks once the deployment configures its server-side key (AI_API_KEY env).
             </TooltipContent>
           </Tooltip>
         )}

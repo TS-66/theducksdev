@@ -21,7 +21,7 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 
 ## Configuration
 
-Everything lives in the browser's `localStorage` — no database, no server state. Add an **API key** in **Settings → Models** to unlock the full agent loop with Ducky 3.5 Coder — or configure the server once (below) and leave Settings empty.
+Everything lives in the browser's `localStorage` — no database, no server state. Settings intentionally has **no credential fields**: set `AI_BASE_URL` + `AI_API_KEY` on the server once (below) and the full agent loop with Ducky 3.5 Coder unlocks for everyone; without them the app runs the zero-config scripted demo.
 
 ### Environment variables (optional)
 

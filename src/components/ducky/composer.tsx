@@ -2,16 +2,30 @@
 
 import * as React from "react";
 import {
+  ArrowUp,
+  Check,
+  ChevronDown,
   CornerDownLeft,
   Cpu,
+  Eye,
+  FolderGit2,
+  Hand,
   ImagePlus,
   Plus,
   SendHorizontal,
   SlashSquare,
   Square,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -23,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { fileToPastedImage } from "@/lib/ducky/images";
+import type { PermissionPolicy } from "@/lib/ducky/types";
 
 export const SLASH_COMMANDS = [
   { cmd: "/help", desc: "Open the cheat sheet (shortcuts + commands)" },
@@ -47,23 +62,71 @@ interface ComposerProps {
   /** awaiting permission gate — send disabled */
   locked: boolean;
   hasSession: boolean;
+  /** "docked" = bottom bar surface · "hero" = centered zcode-style surface */
+  variant?: "docked" | "hero";
 }
 
-export function Composer({ value, onChange, onSend, onStop, running, locked, hasSession }: ComposerProps) {
+const POLICY_META: Record<
+  PermissionPolicy,
+  { label: string; icon: React.ReactNode; className: string }
+> = {
+  auto: {
+    label: "Full access",
+    icon: <Zap className="size-3.5" aria-hidden />,
+    className: "text-orange-400",
+  },
+  ask: {
+    label: "Ask before edits",
+    icon: <Hand className="size-3.5" aria-hidden />,
+    className: "text-amber-300",
+  },
+  readonly: {
+    label: "Read-only",
+    icon: <Eye className="size-3.5" aria-hidden />,
+    className: "text-muted-foreground",
+  },
+};
+
+export function Composer({
+  value,
+  onChange,
+  onSend,
+  onStop,
+  running,
+  locked,
+  hasSession,
+  variant = "docked",
+}: ComposerProps) {
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
+  const sessions = useDuckyStore((s) => s.sessions);
+  const policy = useDuckyStore((s) => s.settings.policy);
   const disabledSurface = !hasSession;
+  const hero = variant === "hero";
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+  const fileCount = activeSession ? Object.keys(activeSession.workspace).length : 7;
+
+  /** hero surface may run with no session yet — create one on demand */
+  const ensureSession = React.useCallback((): string | null => {
+    const st = useDuckyStore.getState();
+    if (activeSessionId && st.sessions.some((s) => s.id === activeSessionId)) {
+      return activeSessionId;
+    }
+    return st.newSession();
+  }, [activeSessionId]);
 
   /** shared pipeline for pasted & picked images → vFS data-URL entries */
   const ingestImages = React.useCallback(
     async (files: File[]) => {
-      if (!activeSessionId || files.length === 0) return;
+      if (files.length === 0) return;
+      const sid = hero ? ensureSession() : activeSessionId;
+      if (!sid) return;
       let stored = 0;
       for (let i = 0; i < files.length; i++) {
         try {
           const img = await fileToPastedImage(files[i], i);
-          useDuckyStore.getState().writeFile(activeSessionId, img.suggestedName, img.dataUrl);
+          useDuckyStore.getState().writeFile(sid, img.suggestedName, img.dataUrl);
           toast.success("Image saved to workspace", {
             description: `${img.suggestedName} · ${(img.bytes / 1024).toFixed(0)} KB — open it from the sidebar tree.`,
           });
@@ -74,7 +137,7 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
       }
       if (stored > 0) taRef.current?.focus();
     },
-    [activeSessionId],
+    [activeSessionId, ensureSession, hero],
   );
 
   const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -86,20 +149,23 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
     void ingestImages(files);
   };
 
-  // autogrow between 52px and 200px
+  // autogrow between 52px (hero: 72px) and 200px (hero: 240px)
+  const minH = hero ? 72 : 52;
+  const maxH = hero ? 240 : 200;
   const grow = React.useCallback(() => {
     const el = taRef.current;
     if (!el) return;
     el.style.height = "0px";
-    const next = Math.min(Math.max(el.scrollHeight, 52), 200);
+    const next = Math.min(Math.max(el.scrollHeight, minH), maxH);
     el.style.height = `${next}px`;
-  }, []);
+  }, [minH, maxH]);
   React.useEffect(grow, [value, grow]);
 
-  const canSend = Boolean(value.trim()) && !running && !locked && !disabledSurface;
+  const canSend = Boolean(value.trim()) && !running && !locked && (!disabledSurface || hero);
 
   const trySend = () => {
     if (!canSend) return;
+    if (hero && !hasSession) ensureSession();
     onSend(value);
   };
 
@@ -110,11 +176,218 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
     }
   };
 
+  const focusGlow = cn(
+    "focus-within:border-[#FDC00A]/55 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.10),0_8px_24px_-12px_rgba(253,192,10,0.25)]",
+  );
+
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/*"
+      multiple
+      className="hidden"
+      aria-hidden
+      tabIndex={-1}
+      onChange={(e) => {
+        void ingestImages(Array.from(e.target.files ?? []));
+        e.target.value = ""; // allow re-picking the same file
+      }}
+    />
+  );
+
+  /* ───────────────────────────── hero surface ───────────────────────────── */
+  if (hero) {
+    return (
+      <div className="w-full">
+        <div
+          className={cn(
+            "group/composer relative rounded-2xl border bg-card shadow-[0_12px_40px_-16px_rgba(0,0,0,0.6)] transition-all duration-200",
+            focusGlow,
+          )}
+        >
+          {/* focus glow hairline (top edge) */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#FDC00A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
+          />
+
+          {/* workspace selector row */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Select workspace"
+                className="flex w-full items-center gap-2 rounded-t-2xl border-b px-4 py-2.5 text-left text-[13px] text-foreground/90 transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <FolderGit2 className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+                <span className="truncate">greeting-service</span>
+                <span className="ml-1 hidden font-mono text-[10px] text-muted-foreground sm:inline">
+                  {fileCount} files
+                </span>
+                <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-3">
+              <p className="text-xs font-semibold">Virtual workspace</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                A sandboxed filesystem scoped to your session — {fileCount} files seeded,
+                stored only in this browser. <span className="font-mono">bash / read / write /
+                grep</span> all operate on it.
+              </p>
+            </PopoverContent>
+          </Popover>
+
+          {/* textarea */}
+          <Textarea
+            ref={taRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            placeholder="Ask Ducky anything, @ to add context, / for commands"
+            aria-label="Ask Ducky"
+            className="min-h-[72px] max-h-[240px] resize-none border-0 bg-transparent px-4 pb-2 pt-3.5 focus-visible:ring-0"
+          />
+
+          {fileInput}
+
+          {/* bottom action row */}
+          <div className="flex min-w-0 items-center gap-1 px-3 pb-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Attach image to workspace"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="size-8 rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="size-4.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Attach an image — saved into the workspace</TooltipContent>
+            </Tooltip>
+
+            {/* permission policy dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Permission policy: ${POLICY_META[policy].label}`}
+                  className="h-8 gap-1.5 rounded-full px-2 font-mono text-xs sm:px-2.5"
+                >
+                  <span className={POLICY_META[policy].className}>{POLICY_META[policy].icon}</span>
+                  <span className={cn("hidden sm:inline", POLICY_META[policy].className)}>
+                    {POLICY_META[policy].label}
+                  </span>
+                  <ChevronDown className="size-3 text-muted-foreground" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  permission policy
+                </DropdownMenuLabel>
+                {(Object.keys(POLICY_META) as PermissionPolicy[]).map((p) => (
+                  <DropdownMenuItem
+                    key={p}
+                    onClick={() => {
+                      useDuckyStore.getState().updateSettings({ policy: p });
+                      toast.success(`Permission policy → ${POLICY_META[p].label}`);
+                    }}
+                    className="gap-2"
+                  >
+                    <span className={POLICY_META[p].className}>{POLICY_META[p].icon}</span>
+                    <span className="flex-1">{POLICY_META[p].label}</span>
+                    {policy === p && <Check className="size-3.5 text-[#FDC00A]" aria-hidden />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="ml-auto flex items-center gap-1.5">
+              {/* single-model selector */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Active model: ${MODEL_DISPLAY}`}
+                    className="h-8 gap-1 rounded-full px-2.5 font-mono text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <span className="max-w-28 truncate sm:max-w-40">{MODEL_DISPLAY}</span>
+                    <ChevronDown className="size-3" aria-hidden />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-60 p-1.5">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <Cpu className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-mono text-xs font-semibold">{MODEL_DISPLAY}</span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        the one model — tuned for agentic coding
+                      </span>
+                    </span>
+                    <Check className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+                  </button>
+                </PopoverContent>
+              </Popover>
+
+              {/* send / stop */}
+              {running ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      aria-label="Stop generation"
+                      onClick={onStop}
+                      className="size-9 rounded-full border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Square className="size-4 fill-current" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Stop</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={canSend ? -1 : 0}>
+                      <Button
+                        size="icon"
+                        aria-label="Send message"
+                        disabled={!canSend}
+                        onClick={trySend}
+                        className={cn(
+                          "size-9 rounded-full",
+                          canSend ? "bg-primary text-primary-foreground hover:bg-primary/90" : "",
+                          locked && "cursor-not-allowed",
+                        )}
+                      >
+                        <ArrowUp className="size-4.5" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {locked && <TooltipContent side="bottom">Waiting for permission approval…</TooltipContent>}
+                </Tooltip>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ──────────────────────────── docked surface ──────────────────────────── */
   const surface = (
     <div
       className={cn(
         "group/composer relative mx-auto w-full max-w-3xl rounded-xl border bg-card shadow-sm transition-all duration-200",
-        "focus-within:border-[#FDC00A]/55 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.10),0_8px_24px_-12px_rgba(253,192,10,0.25)]",
+        focusGlow,
         disabledSurface && "opacity-70",
       )}
     >
@@ -220,20 +493,7 @@ export function Composer({ value, onChange, onSend, onStop, running, locked, has
         className="min-h-[52px] max-h-[200px] resize-none border-0 bg-transparent px-3 pb-11 pt-1.5 pr-24 focus-visible:ring-0"
       />
 
-      {/* hidden picker behind the image chip */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        aria-hidden
-        tabIndex={-1}
-        onChange={(e) => {
-          void ingestImages(Array.from(e.target.files ?? []));
-          e.target.value = ""; // allow re-picking the same file
-        }}
-      />
+      {fileInput}
 
       {/* action buttons */}
       <div className="absolute bottom-2 right-2 flex items-center gap-1.5">

@@ -373,7 +373,7 @@ _Awaiting your approval to exit plan mode._`;
       );
       await runTool('bash', { command: cmd });
       await streamText(
-        `\n> Every tool result in demo mode is executed for real against the virtual workspace — only the agent's decisions are scripted. Add an API key in Settings to unlock the full agent.`,
+        `\n> Every tool result in demo mode is executed for real against the virtual workspace — only the agent's decisions are scripted. Once this deployment has its server-side key configured (AI_API_KEY env), the full agent unlocks automatically.`,
         emitSafe,
         signal,
       );
@@ -429,7 +429,7 @@ _Awaiting your approval to exit plan mode._`;
 
 The repository is intentionally tiny: it exists so the harness tools have something real to read, edit and run while you evaluate Ducky Coder.
 
-> Add your API key in **Settings → Models** and I'll analyze anything you ask with the full Ducky 3.5 Coder loop.`;
+> Once this deployment configures its server-side key (AI_API_KEY env), I'll analyze anything you ask with the full Ducky 3.5 Coder loop.`;
       await streamText(`\n${summary}`, emitSafe, signal);
       emitSafe({ type: 'done', aborted: false });
       return;
@@ -682,7 +682,7 @@ Try one of these:
 - **Toggle Plan mode, then send any task** — research → drafted plan → \`exit_plan_mode\` approval card
 - **\`bash ls -la && head README.md\`** — executes any supported shell command for real
 
-Then paste your API key in **Settings → Models** to unlock the full agent loop with **Ducky 3.5 Coder**.`;
+Once this deployment sets its server-side key (AI_API_KEY env), the full **Ducky 3.5 Coder** agent loop unlocks automatically.`;
     await streamText(intro, emitSafe, signal);
     emitSafe({ type: 'done', aborted: false });
   } catch (e) {

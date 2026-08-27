@@ -1,193 +1,179 @@
 "use client";
 
+import * as React from "react";
 import { motion } from "framer-motion";
 import {
-  BookOpenText,
-  ClipboardList,
-  FilePenLine,
-  Globe,
-  ListTodo,
+  History,
   MessageCircleQuestion,
-  PlugZap,
-  ServerCog,
-  ShieldCheck,
+  Megaphone,
+  Presentation,
+  ScrollText,
   SquareTerminal,
+  FilePenLine,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface Suggestion {
+interface HeroProps {
+  onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
+  /** centered zcode-style composer slot (rendered by the page) */
+  children?: React.ReactNode;
+}
+
+/* dim one-line suggestions under the composer */
+const DIM_LIST = [
+  {
+    icon: <ScrollText className="size-4 text-emerald-400" aria-hidden />,
+    text: "Summarize this repository and identify its main packages",
+    prompt: "Summarize this repository and identify its main packages",
+  },
+  {
+    icon: <SquareTerminal className="size-4 text-red-400" aria-hidden />,
+    text: "bash tree && head -n 12 README.md",
+    prompt: "bash tree && head -n 12 README.md",
+  },
+  {
+    icon: <Presentation className="size-4 text-orange-400" aria-hidden />,
+    text: "Add a LICENSE file and a deploy script",
+    prompt: "Add a LICENSE file and a deploy script",
+  },
+  {
+    icon: <MessageCircleQuestion className="size-4 text-sky-400" aria-hidden />,
+    text: "Interview me about the greeting style",
+    prompt: "Interview me about the greeting style",
+  },
+] as const;
+
+/* bottom feature cards */
+interface HeroCard {
   icon: React.ReactNode;
   title: string;
   desc: string;
   prompt: string;
-  /** toggles session plan mode before sending (for the exit_plan_mode flow) */
   planMode?: boolean;
-  /** spans the full grid row (for headline capabilities) */
-  fullWidth?: boolean;
 }
 
-const SUGGESTIONS: Suggestion[] = [
+const CARDS: HeroCard[] = [
   {
-    icon: <BookOpenText className="size-4 text-[#FDC00A]" aria-hidden />,
-    title: "Explore the repo",
-    desc: "Summarize this repository and identify its main packages",
-    prompt: "Summarize this repository and identify its main packages",
-  },
-  {
-    icon: <FilePenLine className="size-4 text-amber-400" aria-hidden />,
+    icon: <FilePenLine className="size-3.5 text-[#FDC00A]" aria-hidden />,
     title: "Live edit + diff",
-    desc: "Change the default greeting to Howdy",
+    desc: "Change the default greeting to Howdy and watch the diff land.",
     prompt: "Change the default greeting to Howdy",
   },
   {
-    icon: <ClipboardList className="size-4 text-violet-400" aria-hidden />,
+    icon: <History className="size-3.5 text-violet-400" aria-hidden />,
     title: "Plan mode + approval",
-    desc: "Drafts a plan, then exit_plan_mode asks for your sign-off",
+    desc: "Research first — exit_plan_mode asks for your sign-off.",
     prompt: "Refactor the greeting module to support i18n templates",
     planMode: true,
   },
   {
-    icon: <MessageCircleQuestion className="size-4 text-orange-400" aria-hidden />,
-    title: "Interview me",
-    desc: "ask_user_question collects your greeting preferences",
-    prompt: "Interview me about the greeting style",
-  },
-  {
-    icon: <ListTodo className="size-4 text-teal-400" aria-hidden />,
+    icon: <History className="size-3.5 text-teal-400" aria-hidden />,
     title: "Plan with todos",
-    desc: "Write a checklist for the refactor",
+    desc: "Write a checklist for the refactor and follow the live cards.",
     prompt: "Write a checklist for the refactor",
-  },
-  {
-    icon: <SquareTerminal className="size-4 text-emerald-400" aria-hidden />,
-    title: "Try the shell",
-    desc: "bash tree && head -n 12 README.md",
-    prompt: "bash tree && head -n 12 README.md",
-  },
-  {
-    icon: <Globe className="size-4 text-cyan-400" aria-hidden />,
-    title: "Search the web — real results",
-    desc: "web_search runs server-side via the plugin, no API key needed",
-    prompt: "Search the web for the latest AI model releases",
-    fullWidth: true,
   },
 ];
 
-interface HeroProps {
-  /** no session exists yet — swap CTA emphasis */
-  variant?: "welcome" | "empty-session";
-  onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
-  onNewTask: () => void;
+function greetingForHour(h: number): string {
+  if (h >= 5 && h < 11) return "Morning, fresh start";
+  if (h >= 11 && h < 14) return "Midday, keep it flowing";
+  if (h >= 14 && h < 18) return "Afternoon, nice progress";
+  if (h >= 18 && h < 23) return "Evening, nice work today";
+  return "Night shift, quiet hours";
 }
 
-export function Hero({ variant = "welcome", onPick, onNewTask }: HeroProps) {
+export function Hero({ onPick, children }: HeroProps) {
+  // hydration-safe: deterministic server render, localized after mount
+  const [greeting, setGreeting] = React.useState("Hello there");
+  React.useEffect(() => {
+    setGreeting(greetingForHour(new Date().getHours()));
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="flex min-h-full flex-col items-center justify-center py-6 text-center"
+      className="relative flex min-h-full min-w-0 flex-col items-center justify-center overflow-hidden py-8 text-center"
     >
-      {/* The exact Ducky AI pixel-duck logo */}
-      <motion.img
+      {/* giant faint pixel-duck watermark — zcode-style backdrop */}
+      <img
         src="/ducky-mark.png"
-        alt="Ducky AI logo"
-        initial={{ opacity: 0, scale: 0.9, rotate: -2 }}
-        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="mb-4 size-24 rounded-2xl border border-[#FDC00A]/30 bg-black shadow-[0_0_40px_-8px_rgba(253,192,10,0.35)] md:size-28"
+        alt=""
+        aria-hidden
+        draggable={false}
+        className="pointer-events-none absolute -top-10 left-1/2 size-72 -translate-x-1/2 select-none opacity-[0.05] md:size-96"
       />
 
-      <h1 className="flex items-baseline justify-center gap-2 font-mono text-4xl font-bold tracking-tight md:text-5xl">
-        <span className="bg-gradient-to-r from-[#FDC00A] to-[#F97316] bg-clip-text text-transparent">
-          Ducky AI
-        </span>
-        <span aria-hidden className="text-2xl text-muted-foreground/50 md:text-3xl">
-          |
-        </span>
-        <span className="text-foreground/90">Coder</span>
+      {/* greeting */}
+      <h1 className="relative mt-14 text-3xl font-bold tracking-tight text-foreground md:mt-20 md:text-4xl">
+        {greeting}
       </h1>
-      <p className="mt-3 text-sm italic text-muted-foreground md:text-base">
-        Everything is a plugin. Quack.
-      </p>
-      <p className="mt-2 max-w-md px-4 text-xs leading-relaxed text-muted-foreground md:text-[13px]">
-        A browser-native coding agent console — streaming the <span className="font-semibold text-foreground/80">Ducky 3.5 Coder</span> model,
-        a virtual workspace filesystem and permission gates, with your API key stored
-        locally only.
-      </p>
 
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-        <BadgeMini icon={<ShieldCheck className="size-3" />} label="Key stays local" />
-        <BadgeMini icon={<PlugZap className="size-3" />} label="9 plugins" />
-        <BadgeMini icon={<ServerCog className="size-3" />} label="Serverless proxy" />
-      </div>
-
-      {/* boot log strip — pure decoration */}
-      <div
-        aria-hidden
-        className="mt-4 w-full max-w-md overflow-hidden rounded-md border bg-[#0d0d06] px-3 py-2 text-left font-mono text-[10px] leading-relaxed text-muted-foreground"
+      {/* centered composer slot */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.08, ease: "easeOut" }}
+        className="relative z-10 mt-9 w-full max-w-2xl px-4"
       >
-        <p className="ducky-boot-line" style={{ animationDelay: "0.05s" }}>
-          <span className="text-emerald-400">✓</span> ducky runtime ready
-        </p>
-        <p className="ducky-boot-line" style={{ animationDelay: "0.25s" }}>
-          <span className="text-emerald-400">✓</span> 9 plugins loaded · tools registered
-        </p>
-        <p className="ducky-boot-line" style={{ animationDelay: "0.45s" }}>
-          <span className="text-emerald-400">✓</span> virtual workspace mounted (/greeting-service)
-        </p>
-        <p className="ducky-boot-line" style={{ animationDelay: "0.55s" }}>
-          <span className="text-emerald-400">✓</span> model: ducky-3.5-coder · endpoint ready
-        </p>
-        <p className="ducky-boot-line text-[#FDC00A]" style={{ animationDelay: "0.75s" }}>
-          ▸ awaiting your first task… quack
+        {children}
+      </motion.div>
+
+      {/* dim suggestion list */}
+      <div className="relative z-10 mt-4 w-full max-w-2xl px-4">
+        <ul className="space-y-0.5 text-left">
+          {DIM_LIST.map((s) => (
+            <li key={s.prompt}>
+              <button
+                type="button"
+                onClick={() => onPick(s.prompt)}
+                className="group flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <span className="shrink-0 opacity-80">{s.icon}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground transition-colors group-hover:text-foreground">
+                  {s.text}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* announcement line */}
+      <div className="relative z-10 mt-6 flex max-w-xl items-start gap-2 px-6 text-left">
+        <Megaphone className="mt-0.5 size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          New for explorers: paste an image straight into chat and ask
+          &ldquo;describe the image&rdquo; — vision analysis runs free while in beta.
         </p>
       </div>
 
-      {variant === "empty-session" && (
-        <Button onClick={onNewTask} className="mt-4">
-          Start a new task
-        </Button>
-      )}
-
-      <div className="mt-5 w-full max-w-xl px-4">
-        <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground/70">
-          Try:
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s.title}
-              type="button"
-              onClick={() => onPick(s.prompt, s.planMode ? { planMode: true } : undefined)}
-              className={cn(
-                "group flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left shadow-sm transition-all hover:border-ring hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                s.planMode && "border-violet-500/30 hover:border-violet-400/60",
-                s.fullWidth &&
-                  "border-cyan-500/30 bg-cyan-500/[0.04] hover:border-cyan-400/60 hover:bg-cyan-500/[0.08] sm:col-span-2",
-              )}
-            >
-              <span className="mt-0.5 shrink-0">{s.icon}</span>
-              <span className="min-w-0">
-                <span className="block truncate text-[13px] font-medium group-hover:text-foreground">
-                  {s.title}
-                </span>
-                <span className="block text-xs leading-snug text-muted-foreground">{s.desc}</span>
+      {/* bottom feature cards */}
+      <div className="relative z-10 mt-3 grid w-full max-w-3xl grid-cols-1 gap-2 px-4 sm:grid-cols-3">
+        {CARDS.map((c) => (
+          <button
+            key={c.title}
+            type="button"
+            onClick={() => onPick(c.prompt, c.planMode ? { planMode: true } : undefined)}
+            className={cn(
+              "group rounded-xl border bg-card/60 p-3.5 text-left shadow-sm transition-all",
+              "hover:border-ring hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              c.planMode && "border-violet-500/25 hover:border-violet-400/50",
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              {c.icon}
+              <span className="truncate text-[13px] font-medium group-hover:text-foreground">
+                {c.title}
               </span>
-            </button>
-          ))}
-        </div>
+            </span>
+            <span className="mt-1 block text-xs leading-snug text-muted-foreground">
+              {c.desc}
+            </span>
+          </button>
+        ))}
       </div>
     </motion.div>
-  );
-}
-
-function BadgeMini({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
-      {icon}
-      {label}
-    </span>
   );
 }

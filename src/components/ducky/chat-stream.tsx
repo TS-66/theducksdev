@@ -12,10 +12,11 @@ interface ChatStreamProps {
   /** fires while a run is live (for tool-state inference) */
   sessionRunning: boolean;
   onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
-  onNewTask: () => void;
+  /** centered zcode-style composer rendered inside the hero */
+  composerSlot?: React.ReactNode;
 }
 
-export function ChatStream({ sessionRunning, onPick, onNewTask }: ChatStreamProps) {
+export function ChatStream({ sessionRunning, onPick, composerSlot }: ChatStreamProps) {
   const sessions = useDuckyStore((s) => s.sessions);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
 
@@ -66,15 +67,13 @@ export function ChatStream({ sessionRunning, onPick, onNewTask }: ChatStreamProp
 
   if (!session || visible.length === 0) {
     return (
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="ducky-grid-bg mx-auto min-h-full max-w-3xl px-4 py-6 md:px-8">
-          <Hero
-            variant={session ? "welcome" : "empty-session"}
-            onPick={onPick}
-            onNewTask={onNewTask}
-          />
+      /* plain overflow container — Radix ScrollArea's display:table content
+         wrapper would let the hero's intrinsic width stretch the viewport */
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+        <div className="ducky-grid-bg mx-auto min-h-full w-full max-w-5xl px-4 py-6 md:px-8">
+          <Hero onPick={onPick}>{composerSlot}</Hero>
         </div>
-      </ScrollArea>
+      </div>
     );
   }
 

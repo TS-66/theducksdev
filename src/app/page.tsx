@@ -21,6 +21,7 @@ import { StatusBar } from "@/components/ducky/status-bar";
 import { TodoCard } from "@/components/ducky/message-item";
 import { useDuckyAgent } from "@/hooks/use-ducky-agent";
 import { useDuckyStore } from "@/lib/ducky/store";
+import { setServerLive } from "@/lib/ducky/server-caps";
 import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
 import type { PermissionPolicy } from "@/lib/ducky/types";
 
@@ -44,6 +45,25 @@ export default function DuckyCoderPage() {
   const agent = useDuckyAgent();
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+
+  /* ── server capability probe (booleans only) ─────────────────────── */
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch("/api/config")
+      .then((r) => (r.ok ? r.json() : { live: false }))
+      .then((d: { live?: boolean }) => {
+        if (cancelled) return;
+        const changed = setServerLive(Boolean(d.live));
+        // poke subscribers so the DEMO badge / status bar reflect reality
+        if (changed) useDuckyStore.setState({});
+      })
+      .catch(() => {
+        /* offline / probe failed — demo stays the safe default */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* ── global shortcuts ─────────────────────────────────────────────────── */
   React.useEffect(() => {
@@ -230,11 +250,6 @@ export default function DuckyCoderPage() {
     [doSend],
   );
 
-  const newTask = React.useCallback(() => {
-    useDuckyStore.getState().newSession();
-    toast.success("New task created");
-  }, []);
-
   const openSettings = React.useCallback((tab?: SettingsTab) => {
     setSettingsTab(tab);
     setSettingsOpen(true);
@@ -266,6 +281,8 @@ export default function DuckyCoderPage() {
   const askPayload = agent.pendingAsk;
   const showInlineDeck =
     Boolean(approvalRequest) || Boolean(askPayload) || todos.length > 0;
+  /** hero (welcome) state — no visible conversation yet */
+  const heroState = !activeSession || activeSession.messages.length === 0;
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
@@ -306,7 +323,21 @@ export default function DuckyCoderPage() {
           <ChatStream
             sessionRunning={agent.running}
             onPick={pickPrompt}
-            onNewTask={newTask}
+            composerSlot={
+              <Composer
+                variant="hero"
+                value={input}
+                onChange={setInput}
+                onSend={composerSend}
+                onStop={() => {
+                  agent.stop();
+                  toast.info("Stopped by user");
+                }}
+                running={agent.running}
+                locked={Boolean(agent.pendingApproval)}
+                hasSession={Boolean(activeSessionId)}
+              />
+            }
           />
 
           {/* inline deck: todos -> permission gate -> ask-user */}
@@ -332,18 +363,21 @@ export default function DuckyCoderPage() {
             </div>
           )}
 
-          <Composer
-            value={input}
-            onChange={setInput}
-            onSend={composerSend}
-            onStop={() => {
-              agent.stop();
-              toast.info("Stopped by user");
-            }}
-            running={agent.running}
-            locked={Boolean(agent.pendingApproval)}
-            hasSession={Boolean(activeSessionId)}
-          />
+          {/* docked composer — hidden while the hero (zcode welcome) state owns the screen */}
+          {!heroState && (
+            <Composer
+              value={input}
+              onChange={setInput}
+              onSend={composerSend}
+              onStop={() => {
+                agent.stop();
+                toast.info("Stopped by user");
+              }}
+              running={agent.running}
+              locked={Boolean(agent.pendingApproval)}
+              hasSession={Boolean(activeSessionId)}
+            />
+          )}
         </main>
       </div>
 
