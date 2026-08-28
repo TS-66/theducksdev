@@ -8,11 +8,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const live =
-    Boolean(process.env.AI_API_KEY) && Boolean(process.env.AI_BASE_URL);
+    Boolean(process.env.AI_API_KEY?.trim()) &&
+    Boolean(process.env.AI_BASE_URL?.trim());
   // AI_MODEL_ID is technically optional but only works against an endpoint
   // that understands the literal "ducky-3.5-coder" id — real providers need
   // it set to the upstream model they actually serve.
-  const hasModelId = Boolean(process.env.AI_MODEL_ID);
+  const hasModelId = Boolean(process.env.AI_MODEL_ID?.trim());
   return Response.json(
     { live, hasModelId },
     { headers: { "Cache-Control": "no-store" } },

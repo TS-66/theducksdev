@@ -29,7 +29,7 @@ Copy `.env.example` to `.env.local` for local dev, or set them in your hosting d
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `AI_BASE_URL` | See note | OpenAI-compatible chat-completions base URL. Required unless users supply their own Base URL in Settings. |
+| `AI_BASE_URL` | See note | OpenAI-compatible chat-completions base URL. Required unless users supply their own Base URL in Settings. Accepted forms: `https://api.example.com/v1` (recommended), `https://api.example.com` (the `/v1` segment is appended automatically on 404) or a pasted full `/v1/chat/completions` path (stripped automatically). |
 | `AI_API_KEY` | See note | Bearer key for the endpoint above. Required unless users paste their own key in Settings. |
 | `AI_MODEL_ID` | No | Upstream model id that powers Ducky 3.5 Coder. Defaults to passing the public id through. |
 
