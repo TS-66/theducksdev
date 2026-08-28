@@ -456,7 +456,9 @@ export function useDuckyAgent() {
         content:
           '**Model endpoint not configured on this deployment.**\n\n' +
           'The live agent needs a server-side OpenAI-compatible endpoint:\n\n' +
-          '- Set `AI_BASE_URL` and `AI_API_KEY` as environment variables of your deployment, then reload.\n\n' +
+          '- Set `AI_BASE_URL`, `AI_API_KEY` **and `AI_MODEL_ID`** as environment variables of your deployment — then **redeploy** (env changes never apply to existing deployments).\n' +
+          '- `AI_BASE_URL` must include the version segment (e.g. `https://api.openai.com/v1`) — the proxy appends `/chat/completions`.\n' +
+          '- `AI_MODEL_ID` must be a model your endpoint actually serves (e.g. `gpt-4o-mini`).\n\n' +
           'No key ever reaches the browser — `/api/chat` proxies your endpoint server-side.',
         reasoning: '',
         status: 'error',

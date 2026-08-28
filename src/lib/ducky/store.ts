@@ -210,6 +210,10 @@ export type DshStore = StoredState &
       resolve: (a: Record<string, string>) => void;
     } | null;
     hydrated: boolean;
+    /** deployment has AI_BASE_URL + AI_API_KEY (mirrored from /api/config) */
+    serverLive: boolean;
+    /** deployment configured AI_MODEL_ID (upstream model id) */
+    modelIdSet: boolean;
   };
 
 const mapSession = (
@@ -289,6 +293,8 @@ export const useDuckyStore = create<DshStore>()(
       pendingApproval: null,
       pendingAsk: null,
       hydrated: false,
+      serverLive: false,
+      modelIdSet: false,
 
       /* ------------------------------ projects ---------------------------- */
 

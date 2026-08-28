@@ -58,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!rawBase) {
     return jsonError(
       400,
-      'No endpoint configured. Set AI_BASE_URL in the server environment (or Base URL in Settings → Models).',
+      'No endpoint configured. Set AI_BASE_URL in the server environment.',
     );
   }
   const base = rawBase.replace(/\/+$/, '');
@@ -110,7 +110,10 @@ export async function POST(req: Request): Promise<Response> {
       // keep generic message
     }
     if (upstream.status === 401) {
-      message = `${message} — check your API key in Settings → Models (or AI_API_KEY on the server).`;
+      message = `${message} — check AI_API_KEY in the server environment.`;
+    }
+    if (upstream.status === 404 && !process.env.AI_MODEL_ID) {
+      message = `${message} — hint: AI_MODEL_ID is not set on the server, so the request asked for the literal model id "ducky-3.5-coder". Set AI_MODEL_ID to a model your endpoint actually serves.`;
     }
     return jsonError(upstream.status, message);
   }

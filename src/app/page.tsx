@@ -22,7 +22,7 @@ import { StatusBar } from "@/components/ducky/status-bar";
 import { TodoCard } from "@/components/ducky/message-item";
 import { useDuckyAgent } from "@/hooks/use-ducky-agent";
 import { useDuckyStore } from "@/lib/ducky/store";
-import { setServerLive } from "@/lib/ducky/server-caps";
+import { setServerLive, setModelIdSet } from "@/lib/ducky/server-caps";
 import { connectDisk, reconnectDisk, restoreDiskOnBoot, useDiskStore } from "@/lib/ducky/disk";
 import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
 import type { PermissionPolicy } from "@/lib/ducky/types";
@@ -56,10 +56,11 @@ export default function DuckyCoderPage() {
   React.useEffect(() => {
     let cancelled = false;
     fetch("/api/config")
-      .then((r) => (r.ok ? r.json() : { live: false }))
-      .then((d: { live?: boolean }) => {
+      .then((r) => (r.ok ? r.json() : { live: false, hasModelId: false }))
+      .then((d: { live?: boolean; hasModelId?: boolean }) => {
         if (cancelled) return;
         const changed = setServerLive(Boolean(d.live));
+        setModelIdSet(Boolean(d.hasModelId));
         // poke subscribers so the status bar reflects model availability
         if (changed) useDuckyStore.setState({});
       })

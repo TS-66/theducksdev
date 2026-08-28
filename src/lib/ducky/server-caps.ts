@@ -2,19 +2,35 @@
  * Client-side mirror of "this deployment has server-side credentials".
  *
  * The browser can't read env vars, so the app probes GET /api/config once on
- * mount. When the server reports no credentials, the composer shows a
- * "model not configured" state instead of attempting live runs.
+ * mount. Results live BOTH in module flags (imperative reads, e.g. the send
+ * guard) and in the zustand store (reactive UI chips in the status bar).
  */
 
-let serverLive = false;
+import { useDuckyStore } from "@/lib/ducky/store";
 
-/** Update the flag; returns true when the value changed (so UI can refresh). */
+let serverLive = false;
+let modelIdSet = false;
+
+/** Update the live flag; returns true when the value changed (so UI can refresh). */
 export function setServerLive(live: boolean): boolean {
   const changed = serverLive !== live;
   serverLive = live;
+  useDuckyStore.setState({ serverLive: live });
   return changed;
 }
 
 export function isServerLive(): boolean {
   return serverLive;
+}
+
+/** Whether the deployment configured AI_MODEL_ID (upstream model id). */
+export function setModelIdSet(set: boolean): boolean {
+  const changed = modelIdSet !== set;
+  modelIdSet = set;
+  useDuckyStore.setState({ modelIdSet: set });
+  return changed;
+}
+
+export function isModelIdSet(): boolean {
+  return modelIdSet;
 }

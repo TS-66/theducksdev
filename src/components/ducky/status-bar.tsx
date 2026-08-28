@@ -16,7 +16,6 @@ import {
   useDiskStore,
 } from "@/lib/ducky/disk";
 import { type PermissionPolicy } from "@/lib/ducky/types";
-import { isServerLive } from "@/lib/ducky/server-caps";
 import { clockHM, fmtK, shortId } from "./format";
 
 const POLICY_ORDER: PermissionPolicy[] = ["readonly", "ask", "auto"];
@@ -140,6 +139,8 @@ export function StatusBar({
   const isRunning = useDuckyStore((s) => s.isRunning);
   const settings = useDuckyStore((s) => s.settings);
   const disabledPlugins = useDuckyStore((s) => s.disabledPlugins);
+  const serverLive = useDuckyStore((s) => s.serverLive);
+  const modelIdSet = useDuckyStore((s) => s.modelIdSet);
 
   const [now, setNow] = React.useState<string>("");
   React.useEffect(() => {
@@ -242,7 +243,7 @@ export function StatusBar({
             </TooltipContent>
           </Tooltip>
         )}
-        {!isServerLive() && (
+        {!serverLive && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-400">
@@ -251,7 +252,22 @@ export function StatusBar({
             </TooltipTrigger>
             <TooltipContent side="top">
               This deployment has no model endpoint configured. Set AI_BASE_URL and
-              AI_API_KEY as server environment variables to enable the live agent.
+              AI_API_KEY as server environment variables — then REDEPLOY (env changes
+              never apply to existing deployments).
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {serverLive && !modelIdSet && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                <TriangleAlert className="size-3" aria-hidden /> no model id
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              AI_MODEL_ID is not set on the server, so requests ask your endpoint for the
+              literal id &quot;ducky-3.5-coder&quot; — real providers will reject it. Set
+              AI_MODEL_ID to the upstream model your endpoint serves (e.g. gpt-4o-mini).
             </TooltipContent>
           </Tooltip>
         )}
