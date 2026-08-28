@@ -19,8 +19,11 @@ import {
   FolderGit2,
   FolderPlus,
   FolderTree,
+  HardDrive,
   Pencil,
   Package,
+  Plug,
+  RefreshCw,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -64,6 +67,13 @@ import {
   ingestProjectFiles,
   slugifyProjectName,
 } from "@/lib/ducky/projects";
+import {
+  connectDisk,
+  disconnectDisk,
+  reconnectDisk,
+  supportsFsAccess,
+  useDiskStore,
+} from "@/lib/ducky/disk";
 
 /* ─────────────────────────── picker row (hero) ──────────────────────────── */
 
@@ -184,6 +194,11 @@ export function ProjectPickerRow({ onNewProject }: { onNewProject: () => void })
             </div>
           )}
 
+          {/* real local-folder connection — File System Access API */}
+          <div className="mt-1 border-t pt-1.5">
+            <DiskRow />
+          </div>
+
           <div className="mt-1 border-t pt-1.5">
             <button
               type="button"
@@ -243,6 +258,105 @@ export function ProjectPickerRow({ onNewProject }: { onNewProject: () => void })
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+}
+
+/* ─────────────────────── local-folder connection row ────────────────────── */
+
+/**
+ * Real-disk connection state inside the project popover: connect a folder
+ * (Chromium File System Access API), reconnect when the browser re-asks for
+ * permission, or unplug. Hidden entirely on unsupported browsers.
+ */
+function DiskRow() {
+  const status = useDiskStore((s) => s.status);
+  const rootName = useDiskStore((s) => s.rootName);
+  const supported = supportsFsAccess();
+
+  if (!supported) {
+    return (
+      <p className="px-2 py-1.5 text-[10px] leading-relaxed text-muted-foreground/70">
+        <HardDrive className="mr-1 inline size-3 align-[-2px]" aria-hidden />
+        Real-folder access needs Chrome, Edge or Opera — the sandboxed workspace works everywhere.
+      </p>
+    );
+  }
+
+  if (status === "connected") {
+    return (
+      <div className="flex items-center gap-2 rounded-md bg-emerald-500/5 px-2 py-1.5">
+        <HardDrive className="size-3.5 shrink-0 text-emerald-400" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-xs" title={`Real folder connected: ${rootName}`}>
+          <span className="text-muted-foreground">disk: </span>
+          {rootName}
+        </span>
+        <button
+          type="button"
+          aria-label={`Disconnect local folder ${rootName}`}
+          onClick={() => {
+            void disconnectDisk().then(() => {
+              toast.info("Local folder disconnected", {
+                description: "The agent can no longer touch it. You can reconnect any time.",
+              });
+            });
+          }}
+          className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <Plug className="size-3 rotate-180" aria-hidden /> unplug
+        </button>
+      </div>
+    );
+  }
+
+  if (status === "needs-permission") {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          void reconnectDisk().then((ok) => {
+            if (ok) {
+              toast.success(`Folder reconnected: ${useDiskStore.getState().rootName}`);
+            } else {
+              toast.error("Permission not granted", {
+                description: "Try again and choose “Allow” when the browser asks.",
+              });
+            }
+          });
+        }}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <RefreshCw className="size-3.5 shrink-0 text-amber-400" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">
+          Reconnect <span className="font-mono">{rootName}</span>…
+        </span>
+        <span className="shrink-0 font-mono text-[10px] text-amber-400">re-grant</span>
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          void connectDisk().then((ok) => {
+            if (ok) {
+              toast.success(`Folder connected: ${useDiskStore.getState().rootName}`, {
+                description:
+                  "disk_* tools now list, read, edit and create REAL files inside it.",
+              });
+            }
+          });
+        }}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <HardDrive className="size-3.5 text-cyan-400" aria-hidden />
+        Connect local folder…
+      </button>
+      <p className="px-2 pb-0.5 pt-1 text-[10px] leading-relaxed text-muted-foreground/70">
+        Real filesystem access — disk tools edit files in it, permission-gated.
+      </p>
     </>
   );
 }

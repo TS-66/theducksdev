@@ -667,6 +667,16 @@ async function runToolCall(
 
   // --- permission gate ------------------------------------------------------
   const def = getToolDefinition(name);
+  // Hard plan-mode enforcement: while planning, EVERY side-effecting tool is
+  // machine-denied (not just prompt-advised) — essential now that disk_*
+  // tools mutate the user's real filesystem.
+  if (loopOpts.planModeActive && def?.sideEffects) {
+    return {
+      result: `Permission denied: '${name}' is blocked while plan mode is active. Explore read-only and call exit_plan_mode when the plan is ready for review.`,
+      ok: false,
+      durationMs: 0,
+    };
+  }
   const decision = resolvePolicyDecision(def, settings.policy);
   if (decision === 'deny') {
     return {

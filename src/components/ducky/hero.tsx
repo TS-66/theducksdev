@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   FolderPlus,
+  HardDrive,
   History,
   MessageCircleQuestion,
   Megaphone,
@@ -25,6 +26,8 @@ interface HeroProps {
   onNewProject?: () => void;
   /** one-click sample repo project */
   onUseSample?: () => void;
+  /** connect a real local folder (File System Access API picker) */
+  onConnectDisk?: () => void;
 }
 
 /* bottom feature cards — the first card adapts to the project state */
@@ -97,6 +100,7 @@ export function Hero({
   projectFileCount = 0,
   onNewProject,
   onUseSample,
+  onConnectDisk,
 }: HeroProps) {
   // hydration-safe: deterministic server render, localized after mount
   const [greeting, setGreeting] = React.useState("Hello there");
@@ -134,7 +138,12 @@ export function Hero({
         {
           icon: <FolderPlus className="size-4 text-[#FDC00A]" aria-hidden />,
           text: "Create a project — empty, sample repo, or import your own folder",
-          action: "new-project",
+          action: "new-project" as const,
+        },
+        {
+          icon: <HardDrive className="size-4 text-cyan-400" aria-hidden />,
+          text: "Connect a folder on your computer — read & edit real files",
+          action: "connect-disk" as const,
         },
         {
           icon: <Presentation className="size-4 text-orange-400" aria-hidden />,
@@ -215,6 +224,10 @@ export function Hero({
                 onClick={() => {
                   if ("action" in s && s.action === "new-project") {
                     onNewProject?.();
+                    return;
+                  }
+                  if ("action" in s && s.action === "connect-disk") {
+                    onConnectDisk?.();
                     return;
                   }
                   if ("prompt" in s && s.prompt) onPick(s.prompt);

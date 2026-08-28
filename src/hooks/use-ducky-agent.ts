@@ -20,6 +20,7 @@ import {
 } from '@/lib/ducky/agent-loop';
 import { PLUGINS, resolveEnabledPluginIds } from '@/lib/ducky/plugins';
 import { renderTree } from '@/lib/ducky/tools-vfs';
+import { useDiskStore, type DiskStatus } from '@/lib/ducky/disk';
 import { demoEnabledToolNames, runDemoTurn } from '@/lib/ducky/demo-loop';
 import { isDemoMode } from '@/lib/ducky/types';
 import type { AskUserQuestion } from '@/lib/ducky/plugins';
@@ -103,6 +104,7 @@ function buildSystemPrompt(opts: {
   planMode: boolean;
   planDraft?: string;
   systemPromptExtra: string;
+  disk: { status: DiskStatus; rootName: string };
 }): string {
   const now = new Date();
   const enabled = PLUGINS.filter((p) => !useDuckyStore.getState().disabledPlugins.includes(p.id));
@@ -132,6 +134,22 @@ function buildSystemPrompt(opts: {
           .join('\n')
       : '(empty)',
   ];
+
+  if (opts.disk.status === 'connected') {
+    lines.push(
+      '',
+      '# Local disk access (REAL filesystem)',
+      `The user connected a real local folder: "${opts.disk.rootName}" (read-write, browser-granted).`,
+      '- disk_ls / disk_read / disk_status inspect it; disk_write / disk_edit / disk_delete / disk_mkdir mutate the user\'s ACTUAL computer inside that folder — with great care: read before overwriting, prefer disk_edit over full rewrites, confirm targets before deletes.',
+      '- disk_* paths are relative to that folder; the sandbox workspace and the real folder are separate trees — mention where a change landed when both are in play.',
+    );
+  } else if (opts.disk.status === 'needs-permission') {
+    lines.push(
+      '',
+      '# Local disk access',
+      `A folder ("${opts.disk.rootName}") was connected before but needs its permission re-granted — tell the user to click the disk chip in the status bar to reconnect.`,
+    );
+  }
 
   if (opts.planMode) {
     lines.push(
@@ -230,6 +248,10 @@ export function useDuckyAgent() {
       planMode: session.planMode,
       planDraft: session.planDraft,
       systemPromptExtra: settings.systemPromptExtra,
+      disk: {
+        status: useDiskStore.getState().status,
+        rootName: useDiskStore.getState().rootName,
+      },
     });
     const wireHistory: WireMessage[] = [
       { role: 'system', content: sysPrompt },

@@ -1,17 +1,107 @@
 "use client";
 
 import * as React from "react";
-import { Command, Eye, FlaskConical, GitBranch, Hand, Plug, Wrench, Zap } from "lucide-react";
+import { Command, Eye, FlaskConical, GitBranch, Hand, HardDrive, Plug, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PLUGINS } from "@/lib/ducky/plugins";
 import { modelDisplayName } from "@/lib/ducky/models";
 import { useDuckyStore } from "@/lib/ducky/store";
+import {
+  disconnectDisk,
+  reconnectDisk,
+  useDiskStore,
+} from "@/lib/ducky/disk";
 import { isDemoMode, type PermissionPolicy } from "@/lib/ducky/types";
 import { clockHM, fmtK, shortId } from "./format";
 
 const POLICY_ORDER: PermissionPolicy[] = ["readonly", "ask", "auto"];
+
+/**
+ * Real local-folder chip: emerald when connected (popover with unplug),
+ * amber & click-to-reconnect when the browser wants a re-grant. Renders
+ * nothing when no folder was ever connected or the API is unsupported.
+ */
+function DiskChip() {
+  const status = useDiskStore((s) => s.status);
+  const rootName = useDiskStore((s) => s.rootName);
+  const [open, setOpen] = React.useState(false);
+
+  if (status === "none" || status === "unsupported") return null;
+
+  if (status === "needs-permission") {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => {
+              void reconnectDisk().then((ok) => {
+                if (ok) {
+                  toast.success(`Folder reconnected: ${useDiskStore.getState().rootName}`);
+                } else {
+                  toast.error("Permission not granted", {
+                    description: "Try again and choose “Allow” when the browser asks.",
+                  });
+                }
+              });
+            }}
+            className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-400 transition-colors hover:bg-amber-500/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            aria-label="Reconnect local folder — permission re-grant needed"
+          >
+            <HardDrive className="size-3" aria-hidden /> disk: reconnect
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-64">
+          “{rootName}” was connected before — click to re-grant access (the browser keeps folder
+          permissions per session).
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-emerald-400 transition-colors hover:bg-emerald-500/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label={`Local folder connected: ${rootName} — open details`}
+        >
+          <HardDrive className="size-3" aria-hidden />
+          <span className="max-w-28 truncate normal-case">disk: {rootName}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-3 text-xs">
+        <p className="font-medium">Real folder connected</p>
+        <p className="mt-1 font-mono text-[11px] text-emerald-400">{rootName}</p>
+        <p className="mt-2 leading-relaxed text-muted-foreground">
+          disk_ls / disk_read / disk_write / disk_edit / disk_delete / disk_mkdir operate on your
+          actual files inside this folder. Writes still pass the permission policy and plan-mode
+          gate.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2.5 w-full gap-1.5"
+          onClick={() => {
+            setOpen(false);
+            void disconnectDisk().then(() => {
+              toast.info("Local folder disconnected", {
+                description: "The agent can no longer touch it. You can reconnect any time.",
+              });
+            });
+          }}
+        >
+          <Plug className="size-3.5 rotate-180" aria-hidden /> Disconnect folder
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const POLICY_META: Record<
   PermissionPolicy,
@@ -164,6 +254,7 @@ export function StatusBar({
             </TooltipContent>
           </Tooltip>
         )}
+        <DiskChip />
       </div>
 
       {/* center */}

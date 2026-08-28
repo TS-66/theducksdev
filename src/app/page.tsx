@@ -23,6 +23,7 @@ import { TodoCard } from "@/components/ducky/message-item";
 import { useDuckyAgent } from "@/hooks/use-ducky-agent";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { setServerLive } from "@/lib/ducky/server-caps";
+import { connectDisk, reconnectDisk, restoreDiskOnBoot, useDiskStore } from "@/lib/ducky/disk";
 import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
 import type { PermissionPolicy } from "@/lib/ducky/types";
 
@@ -68,6 +69,35 @@ export default function DuckyCoderPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  /* ── local-folder (File System Access API) boot restore ──────────── */
+  React.useEffect(() => {
+    void restoreDiskOnBoot();
+  }, []);
+
+  /** Hero / picker entry: connect (or re-grant) a real local folder. */
+  const handleConnectDisk = React.useCallback(async () => {
+    const st = useDiskStore.getState();
+    if (st.status === "needs-permission") {
+      const ok = await reconnectDisk();
+      if (ok) {
+        toast.success(`Folder reconnected: ${useDiskStore.getState().rootName}`, {
+          description: "disk_* tools can read and edit real files in it again.",
+        });
+      } else {
+        toast.error("Permission not granted", {
+          description: "The browser kept the folder locked — try again and allow access.",
+        });
+      }
+      return;
+    }
+    const ok = await connectDisk();
+    if (ok) {
+      toast.success(`Folder connected: ${useDiskStore.getState().rootName}`, {
+        description: "disk_* tools now list, read, edit and create REAL files inside it.",
+      });
+    }
   }, []);
 
   /* ── global shortcuts ─────────────────────────────────────────────────── */
@@ -353,6 +383,7 @@ export default function DuckyCoderPage() {
               projectFileCount: activeProject ? Object.keys(activeProject.files).length : 0,
               onNewProject: () => setNewProjectOpen(true),
               onUseSample: useSampleProject,
+              onConnectDisk: () => void handleConnectDisk(),
             }}
             composerSlot={
               <Composer

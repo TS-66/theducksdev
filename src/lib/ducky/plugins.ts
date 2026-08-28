@@ -19,6 +19,17 @@ import {
   matchGlob,
   normalizePath,
 } from './tools-vfs';
+import {
+  describeDiskSupport,
+  diskDelete,
+  diskEdit,
+  diskList,
+  diskMkdir,
+  diskRead,
+  diskWrite,
+  formatDiskListing,
+  useDiskStore,
+} from './disk';
 
 export const PLUGIN_PREFIX = '@ducky-ai/';
 
@@ -43,6 +54,16 @@ export const PLUGINS: PluginManifest[] = [
     description:
       'Workspace discovery: glob for path patterns and ripgrep-style grep over contents. Plugins like this one compose cleanly — install search without mutating tools.',
     tools: ['glob', 'grep'],
+    category: 'filesystem',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-disk`,
+    name: 'ducky-tool-disk',
+    version: '1.0.0',
+    description:
+      'REAL local-folder access through the browser File System Access API: after the user picks a folder, disk_* tools list, read, create, edit and delete files DIRECTLY on their computer — always scoped to that folder, permission-gated, and subject to the same policy gate as every other side-effecting plugin.',
+    tools: ['disk_status', 'disk_ls', 'disk_read', 'disk_write', 'disk_edit', 'disk_delete', 'disk_mkdir'],
     category: 'filesystem',
     defaultEnabled: true,
   },
@@ -221,6 +242,92 @@ export function buildToolDefinitions(): ToolDefinition[] {
         },
         ['path', 'old_str', 'new_str'],
       ),
+      sideEffects: true,
+    },
+    {
+      name: 'disk_status',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'Report the state of the REAL local-folder connection: whether the browser supports folder access, whether a folder is connected, its name and the guard rails. Call this before any disk_* tool when unsure.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'disk_ls',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'List entries of a folder inside the connected REAL local folder. With recursive=true, walks the whole subtree (dependency/build dirs like node_modules and .git are skipped, entry count capped).',
+      parameters: obj(
+        {
+          path: str('Folder path relative to the connected root. Defaults to the root itself.'),
+          recursive: bool('Walk the entire subtree. Defaults to false (single level).'),
+        },
+        [],
+      ),
+    },
+    {
+      name: 'disk_read',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'Read a UTF-8 text file from the REAL local folder (line-numbered window, large files truncated honestly at the cap). Reads are free — read before you edit or overwrite anything.',
+      parameters: obj(
+        {
+          path: str('File path relative to the connected root.'),
+          offset: num('1-based first line to return. Defaults to 1.'),
+          limit: num('Maximum number of lines to return. Defaults to 2000.'),
+        },
+        ['path'],
+      ),
+    },
+    {
+      name: 'disk_write',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'Create or fully replace a UTF-8 text file on the user\'s REAL disk (parent folders are created automatically). This hits their actual filesystem: read an existing file first, and never overwrite unrelated content.',
+      parameters: obj(
+        {
+          path: str('File path relative to the connected root.'),
+          content: str('Full UTF-8 text content to write.'),
+        },
+        ['path', 'content'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'disk_edit',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'Literal old→new replacement inside a file on the user\'s REAL disk. Read the file first: old_str must match exactly and, unless replace_all is set, must appear exactly once.',
+      parameters: obj(
+        {
+          path: str('File path relative to the connected root.'),
+          old_str: str('Literal text to replace. Must match exactly.'),
+          new_str: str('Literal replacement text. Use an empty string to delete the match.'),
+          replace_all: bool('Replace all occurrences. Defaults to false.'),
+        },
+        ['path', 'old_str', 'new_str'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'disk_delete',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'Delete a file from the user\'s REAL disk. Folders require recursive=true and take everything inside with them — confirm the target with disk_ls first; deletion cannot be undone.',
+      parameters: obj(
+        {
+          path: str('Path relative to the connected root (file, or folder with recursive=true).'),
+          recursive: bool('Required true to delete a folder and all its contents.'),
+        },
+        ['path'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'disk_mkdir',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-disk`).id,
+      description:
+        'Create a folder (with parents) in the connected REAL local folder. Succeeds silently when the folder already exists.',
+      parameters: obj({ path: str('Folder path relative to the connected root.') }, ['path']),
       sideEffects: true,
     },
     {
@@ -490,6 +597,92 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
       const next = replaceAll ? content.split(oldStr).join(newStr) : content.replace(oldStr, newStr);
       ctx.writeFile(p, next);
       return `Edited ${p}: ${replaceAll ? count : 1} replacement(s) applied.`;
+    },
+
+  disk_status:
+    () =>
+    async () => {
+      const st = useDiskStore.getState();
+      const sup = describeDiskSupport();
+      switch (st.status) {
+        case 'connected':
+          return [
+            `Local disk CONNECTED: “${st.rootName}” (read-write).`,
+            'All disk_* paths are relative to this folder; traversal above it is impossible.',
+            'Guard rails: list ≤ 2000 entries / depth 12, reads ≤ 384 KB, writes ≤ 2 MB, UTF-8 text only.',
+            'Writes, edits, deletes and mkdir go through the same permission policy as every other side-effecting tool.',
+          ].join('\n');
+        case 'needs-permission':
+          return `A folder (“${st.rootName}”) was connected previously but the browser needs the permission re-granted. Ask the user to click the disk chip in the status bar (or project picker → Connect local folder…).`;
+        case 'unsupported':
+          return `This browser does not support the File System Access API. ${sup.hint}`;
+        default:
+          return 'No local folder is connected — disk_* mutations and reads are unavailable. Ask the user to connect one via the project picker (“Connect local folder…”) or the status-bar disk chip.';
+      }
+    },
+
+  disk_ls:
+    () =>
+    async (args) => {
+      const dirPath = asString(args.path);
+      const recursive = args.recursive === true;
+      const rootName = useDiskStore.getState().rootName || 'disk';
+      const entries = await diskList(dirPath, recursive);
+      return formatDiskListing(entries, `${rootName}${dirPath ? `/${normalizePath(dirPath)}` : ''}`);
+    },
+
+  disk_read:
+    () =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('disk_read: "path" must be a non-empty root-relative path');
+      const { content, size, truncated } = await diskRead(p);
+      const offset = asNumber(args.offset) ?? 1;
+      const limit = asNumber(args.limit) ?? 2000;
+      const header = truncated
+        ? `[disk_read: showing the first 384 KB of ${size} bytes — file is larger]\n`
+        : `[disk_read: ${size} bytes]\n`;
+      return header + formatReadWindow(content, offset, limit);
+    },
+
+  disk_write:
+    () =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('disk_write: "path" must be a non-empty root-relative path');
+      const content = asString(args.content);
+      const { created, bytes } = await diskWrite(p, content);
+      return `${created ? 'Created' : 'Overwrote'} ${p} on the local disk (${bytes} bytes).`;
+    },
+
+  disk_edit:
+    () =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('disk_edit: "path" must be a non-empty root-relative path');
+      const oldStr = asString(args.old_str);
+      const newStr = asString(args.new_str);
+      const replacements = await diskEdit(p, oldStr, newStr, args.replace_all === true);
+      return `Edited ${p} on the local disk: ${replacements} replacement(s) applied.`;
+    },
+
+  disk_delete:
+    () =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('disk_delete: "path" must be a non-empty root-relative path');
+      const { kind } = await diskDelete(p, args.recursive === true);
+      return `Deleted ${kind === 'dir' ? 'folder (recursive)' : 'file'} ${p} from the local disk.`;
+    },
+
+  disk_mkdir:
+    () =>
+    async (args) => {
+      const p = asString(args.path);
+      const { created } = await diskMkdir(p);
+      return created
+        ? `Created folder ${normalizePath(p)} on the local disk.`
+        : `Folder ${normalizePath(p)} already exists.`;
     },
 
   glob:
