@@ -69,7 +69,6 @@ export const DEFAULT_SETTINGS: Settings = {
   systemPromptExtra: '',
   maxToolIterations: 25,
   showReasoning: true,
-  demoMode: false,
 };
 
 /* --------------------------- throttled persistence -------------------------- */

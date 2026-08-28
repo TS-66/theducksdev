@@ -217,7 +217,7 @@ function UsageChip({ message: m }: { message: ChatMessage }) {
           aria-label={`Model ${meta.model ?? "unknown"}, ${total} tokens`}
         >
           <Zap className={cn("size-2.5", total > 0 ? "text-[#FDC00A]" : "text-muted-foreground")} aria-hidden />
-          {meta.model === "demo-script" ? "demo" : total > 0 ? fmtK(total) : modelDisplayName(meta.model)}
+          {total > 0 ? fmtK(total) : modelDisplayName(meta.model)}
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="font-mono text-[10px]">

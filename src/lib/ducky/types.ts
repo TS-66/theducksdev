@@ -3,8 +3,6 @@
  * DO NOT edit without updating both engine & UI sides.
  */
 
-import { isServerLive } from "@/lib/ducky/server-caps";
-
 /* ------------------------------ Wire protocol ----------------------------- */
 
 export type Role = "system" | "user" | "assistant" | "tool";
@@ -154,18 +152,6 @@ export interface Settings {
   systemPromptExtra: string;
   maxToolIterations: number;
   showReasoning: boolean;
-  /**
-   * Force scripted demo mode even when a key exists. When apiKey is empty,
-   * demo mode is implied regardless of this flag.
-   */
-  demoMode: boolean;
-}
-
-/** True when the next turn should run the scripted demo engine.
- *  Demo is implied when there is no user key AND the server reports no
- *  credentials (see /api/config + server-caps.ts). */
-export function isDemoMode(s: Settings): boolean {
-  return s.demoMode || (s.apiKey.trim() === "" && !isServerLive());
 }
 
 /* ------------------------------- Engine events ---------------------------- */

@@ -201,12 +201,7 @@ export function buildTimeline(session: Session): TimelineEntry[] {
         title:
           trunc(m.content.replace(/[#*`>\-]+/g, "").trim().split("\n")[0], 90) ||
           "(response)",
-        detail:
-          m.meta?.model === "demo-script"
-            ? "demo-script"
-            : m.meta?.model
-              ? m.meta.model
-              : undefined,
+        detail: m.meta?.model ? m.meta.model : undefined,
       });
     }
 

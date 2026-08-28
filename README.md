@@ -15,13 +15,13 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **Permission gates** — `auto` / `ask` / `readonly` policies; side-effecting tools raise an inline approval card.
 - **Plan mode** — read-only research phase ending in an `exit_plan_mode` approval.
 - **Subagents** — the `subagent` tool spawns a focused child agent loop with a restricted toolset and returns its report.
-- **Zero-config demo mode** — no key yet? A scripted engine drives *real* tool execution (reads, writes, diffs, todos, shell, plan approvals) and even *live* `web_search` / `web_fetch` / `vision_describe` (image understanding) — all server-side, no key needed.
+- **Server-key model** — set `AI_BASE_URL` + `AI_API_KEY` as server environment variables (below) and the full agent loop with Ducky 3.5 Coder unlocks for everyone. Without them the UI shows a clear "no model" state — nothing fake, nothing simulated.
 - **Activity ledger** — a git-log-style timeline of every prompt, tool call and file change, with filters, copyable shas, workspace rewind (time-travel) and conversation trim.
 - **Command palette & slash commands** — `⌘P` palette plus `/new`, `/clear`, `/plan`, `/model`, `/policy`, `/plugins`, `/activity`, `/export`, `/zip`, `/backup`, `/help`.
 
 ## Configuration
 
-Everything lives in the browser's `localStorage` — no database, no server state. Settings intentionally has **no credential fields**: set `AI_BASE_URL` + `AI_API_KEY` on the server once (below) and the full agent loop with Ducky 3.5 Coder unlocks for everyone; without them the app runs the zero-config scripted demo.
+Everything lives in the browser's `localStorage` — no database, no server state. Settings intentionally has **no credential fields**: set `AI_BASE_URL` + `AI_API_KEY` on the server once (below) and the full agent loop with Ducky 3.5 Coder unlocks for everyone; without them the composer reports the deployment as unconfigured.
 
 ### Environment variables (optional)
 
@@ -68,7 +68,6 @@ Browser (client)                          Server (stateless)
 - `src/lib/ducky/models.ts` — model registry (single public model: `ducky-3.5-coder`).
 - `src/lib/ducky/plugins.ts` — plugin manifests + tool schemas.
 - `src/lib/ducky/agent-loop.ts` — multi-iteration loop, SSE parsing, policy gate, subagent.
-- `src/lib/ducky/demo-loop.ts` — zero-config scripted demo engine (real tool execution).
 - `src/lib/ducky/tools-*.ts` — virtual FS, mini-bash, web tool fetchers.
 - `src/hooks/use-ducky-agent.ts` — React ⇄ engine bridge (system prompt assembly, approvals).
 - `src/app/api/chat/route.ts` — stateless streaming proxy + model-id mapping.

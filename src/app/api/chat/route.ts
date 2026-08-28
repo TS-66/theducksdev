@@ -42,12 +42,12 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError(400, 'Invalid JSON body.');
   }
 
-  // Resolution order: client-provided (Settings, dev convenience) → server env.
+  // Resolution order: client-provided (dev convenience) → server env.
   const apiKey = body.apiKey || process.env.AI_API_KEY || '';
   if (!apiKey) {
     return jsonError(
       400,
-      'No API key configured. Add one in Settings → Models, or set AI_API_KEY in the server environment.',
+      'No API key configured. Set AI_API_KEY (and AI_BASE_URL) as server environment variables.',
     );
   }
   if (!Array.isArray(body.messages) || body.messages.length === 0) {

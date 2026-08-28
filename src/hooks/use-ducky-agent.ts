@@ -21,8 +21,7 @@ import {
 import { PLUGINS, resolveEnabledPluginIds } from '@/lib/ducky/plugins';
 import { renderTree } from '@/lib/ducky/tools-vfs';
 import { useDiskStore, type DiskStatus } from '@/lib/ducky/disk';
-import { demoEnabledToolNames, runDemoTurn } from '@/lib/ducky/demo-loop';
-import { isDemoMode } from '@/lib/ducky/types';
+import { isServerLive } from '@/lib/ducky/server-caps';
 import type { AskUserQuestion } from '@/lib/ducky/plugins';
 import type {
   ApprovalRequest,
@@ -289,7 +288,7 @@ export function useDuckyAgent() {
         content: '',
         reasoning: '',
         status: 'streaming',
-        meta: { model: isDemoMode(settings) ? 'demo-script' : settings.model },
+        meta: { model: settings.model },
         createdAt: Date.now(),
       });
       return id;
@@ -449,60 +448,50 @@ export function useDuckyAgent() {
       }
     };
 
-    const demoActive = isDemoMode(settings);
+    // Live path only: the deployment must provide server-side credentials.
+    if (settings.apiKey.trim() === '' && !isServerLive()) {
+      useDuckyStore.getState().addMessage(sid, {
+        id: uid(),
+        role: 'assistant',
+        content:
+          '**Model endpoint not configured on this deployment.**\n\n' +
+          'The live agent needs a server-side OpenAI-compatible endpoint:\n\n' +
+          '- Set `AI_BASE_URL` and `AI_API_KEY` as environment variables of your deployment, then reload.\n\n' +
+          'No key ever reaches the browser — `/api/chat` proxies your endpoint server-side.',
+        reasoning: '',
+        status: 'error',
+        error: 'Model endpoint not configured (missing AI_BASE_URL / AI_API_KEY server env).',
+        meta: { model: settings.model },
+        createdAt: Date.now(),
+      });
+      // mirror the finally-block cleanup since we return before the try
+      runningRef.current = false;
+      useDuckyStore.getState().setIsRunning(false);
+      useDuckyStore.getState().setPendingApproval(null);
+      useDuckyStore.getState().setPendingAsk(null);
+      abortRef.current = null;
+      return;
+    }
+
     try {
-      if (demoActive) {
-        // Scripted demo engine: same event protocol, REAL tool executors.
-        await runDemoTurn({
+      await runAgentLoop({
+        sessionId: sid,
+        settings,
+        messages: wireHistory,
+        tools: buildToolSchemas(enabledPluginIds),
+        executors: buildExecutors({
           sessionId: sid,
           settings,
-          userText: trimmed,
-          executors: buildExecutors({
-            sessionId: sid,
-            settings,
-            signal: controller.signal,
-            onEvent: handleEvent,
-          }),
-          enabledToolNames: demoEnabledToolNames(disabledPlugins),
-          listFiles: () => useDuckyStore.getState().listWorkspaceFiles(sid),
-          readFile: (p) => useDuckyStore.getState().getFile(sid, p),
-          projectName:
-            session.projectName ??
-            useDuckyStore
-              .getState()
-              .projects.find((p) => p.id === session.projectId)?.name ??
-            null,
-          todos: session.todos,
-          askUser: askUserBridge,
-          planModeActive: session.planMode,
-          onPlanExit: onPlanExitBridge,
-          setPlanDraft: (d) => useDuckyStore.getState().setPlanDraft(sid, d),
-          getSearchUrls: () =>
-            useDuckyStore.getState().sessions.find((s) => s.id === sid)?.lastSearchUrls ?? [],
-          setSearchUrls: (urls) => useDuckyStore.getState().setSessionSearchUrls(sid, urls),
-          onEvent: handleEvent,
           signal: controller.signal,
-        });
-      } else {
-        await runAgentLoop({
-          sessionId: sid,
-          settings,
-          messages: wireHistory,
-          tools: buildToolSchemas(enabledPluginIds),
-          executors: buildExecutors({
-            sessionId: sid,
-            settings,
-            signal: controller.signal,
-            onEvent: handleEvent,
-          }),
           onEvent: handleEvent,
-          signal: controller.signal,
-          requestApproval: requestApprovalBridge,
-          askUser: askUserBridge,
-          onPlanExit: onPlanExitBridge,
-          planModeActive: session.planMode,
-        });
-      }
+        }),
+        onEvent: handleEvent,
+        signal: controller.signal,
+        requestApproval: requestApprovalBridge,
+        askUser: askUserBridge,
+        onPlanExit: onPlanExitBridge,
+        planModeActive: session.planMode,
+      });
     } catch (e) {
       // Engine already reports structured errors; this guards against listener crashes.
       const store = useDuckyStore.getState();

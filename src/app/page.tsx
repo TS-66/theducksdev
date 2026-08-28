@@ -60,11 +60,11 @@ export default function DuckyCoderPage() {
       .then((d: { live?: boolean }) => {
         if (cancelled) return;
         const changed = setServerLive(Boolean(d.live));
-        // poke subscribers so the DEMO badge / status bar reflect reality
+        // poke subscribers so the status bar reflects model availability
         if (changed) useDuckyStore.setState({});
       })
       .catch(() => {
-        /* offline / probe failed — demo stays the safe default */
+        /* offline / probe failed — stays "no model" */
       });
     return () => {
       cancelled = true;

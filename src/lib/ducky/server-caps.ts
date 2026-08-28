@@ -2,8 +2,8 @@
  * Client-side mirror of "this deployment has server-side credentials".
  *
  * The browser can't read env vars, so the app probes GET /api/config once on
- * mount. Until (and unless) the server reports credentials, an empty Settings
- * key means the scripted demo engine runs.
+ * mount. When the server reports no credentials, the composer shows a
+ * "model not configured" state instead of attempting live runs.
  */
 
 let serverLive = false;

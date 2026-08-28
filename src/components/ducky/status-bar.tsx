@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Command, Eye, FlaskConical, GitBranch, Hand, HardDrive, Plug, Wrench, Zap } from "lucide-react";
+import { Command, Eye, GitBranch, Hand, HardDrive, Plug, TriangleAlert, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,7 +15,8 @@ import {
   reconnectDisk,
   useDiskStore,
 } from "@/lib/ducky/disk";
-import { isDemoMode, type PermissionPolicy } from "@/lib/ducky/types";
+import { type PermissionPolicy } from "@/lib/ducky/types";
+import { isServerLive } from "@/lib/ducky/server-caps";
 import { clockHM, fmtK, shortId } from "./format";
 
 const POLICY_ORDER: PermissionPolicy[] = ["readonly", "ask", "auto"];
@@ -201,7 +202,7 @@ export function StatusBar({
             )}
           />
           {isRunning
-            ? `Running… ${isDemoMode(settings) ? "demo-script" : modelDisplayName(settings.model)}`
+            ? `Running… ${modelDisplayName(settings.model)}`
             : "Ready"}
         </span>
         <span className="truncate text-muted-foreground/60">
@@ -241,16 +242,16 @@ export function StatusBar({
             </TooltipContent>
           </Tooltip>
         )}
-        {isDemoMode(settings) && (
+        {!isServerLive() && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-400">
-                <FlaskConical className="size-3" aria-hidden /> demo
+                <TriangleAlert className="size-3" aria-hidden /> no model
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              No credentials yet — scripted engine with real tool execution. The full agent
-              unlocks once the deployment configures its server-side key (AI_API_KEY env).
+              This deployment has no model endpoint configured. Set AI_BASE_URL and
+              AI_API_KEY as server environment variables to enable the live agent.
             </TooltipContent>
           </Tooltip>
         )}

@@ -24,6 +24,5 @@ export const DEFAULT_BASE_URL = "";
 /** Map a (possibly legacy) model id to its user-facing display name. */
 export function modelDisplayName(model: string | undefined): string {
   if (!model) return MODEL_DISPLAY;
-  if (model === "demo-script") return "demo";
   return MODEL_DISPLAY;
 }
