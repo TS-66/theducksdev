@@ -394,8 +394,12 @@ export async function runAgentLoop(loopOpts: RunLoopOptionsExt): Promise<void> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          baseUrl: settings.baseUrl,
-          apiKey: settings.apiKey,
+          // Client-side credentials are a local-dev convenience only. Omit
+          // them when unset so the server env (AI_BASE_URL / AI_API_KEY)
+          // is what actually reaches the proxy — stale localStorage values
+          // from older app versions can no longer override the deployment.
+          ...(settings.baseUrl.trim() ? { baseUrl: settings.baseUrl.trim() } : {}),
+          ...(settings.apiKey.trim() ? { apiKey: settings.apiKey.trim() } : {}),
           model: settings.model,
           messages: history,
           ...(tools.length ? { tools } : {}),

@@ -88,6 +88,9 @@ const STREAM_HEADERS: HeadersInit = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',
   Connection: 'keep-alive',
+  // Disable proxy buffering (nginx-style layers) so SSE chunks flush
+  // immediately instead of arriving in delayed bursts.
+  'X-Accel-Buffering': 'no',
 };
 
 function streamResponse(body: ReadableStream<Uint8Array>): Response {
@@ -102,8 +105,10 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError(400, 'Invalid JSON body.');
   }
 
-  // Resolution order: client-provided (dev convenience) → server env.
-  const apiKey = clean(body.apiKey) || clean(process.env.AI_API_KEY);
+  // Resolution order: server env (deployment config wins) → client-provided
+  // (local-dev convenience only). Stale browser-side values persisted by
+  // older app versions must never override a correctly configured deployment.
+  const apiKey = clean(process.env.AI_API_KEY) || clean(body.apiKey);
   if (!apiKey) {
     return jsonError(
       400,
@@ -114,7 +119,7 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError(400, 'Missing required field: messages.');
   }
 
-  const rawBase = clean(body.baseUrl) || clean(process.env.AI_BASE_URL);
+  const rawBase = clean(process.env.AI_BASE_URL) || clean(body.baseUrl);
   if (!rawBase) {
     return jsonError(
       400,
