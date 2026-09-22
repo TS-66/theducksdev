@@ -44,6 +44,15 @@ function makeCtx() {
   const notes = new Map();
   let todos = [];
   let n = 0;
+  const settings = {
+    policy: "ask",
+    temperature: 1,
+    maxTokens: 8192,
+    maxToolIterations: 25,
+    showReasoning: true,
+  };
+  const created = [];
+  const renamed = [];
   return {
     ctx: {
       sessionId: "test-session",
@@ -92,6 +101,32 @@ function makeCtx() {
         { role: "user", content: "hi" },
         { role: "assistant", content: "hello", tools: ["calc"] },
       ],
+      getPublicSettings: () => ({
+        policy: "ask",
+        temperature: 1,
+        maxTokens: 8192,
+        maxToolIterations: 25,
+        showReasoning: true,
+        model: "ducky-3.5-coder",
+      }),
+      updatePublicSettings: (patch) => {
+        Object.assign(settings, patch);
+        return Object.keys(patch);
+      },
+      listSessionsBrief: () => [
+        { id: "sess_aaa111", title: "first", messages: 2, files: 3, updatedAt: 5 },
+        { id: "test-session", title: "test", messages: 4, files: files.size, updatedAt: 9 },
+      ],
+      createSessionNamed: (title) => {
+        created.push(title);
+        return `sess_new${created.length}`;
+      },
+      renameSessionById: (prefix, title) => {
+        if (!"sess_aaa111".startsWith(prefix) && prefix !== "sess_aaa111") return false;
+        renamed.push(title);
+        return true;
+      },
+      switchSessionById: (prefix) => "sess_aaa111".startsWith(prefix),
     },
     files,
   };
@@ -137,10 +172,10 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (57 tools, 24 plugins)", async () => {
+await run("registry: counts (69 tools, 26 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 55, `only ${defs.length} tools`);
-  assert(PLUGINS.length >= 20, `only ${PLUGINS.length} plugins`);
+  assert(defs.length >= 69, `only ${defs.length} tools`);
+  assert(PLUGINS.length >= 26, `only ${PLUGINS.length} plugins`);
 });
 
 await run("registry: every tool has an executor (except loop special-cases)", async () => {
@@ -392,6 +427,78 @@ await run("registry: every executor has a schema", async () => {
     const s = await ex("skill_show")({ name: "debug" });
     assert(s.includes("# Skill: debug"), s.slice(0, 60));
     await expectThrow(() => ex("skill_show")({ name: "nope" }), "unknown skill");
+  });
+}
+
+/* --------------------------- config + sessions -------------------------- */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+
+  await run("get_config hides secrets", async () => {
+    const out = await ex("get_config")({});
+    assert(out.includes("policy: ask") && out.includes("temperature: 1"), out);
+    assert(!/sk-|nvapi|AIza|gsk_/i.test(out), "secret leaked?");
+  });
+  await run("set_config validation + apply", async () => {
+    const out = await ex("set_config")({ temperature: 0.2, policy: "auto" });
+    assert(out.includes("temperature") && out.includes("policy"), out);
+    await expectThrow(() => ex("set_config")({ policy: "yolo" }), "bad policy");
+    await expectThrow(() => ex("set_config")({ temperature: 9 }), "temp range");
+    await expectThrow(() => ex("set_config")({}), "empty patch");
+  });
+  await run("sessions list/new/rename/switch", async () => {
+    const l = await ex("session_list")({});
+    assert(l.includes("sess_aaa") && l.includes("test-ses") && l.includes("●current"), l);
+    const nw = await ex("session_new")({ title: "parallel" });
+    assert(nw.includes("sess_new") && nw.includes("parallel"), nw);
+    const rn = await ex("session_rename")({ id: "sess_aaa1", title: "renamed!" });
+    assert(rn.includes("renamed!"), rn);
+    await expectThrow(() => ex("session_rename")({ id: "zzz", title: "x" }), "unknown rename");
+    const sw = await ex("session_switch")({ id: "sess_aaa1" });
+    assert(sw.includes("switched"), sw);
+    await expectThrow(() => ex("session_switch")({ id: "zzz" }), "unknown switch");
+  });
+}
+
+/* ------------------------- transforms + csv/stats ------------------------- */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+
+  await run("sort/dedupe/count", async () => {
+    assert((await ex("sort_lines")({ text: "b\na\nc" })) === "a\nb\nc", "lexical");
+    assert((await ex("sort_lines")({ text: "10\n2\n30", numeric: true })) === "2\n10\n30", "numeric");
+    assert((await ex("sort_lines")({ text: "a\nb", reverse: true })) === "b\na", "reverse");
+    const d = await ex("dedupe_lines")({ text: "a\nB\na\nb", ignore_case: true });
+    assert(d.startsWith("a\nB\n") && d.includes("removed 2"), d);
+    const c = await ex("count_words")({ text: "hi there\nsecond line" });
+    assert(c.includes("words: 4") && c.includes("lines: 2"), c);
+  });
+  await run("regex_edit groups + flags", async () => {
+    await ex("write_file")({ path: "r.txt", content: "foo 123 bar 456" });
+    const out = await ex("regex_edit")({ path: "r.txt", pattern: "\\d+", replacement: "#", flags: "g" });
+    assert(ctx.readFile("r.txt") === "foo # bar #", ctx.readFile("r.txt"));
+    assert(out.includes("2 replacement"), out);
+    await ex("write_file")({ path: "r2.txt", content: "2026-09-22" });
+    await ex("regex_edit")({ path: "r2.txt", pattern: "(\\d+)-(\\d+)-(\\d+)", replacement: "$3/$2/$1" });
+    assert(ctx.readFile("r2.txt") === "22/09/2026", ctx.readFile("r2.txt"));
+    await expectThrow(() => ex("regex_edit")({ path: "r2.txt", pattern: "([", replacement: "x" }), "bad regex");
+    await expectThrow(
+      () => ex("regex_edit")({ path: "r2.txt", pattern: "zzz", replacement: "x" }),
+      "zero matches",
+    );
+  });
+  await run("workspace_stats + preview_csv", async () => {
+    await ex("write_file")({ path: "big.txt", content: "x".repeat(5000) });
+    const s = await ex("workspace_stats")({});
+    assert(s.includes("files") && s.includes("big.txt") && s.includes(".txt×"), s);
+    await ex("write_file")({ path: "t.csv", content: 'name,age\n"doe, jane",30\nbob,25\nshort\n' });
+    const p = await ex("preview_csv")({ path: "t.csv", rows: 10 });
+    assert(p.includes("doe, jane") && p.includes("ragged"), p);
+    await expectThrow(() => ex("preview_csv")({ path: "nope.csv" }), "missing csv");
   });
 }
 

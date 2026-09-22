@@ -34,20 +34,18 @@ import {
   applyEdits,
   b64decode,
   b64encode,
+  dedupeLines,
   evaluateExpression,
   fileInfoSummary,
   getJsonPath,
   lineDiff,
+  previewCsv,
+  regexReplace,
   sha256Hex,
+  sortLines,
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
-import {
-  closeTab,
-  getActiveTab,
-  listTabs,
-  openTab,
-  setActiveTab,
-} from './browser-tabs';
+import { closeTab, getActiveTab, listTabs, openTab } from './browser-tabs';
 import { captureScreenToWorkspace } from './screen';
 
 export const PLUGIN_PREFIX = '@ducky-ai/';
@@ -162,7 +160,7 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'Workspace file management beyond read/write: list directories, inspect sizes, copy/move/delete/append, and hand any file to the browser download shelf.',
-    tools: ['list_files', 'file_info', 'copy_file', 'move_file', 'delete_file', 'append_file', 'download_file'],
+    tools: ['list_files', 'file_info', 'copy_file', 'move_file', 'delete_file', 'append_file', 'download_file', 'workspace_stats', 'preview_csv'],
     category: 'filesystem',
     defaultEnabled: true,
   },
@@ -172,7 +170,7 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'Surgical multi-file editing: batch literal edits in one call, create many files at once, and diff any two workspace files line by line.',
-    tools: ['multi_edit', 'create_files', 'diff_files'],
+    tools: ['multi_edit', 'create_files', 'diff_files', 'regex_edit'],
     category: 'filesystem',
     defaultEnabled: true,
   },
@@ -242,7 +240,7 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'Text codecs and inspectors: base64, SHA-256, JSON validation and dot-path queries over JSON strings.',
-    tools: ['base64_encode', 'base64_decode', 'sha256', 'json_parse', 'json_query'],
+    tools: ['base64_encode', 'base64_decode', 'sha256', 'json_parse', 'json_query', 'sort_lines', 'dedupe_lines', 'count_words'],
     category: 'meta',
     defaultEnabled: true,
   },
@@ -293,6 +291,26 @@ export const PLUGINS: PluginManifest[] = [
     description:
       'Skill playbooks: code-review, debug, refactor, plan, commit, docs, test-gen, web-research. List them, then pull one into context before starting that kind of work.',
     tools: ['skill_list', 'skill_show'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-config`,
+    name: 'ducky-tool-config',
+    version: '1.0.0',
+    description:
+      'Self-configuration: inspect the live harness settings (policy, temperature, budgets — never secrets) and retune them mid-run, e.g. cooling temperature for precise edits or switching the permission policy with approval.',
+    tools: ['get_config', 'set_config'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-sessions`,
+    name: 'ducky-tool-sessions',
+    version: '1.0.0',
+    description:
+      'Session management from inside a run: list sessions with sizes, start a fresh one for a parallel thread, rename for clarity, or switch the UI to another session. Tool bindings stay on the session that started the run.',
+    tools: ['session_list', 'session_new', 'session_rename', 'session_switch'],
     category: 'meta',
     defaultEnabled: true,
   },
@@ -966,6 +984,137 @@ export function buildToolDefinitions(): ToolDefinition[] {
       parameters: obj({ name: str('Skill name from skill_list.') }, ['name']),
     },
     {
+      name: 'get_config',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-config`).id,
+      description:
+        'Show the live harness settings: permission policy, temperature, token/iteration budgets, model. Secrets (keys, URLs) are NEVER exposed — they live server-side only.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'set_config',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-config`).id,
+      description:
+        'Retune harness settings mid-run. Omit fields to leave them unchanged. policy=cycle guard: switching to auto still passes the approval gate for THIS call.',
+      parameters: obj(
+        {
+          policy: {
+            type: 'string',
+            enum: ['readonly', 'ask', 'auto'],
+            description: 'Permission policy.',
+          },
+          temperature: num('Sampling temperature 0–2. Lower (0.2) for precise edits, higher (1) for ideas.'),
+          max_tokens: num('Response length cap, 512–16384.'),
+          max_tool_iterations: num('Agent-loop tool rounds per turn, 2–16.'),
+          show_reasoning: bool('Render Thinking cards when the model streams reasoning.'),
+        },
+        [],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'session_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-sessions`).id,
+      description:
+        'List sessions: id prefix, title, message/file counts, last activity. The starred/current session is marked.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'session_new',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-sessions`).id,
+      description:
+        'Start a fresh session (empty, from the active project) and return its id — for parking a parallel thread. Does NOT switch the UI; use session_switch for that.',
+      parameters: obj({ title: str('Optional title (defaults to "New task").') }, []),
+    },
+    {
+      name: 'session_rename',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-sessions`).id,
+      description: 'Rename any session by id prefix — keep titles truthful as tasks evolve.',
+      parameters: obj(
+        {
+          id: str('Session id prefix (see session_list).'),
+          title: str('New title (1–80 chars).'),
+        },
+        ['id', 'title'],
+      ),
+    },
+    {
+      name: 'session_switch',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-sessions`).id,
+      description:
+        'Point the UI at another session by id prefix. The CURRENT run keeps its own tools/workspace binding; the switch affects what the human sees and where the NEXT message lands.',
+      parameters: obj({ id: str('Session id prefix (see session_list).') }, ['id']),
+    },
+    {
+      name: 'sort_lines',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description:
+        'Sort lines of text (lexicographic, numeric-aware, or reverse). For files, read first; result returns as text (write_file to keep it).',
+      parameters: obj(
+        {
+          text: str('Text to sort.'),
+          numeric: bool('Numeric-aware ordering (parseFloat per line, fallback lexical). Defaults to false.'),
+          reverse: bool('Descending order. Defaults to false.'),
+        },
+        ['text'],
+      ),
+    },
+    {
+      name: 'dedupe_lines',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description:
+        'Drop duplicate lines, keeping first-occurrence order. Reports how many were removed.',
+      parameters: obj(
+        {
+          text: str('Text to dedupe.'),
+          ignore_case: bool('Case-insensitive comparison. Defaults to false.'),
+        },
+        ['text'],
+      ),
+    },
+    {
+      name: 'count_words',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description: 'Count lines, words, characters and bytes of any text (cheaper than file_info for inline strings).',
+      parameters: obj({ text: str('Text to measure.') }, ['text']),
+    },
+    {
+      name: 'regex_edit',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-patch`).id,
+      description:
+        'Regex find-and-replace inside a workspace file (edit_file is literal-only). Supports $1-style group references and g/i/m/s/u/y flags. Read the file first; reports the replacement count.',
+      parameters: obj(
+        {
+          path: str('Workspace-relative path to edit.'),
+          pattern: str('Regular expression source (no slashes).'),
+          replacement: str('Replacement string ($1, $&, $$ supported).'),
+          flags: str('Regex flags, e.g. "g" or "gi". Defaults to "" (first match only).'),
+        },
+        ['path', 'pattern', 'replacement'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'workspace_stats',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Workspace overview: file count, total bytes, top-5 largest files, and file counts by extension. The cheap "how big is this thing" before diving in.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'preview_csv',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Preview a CSV file as an aligned table (header + N rows, quote-aware). Flags ragged rows.',
+      parameters: obj(
+        {
+          path: str('Workspace-relative path of the CSV file.'),
+          rows: num('Data rows to show, 1–50. Defaults to 10.'),
+          delimiter: str('Single-character delimiter. Defaults to ",".'),
+        },
+        ['path'],
+      ),
+    },
+    {
       name: 'ask_user_question',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-ask-user`).id,
       description:
@@ -1063,6 +1212,26 @@ export interface ToolExecutionContext {
     files: number;
   };
   getTranscript(): Array<{ role: string; content: string; tools?: string[] }>;
+  /* ---------------- config + session management backends ------------------ */
+  getPublicSettings(): {
+    policy: string;
+    temperature: number;
+    maxTokens: number;
+    maxToolIterations: number;
+    showReasoning: boolean;
+    model: string;
+  };
+  updatePublicSettings(patch: {
+    policy?: string;
+    temperature?: number;
+    maxTokens?: number;
+    maxToolIterations?: number;
+    showReasoning?: boolean;
+  }): string[];
+  listSessionsBrief(): Array<{ id: string; title: string; messages: number; files: number; updatedAt: number }>;
+  createSessionNamed(title: string): string;
+  renameSessionById(idPrefix: string, title: string): boolean;
+  switchSessionById(idPrefix: string): boolean;
 }
 
 export type ToolExecutor = (args: Record<string, unknown>) => Promise<string>;
@@ -1815,4 +1984,204 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
     if (!skill) throw new Error(`skill_show: unknown skill "${name}" (see skill_list)`);
     return `${skill.body}\n\n[ducky: follow this playbook step by step for the current task.]`;
   },
+
+  /* -------------------------------- config --------------------------------- */
+
+  get_config:
+    (ctx) =>
+    async () => {
+      const s = ctx.getPublicSettings();
+      return [
+        `policy: ${s.policy} (readonly | ask | auto)`,
+        `temperature: ${s.temperature} · max_tokens: ${s.maxTokens}`,
+        `max_tool_iterations: ${s.maxToolIterations} · show_reasoning: ${s.showReasoning}`,
+        `model: ${s.model}`,
+        'secrets: hidden server-side (never exposed here)',
+      ].join('\n');
+    },
+
+  set_config:
+    (ctx) =>
+    async (args) => {
+      const patch: Record<string, unknown> = {};
+      if (args.policy !== undefined) {
+        const p = asString(args.policy);
+        if (!['readonly', 'ask', 'auto'].includes(p)) {
+          throw new Error('set_config: policy must be readonly | ask | auto');
+        }
+        patch.policy = p;
+      }
+      const numIn = (v: unknown, lo: number, hi: number, name: string): number | undefined => {
+        if (v === undefined) return undefined;
+        const n = asNumber(v);
+        if (n === undefined || !Number.isFinite(n) || n < lo || n > hi) {
+          throw new Error(`set_config: ${name} must be a number in [${lo}, ${hi}]`);
+        }
+        return n;
+      };
+      const t = numIn(args.temperature, 0, 2, 'temperature');
+      if (t !== undefined) patch.temperature = Math.round(t * 10) / 10;
+      const mt = numIn(args.max_tokens, 512, 16384, 'max_tokens');
+      if (mt !== undefined) patch.maxTokens = Math.round(mt);
+      const it = numIn(args.max_tool_iterations, 2, 16, 'max_tool_iterations');
+      if (it !== undefined) patch.maxToolIterations = Math.round(it);
+      if (args.show_reasoning !== undefined) {
+        if (typeof args.show_reasoning !== 'boolean') throw new Error('set_config: show_reasoning must be boolean');
+        patch.showReasoning = args.show_reasoning;
+      }
+      if (!Object.keys(patch).length) throw new Error('set_config: nothing to change (pass at least one field)');
+      const changed = ctx.updatePublicSettings(
+        patch as { policy?: string; temperature?: number; maxTokens?: number; maxToolIterations?: number; showReasoning?: boolean },
+      );
+      return `Updated: ${changed.join(', ')}.`;
+    },
+
+  /* -------------------------------- sessions ------------------------------- */
+
+  session_list:
+    (ctx) =>
+    async () => {
+      const items = ctx.listSessionsBrief();
+      if (!items.length) return 'No sessions. Use session_new to start one.';
+      return items
+        .map(
+          (s) =>
+            `${s.id.slice(0, 8)}${s.id === ctx.sessionId ? ' ●current' : ''}  ${s.title}\n  ${s.messages} msgs · ${s.files} files · ${new Date(s.updatedAt).toISOString()}`,
+        )
+        .join('\n');
+    },
+
+  session_new:
+    (ctx) =>
+    async (args) => {
+      const title = asString(args.title).trim().slice(0, 80);
+      const id = ctx.createSessionNamed(title);
+      return `Started session ${id.slice(0, 8)}${title ? ` ("${title}")` : ''}. Use session_switch to move the UI there.`;
+    },
+
+  session_rename:
+    (ctx) =>
+    async (args) => {
+      const prefix = asString(args.id).trim();
+      const title = asString(args.title).trim().slice(0, 80);
+      if (!prefix) throw new Error('session_rename: "id" is required (see session_list)');
+      if (!title) throw new Error('session_rename: "title" must be 1–80 chars');
+      const ok = ctx.renameSessionById(prefix, title);
+      if (!ok) throw new Error(`session_rename: no session starts with "${prefix}"`);
+      return `Renamed to "${title}".`;
+    },
+
+  session_switch:
+    (ctx) =>
+    async (args) => {
+      const prefix = asString(args.id).trim();
+      if (!prefix) throw new Error('session_switch: "id" is required (see session_list)');
+      const ok = ctx.switchSessionById(prefix);
+      if (!ok) throw new Error(`session_switch: no session starts with "${prefix}"`);
+      return 'UI switched. This run keeps its own binding; the next message lands in the new session.';
+    },
+
+  /* --------------------------- text transforms ----------------------------- */
+
+  sort_lines:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('sort_lines: "text" is required');
+      if (text.length > 200_000) throw new Error('sort_lines: text too long (≤200k chars)');
+      return sortLines(text, { reverse: args.reverse === true, numeric: args.numeric === true });
+    },
+
+  dedupe_lines:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('dedupe_lines: "text" is required');
+      if (text.length > 200_000) throw new Error('dedupe_lines: text too long (≤200k chars)');
+      const { text: out, removed } = dedupeLines(text, args.ignore_case === true);
+      return `${out}\n[ducky: removed ${removed} duplicate line(s)]`;
+    },
+
+  count_words:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) return 'lines: 0 · words: 0 · chars: 0 · bytes: 0';
+      const s = fileInfoSummary(text);
+      return `lines: ${s.lines} · words: ${s.words} · chars: ${s.chars} · bytes: ${s.bytes}`;
+    },
+
+  /* ------------------------------ patch: regex ----------------------------- */
+
+  regex_edit:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('regex_edit: "path" is required');
+      const content = ctx.readFile(p);
+      if (content === null) throw new Error(`File not found: ${p} (read it first)`);
+      const pattern = asString(args.pattern);
+      if (!pattern) throw new Error('regex_edit: "pattern" is required');
+      try {
+        const { text, count } = regexReplace(content, pattern, asString(args.replacement), asString(args.flags));
+        if (count === 0) throw new Error(`regex_edit: pattern matched 0 times in ${p}`);
+        ctx.writeFile(p, text);
+        return `Edited ${p}: ${count} replacement(s).`;
+      } catch (e) {
+        const msg = (e as Error).message;
+        throw new Error(msg.startsWith('regex:') ? msg.replace(/^regex: /, 'regex_edit: ') : msg);
+      }
+    },
+
+  /* --------------------------- fs-plus: overview --------------------------- */
+
+  workspace_stats:
+    (ctx) =>
+    async () => {
+      const files = ctx.listWorkspaceFiles();
+      if (!files.length) return 'Workspace is empty.';
+      const snap = ctx.readWorkspaceSnapshot();
+      let bytes = 0;
+      const sizes: Array<[string, number]> = [];
+      const exts = new Map<string, number>();
+      for (const f of files) {
+        const b = new TextEncoder().encode(snap[f] ?? '').length;
+        bytes += b;
+        sizes.push([f, b]);
+        const dot = f.lastIndexOf('.');
+        const ext = dot > 0 ? f.slice(dot).toLowerCase() : '(no ext)';
+        exts.set(ext, (exts.get(ext) ?? 0) + 1);
+      }
+      sizes.sort((a, b) => b[1] - a[1]);
+      const kb = (n: number) => (n / 1024).toFixed(1);
+      const lines = [
+        `${files.length} files · ${kb(bytes)} KB total`,
+        `largest: ${sizes
+          .slice(0, 5)
+          .map(([f, b]) => `${f} (${kb(b)} KB)`)
+          .join(', ')}`,
+        `by type: ${[...exts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([e, n]) => `${e}×${n}`)
+          .join(' ')}`,
+      ];
+      return lines.join('\n');
+    },
+
+  preview_csv:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('preview_csv: "path" is required');
+      const content = ctx.readFile(p);
+      if (content === null) throw new Error(`File not found: ${p}`);
+      const rows = Math.min(50, Math.max(1, Math.round(asNumber(args.rows) ?? 10)));
+      const delim = asString(args.delimiter) || ',';
+      try {
+        return `${p}:\n${previewCsv(content, rows, delim)}`;
+      } catch (e) {
+        throw new Error(`preview_csv: ${(e as Error).message}`);
+      }
+    },
 };

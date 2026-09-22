@@ -304,6 +304,67 @@ export function buildExecutors(
           ...(m.toolCalls?.length ? { tools: m.toolCalls.map((c) => c.function.name) } : {}),
         }));
     },
+    getPublicSettings: () => {
+      const s = useDuckyStore.getState().settings;
+      return {
+        policy: s.policy,
+        temperature: s.temperature,
+        maxTokens: s.maxTokens,
+        maxToolIterations: s.maxToolIterations,
+        showReasoning: s.showReasoning,
+        model: s.model,
+      };
+    },
+    updatePublicSettings: (patch) => {
+      const changed: string[] = [];
+      const cur = useDuckyStore.getState().settings;
+      const next: Record<string, unknown> = {};
+      if (patch.policy !== undefined && patch.policy !== cur.policy) next.policy = patch.policy;
+      if (patch.temperature !== undefined && patch.temperature !== cur.temperature) next.temperature = patch.temperature;
+      if (patch.maxTokens !== undefined && patch.maxTokens !== cur.maxTokens) next.maxTokens = patch.maxTokens;
+      if (patch.maxToolIterations !== undefined && patch.maxToolIterations !== cur.maxToolIterations) {
+        next.maxToolIterations = patch.maxToolIterations;
+      }
+      if (patch.showReasoning !== undefined && patch.showReasoning !== cur.showReasoning) {
+        next.showReasoning = patch.showReasoning;
+      }
+      if (Object.keys(next).length) {
+        useDuckyStore.getState().updateSettings(next as Partial<Settings>);
+        changed.push(...Object.keys(next));
+      }
+      return changed.length ? changed : ['(already set — no change)'];
+    },
+    listSessionsBrief: () =>
+      useDuckyStore
+        .getState()
+        .sessions.map((s) => ({
+          id: s.id,
+          title: s.title,
+          messages: s.messages.filter((m) => m.role === 'user' || m.role === 'assistant').length,
+          files: Object.keys(s.workspace).length,
+          updatedAt: s.updatedAt,
+        }))
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    createSessionNamed: (title) => {
+      const st = useDuckyStore.getState();
+      const id = st.newSession();
+      if (title.trim()) st.renameSession(id, title.trim().slice(0, 80));
+      return id;
+    },
+    renameSessionById: (idPrefix, title) => {
+      const st = useDuckyStore.getState();
+      const hit = st.sessions.find((s) => s.id.startsWith(idPrefix));
+      if (!hit) return false;
+      st.renameSession(hit.id, title);
+      return true;
+    },
+    switchSessionById: (idPrefix) => {
+      const st = useDuckyStore.getState();
+      const hit = st.sessions.find((s) => s.id.startsWith(idPrefix));
+      if (!hit) return false;
+      st.selectSession(hit.id);
+      return true;
+    },
   };
 
   const executors: Record<string, (args: Record<string, unknown>) => Promise<string>> = {};

@@ -8,7 +8,14 @@
 #       https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh -o /tmp/opencode/ducky-install.sh
 #     bash /tmp/opencode/ducky-install.sh
 #
-#   Fully non-interactive (pipe-friendly — pass the key as a flag):
+#   ONE command to copy (repo is private, so curl asks for a GitHub token at
+#   a password prompt — paste a fine-grained PAT with "Contents: read"):
+#     curl -fsSL -u ducky https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
+#   Then answer two prompts: (1) GitHub token [asked by curl], (2) your free
+#   NVIDIA key [asked by the installer — every user needs their OWN key from
+#   build.nvidia.com, so no curl on earth can embed it].
+#
+#   Fully non-interactive (pipe-friendly — pass everything as flags):
 #     export GITHUB_TOKEN=ghp_...
 #     curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
 #       https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh \
@@ -171,7 +178,17 @@ if [ "$DO_RUN" = 0 ]; then
 fi
 
 if [ ! -t 0 ] && [ -z "$SETUP_KEY" ]; then
-  warn "stdin is a pipe and no --key was given — skipping interactive setup."
+  # Piped (curl | bash): stdin is the script, so ask on the real terminal.
+  if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+    printf '  NVIDIA API key (nvapi-..., hidden — Enter to skip setup): ' > /dev/tty
+    if read -rs TTY_KEY < /dev/tty; then
+      printf '\n' > /dev/tty
+      SETUP_KEY="$TTY_KEY"
+    fi
+  fi
+fi
+if [ -z "$SETUP_KEY" ] && [ ! -t 0 ]; then
+  warn "no key given — skipping interactive setup."
   warn "re-run: ducky setup   (or reinstall with --key nvapi-...)"
 else
   say "running setup (key stays on this machine)"

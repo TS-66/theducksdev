@@ -11,7 +11,9 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **One model: Ducky 3.5 Coder** — the only model you'll ever see. Which endpoint serves it is a pure deployment concern: `/api/chat` maps the public id to a server-side `AI_MODEL_ID` so the upstream name never reaches the client.
 - **Streaming chat with tools** — the model calls tools across multiple iterations; results stream back as tool cards (per-tool icons, diff previews for edits, live output).
 - **Virtual workspace** — a sandboxed filesystem stored in your browser (seeded with a sample repo). `read_file`, `write_file`, `edit_file`, `glob`, `grep` and a simulated `bash` (pipes, redirects, `&&` chains) all operate on it. Paste or import images, preview them, export everything as a valid `.zip`.
-- **Everything is a plugin** — 24 plugins / 57 tools (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-todo`, …). Toggling a plugin unloads its tools from the model's schema. `npm run test:tools` executes every tool (30 checks green).
+- **Everything is a plugin** — 26 plugins / 69 tools (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-todo`, …). Toggling a plugin unloads its tools from the model's schema. `npm run test:tools` executes every tool (36 checks green).
+- **Self-driving harness** — `get/set_config` lets the agent retune policy, temperature and budgets mid-run (gated); `session_list/new/rename/switch` manages parallel threads.
+- **Text power tools** — `sort/dedupe/count` lines, `regex_edit` with `$1` groups, `preview_csv` tables, `workspace_stats` overviews.
 - **Computer use** — `screen_capture` grabs a user-shared screen frame into `images/` (browser picker first, never silent) and `vision_describe` reads it; `disk_*` tools act on the real folder.
 - **Browser use** — `browser_open` loads pages in the IDE browser panel, `browser_snapshot` reads their text, `browser_tabs`/`browser_close` manage tabs.
 - **Memory + skills** — `memory_save` persists facts across sessions (injected into the system prompt), `note_*` is the session scratchpad, and 8 skill playbooks (`skill_list`/`skill_show`: code-review, debug, refactor, plan, commit, docs, test-gen, web-research) discipline the agent.
@@ -26,14 +28,15 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 ## Quickstart (`ducky --web`)
 
 ```sh
-export GITHUB_TOKEN=ghp_...
-curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
-  https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh \
-  | bash -s -- --key nvapi-... --no-open
+curl -fsSL -u ducky https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
 ```
 
-(The repo is private, hence the token header. Prefer it interactive? Download
-`install.sh` first, then run `bash install.sh` — it walks through setup.)
+One command to copy — nothing to edit. It asks for two pastes at prompts
+(never inside the command): (1) a GitHub token for the private download
+(`curl` asks for the password — any fine-grained PAT with Contents: read
+works), (2) your free NVIDIA key from build.nvidia.com (every user needs
+their OWN key, so no installer on earth can embed it). Fully
+non-interactive variant with flags is documented atop `install.sh`.
 
 What the installer does: downloads the ref → `npm install` (or bun) →
 `next build` → links the global `ducky` command (user-local shim when sudo is

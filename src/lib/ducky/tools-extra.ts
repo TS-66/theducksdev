@@ -357,3 +357,100 @@ export function fileInfoSummary(content: string): { lines: number; words: number
   const words = (content.match(/\S+/g) ?? []).length;
   return { lines, words, chars: content.length, bytes: te().encode(content).length };
 }
+
+/* ------------------------------ line transforms -------------------------- */
+
+/** Sort lines (lexicographic, numeric-aware, or reverse). Returns sorted text. */
+export function sortLines(text: string, opts?: { reverse?: boolean; numeric?: boolean }): string {
+  const lines = text.split("\n");
+  const cmp = opts?.numeric
+    ? (a: string, b: string) => {
+        const na = parseFloat(a);
+        const nb = parseFloat(b);
+        if (Number.isNaN(na) || Number.isNaN(nb)) return a.localeCompare(b);
+        return na - nb || a.localeCompare(b);
+      }
+    : (a: string, b: string) => a.localeCompare(b);
+  lines.sort(opts?.reverse ? (a, b) => -cmp(a, b) : cmp);
+  return lines.join("\n");
+}
+
+/** Drop duplicate lines, keeping first occurrence order. Returns {text, removed}. */
+export function dedupeLines(text: string, ignoreCase?: boolean): { text: string; removed: number } {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of text.split("\n")) {
+    const k = ignoreCase ? line.toLowerCase() : line;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(line);
+  }
+  return { text: out.join("\n"), removed: text.split("\n").length - out.length };
+}
+
+/** Regex find-and-replace over full text (native $-substitution). Returns {text, count}. */
+export function regexReplace(
+  text: string,
+  pattern: string,
+  replacement: string,
+  flags = "",
+): { text: string; count: number } {
+  if (!/^[gimsuy]*$/.test(flags)) throw new Error(`regex: bad flags "${flags}" (allowed: g i m s u y)`);
+  let re: RegExp;
+  let reAll: RegExp;
+  try {
+    re = new RegExp(pattern, flags);
+    reAll = new RegExp(pattern, flags.includes("g") ? flags : `${flags}g`);
+  } catch (e) {
+    throw new Error(`regex: invalid pattern — ${(e as Error).message}`);
+  }
+  const matches = text.match(reAll);
+  return { text: text.replace(re, replacement), count: matches ? matches.length : 0 };
+}
+
+/* --------------------------------- CSV ----------------------------------- */
+
+/** Split one CSV line honoring quotes + escaped quotes. */
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const cells: string[] = [];
+  let cur = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quoted) {
+      if (c === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else quoted = false;
+      } else cur += c;
+    } else if (c === '"') quoted = true;
+    else if (c === delimiter) {
+      cells.push(cur);
+      cur = "";
+    } else cur += c;
+  }
+  cells.push(cur);
+  return cells;
+}
+
+/** Render the head of a CSV file as an aligned table. */
+export function previewCsv(content: string, rows = 10, delimiter = ","): string {
+  if (delimiter.length !== 1) throw new Error("csv: delimiter must be one character");
+  const lines = content.split("\n").filter((l) => l.trim() !== "");
+  if (!lines.length) return "(empty file)";
+  const head = lines.slice(0, Math.min(rows + 1, lines.length)).map((l) => splitCsvLine(l, delimiter));
+  const cols = Math.max(...head.map((r) => r.length));
+  const ragged = head.some((r) => r.length !== cols);
+  const widths = Array.from({ length: cols }, (_, c) =>
+    Math.min(40, Math.max(...head.map((r) => (r[c] ?? "").length), 6)),
+  );
+  const fmt = (r: string[]) =>
+    `| ${r.map((cell, c) => (cell ?? "").slice(0, 40).padEnd(widths[c])).join(" | ")} |`;
+  const out = [fmt(head[0]), `|${widths.map((w) => "-".repeat(w + 2)).join("|")}|`];
+  for (const r of head.slice(1)) out.push(fmt(r));
+  const extra = lines.length - head.length;
+  if (extra > 0) out.push(`… +${extra} more row(s)`);
+  if (ragged) out.push("[ducky: ragged rows — some lines have a different column count]");
+  return out.join("\n");
+}
