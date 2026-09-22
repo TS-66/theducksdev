@@ -29,7 +29,7 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 ## Quickstart (one copy-paste)
 
 ```sh
-curl -fsSL --location-trusted -u ducky https://ducky-install.vercel.app | bash
+curl -fsSL https://ducky-install.vercel.app | bash
 ```
 
 One command to copy — nothing to edit. Two pastes at prompts, never inside

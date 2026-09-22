@@ -2,8 +2,8 @@
 #
 # Ducky AI | Coder — one-line installer.
 #
-#   Shortest form (short URL → this file → full install):
-#     curl -fsSL --location-trusted -u ducky https://ducky-install-ts-66s-projects.vercel.app | bash
+#   Shortest form (short URL → this file → full install, zero auth):
+#     curl -fsSL https://ducky-install.vercel.app | bash
 #
 #   Interactive (clone/download first when the repo is private, then run):
 #     export GITHUB_TOKEN=ghp_...
@@ -91,7 +91,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"  # fallback only — the repo is public
 
 need() { command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"; }
 need curl
@@ -122,16 +122,23 @@ else
   if [ -e "$DEST" ] && [ "$DRY_RUN" = 0 ]; then
     fail "$DEST already exists — pass --dir <fresh-path> or --local <checkout>"
   fi
-  [ -n "$TOKEN" ] || fail "repo is private: export GITHUB_TOKEN=ghp_... first"
   say "downloading $REPO@$REF → $DEST"
+  PUBLIC_TARBALL="https://codeload.github.com/$REPO/tar.gz/refs/heads/$REF"
   if [ "$DRY_RUN" = 1 ]; then
-    run curl -fsSL -H "'Authorization: Bearer \$GITHUB_TOKEN'" \
-      "https://api.github.com/repos/$REPO/tarball/$REF"
+    run curl -fsSL "$PUBLIC_TARBALL"
   else
     mkdir -p "$DEST"
-    curl -fsSL -H "Authorization: Bearer $TOKEN" \
-      "https://api.github.com/repos/$REPO/tarball/$REF" \
-      | tar -xz -C "$DEST" --strip-components=1
+    # Public repo first (zero auth); private-token fallback for forks kept private.
+    if curl -fsSL "$PUBLIC_TARBALL" 2>/dev/null | tar -xz -C "$DEST" --strip-components=1 2>/dev/null; then
+      :
+    elif [ -n "$TOKEN" ]; then
+      warn "public download failed — retrying with GITHUB_TOKEN"
+      curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        "https://api.github.com/repos/$REPO/tarball/$REF" \
+        | tar -xz -C "$DEST" --strip-components=1
+    else
+      fail "download failed. The repo may be private again — export GITHUB_TOKEN=ghp_... and retry."
+    fi
   fi
 fi
 
