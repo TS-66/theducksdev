@@ -29,6 +29,14 @@ import {
 } from './plugins';
 import { webFetch, webSearch } from './tools-web';
 import { visionDescribe } from './tools-vision';
+import {
+  forgetMemory,
+  listMemories,
+  listNotes,
+  readNote,
+  saveMemory,
+  writeNote,
+} from './memory';
 import { useDuckyStore } from './store';
 
 /* ------------------------- extended loop options --------------------------- */
@@ -265,6 +273,37 @@ export function buildExecutors(
     webSearch: (query, num) => webSearch(query, num),
     webFetch: (url) => webFetch(url),
     visionDescribe: (imageDataUrl, question) => visionDescribe(imageDataUrl, question),
+    saveMemoryText: (text) => saveMemory(text).id,
+    listMemoryEntries: () => listMemories().map((m) => ({ id: m.id, text: m.text, createdAt: m.createdAt })),
+    forgetMemoryEntry: (idPrefix) => forgetMemory(idPrefix),
+    writeSessionNote: (name, content) => {
+      const e = writeNote(opts.sessionId, name, content);
+      return { name: e.name, chars: e.content.length };
+    },
+    readSessionNote: (name) => readNote(opts.sessionId, name)?.content ?? null,
+    listSessionNotes: () =>
+      listNotes(opts.sessionId).map((n) => ({ name: n.name, chars: n.content.length, updatedAt: n.updatedAt })),
+    getSessionStats: () => {
+      const s = useDuckyStore.getState().sessions.find((x) => x.id === opts.sessionId);
+      return {
+        title: s?.title ?? '(unknown session)',
+        promptTokens: s?.stats.promptTokens ?? 0,
+        completionTokens: s?.stats.completionTokens ?? 0,
+        toolCalls: s?.stats.toolCalls ?? 0,
+        messages: s?.messages.filter((m) => m.role === 'user' || m.role === 'assistant').length ?? 0,
+        files: s ? Object.keys(s.workspace).length : 0,
+      };
+    },
+    getTranscript: () => {
+      const s = useDuckyStore.getState().sessions.find((x) => x.id === opts.sessionId);
+      return (s?.messages ?? [])
+        .filter((m) => m.role === 'user' || m.role === 'assistant' || m.role === 'tool')
+        .map((m) => ({
+          role: m.role,
+          content: m.content,
+          ...(m.toolCalls?.length ? { tools: m.toolCalls.map((c) => c.function.name) } : {}),
+        }));
+    },
   };
 
   const executors: Record<string, (args: Record<string, unknown>) => Promise<string>> = {};

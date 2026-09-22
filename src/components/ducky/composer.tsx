@@ -178,7 +178,7 @@ export function Composer({
   };
 
   const focusGlow = cn(
-    "focus-within:border-[#FDC00A]/55 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.10),0_8px_24px_-12px_rgba(253,192,10,0.25)]",
+    "focus-within:border-[#FDC00A]/60 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.12),0_16px_40px_-16px_rgba(253,192,10,0.35)]",
   );
 
   const fileInput = (

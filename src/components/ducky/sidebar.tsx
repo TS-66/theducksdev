@@ -7,6 +7,7 @@ import {
   FilePlus2,
   FolderDown,
   FolderTree,
+  Monitor,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -323,6 +324,42 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Export .zip</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Capture screen into workspace images"
+                disabled={!active}
+                onClick={() => {
+                  if (!active) return;
+                  import("@/lib/ducky/screen").then(({ captureScreenToWorkspace }) => {
+                    const sid = active.id;
+                    toast.info("Pick a screen to share…", {
+                      description: "Your browser asks what to share — one frame is saved to images/.",
+                    });
+                    captureScreenToWorkspace(sid, (path, content) =>
+                      useDuckyStore.getState().writeFile(sid, path, content),
+                    )
+                      .then((msg) => {
+                        toast.success("Screen captured", { description: msg });
+                        const m = msg.match(/→ (\S+)/);
+                        if (m) onPreviewFile(m[1]);
+                      })
+                      .catch((e) =>
+                        toast.error("Capture cancelled", {
+                          description: e instanceof Error ? e.message : String(e),
+                        }),
+                      );
+                  });
+                }}
+                className="size-6 rounded-sm"
+              >
+                <Monitor className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Capture screen → images/ (then vision_describe)</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>

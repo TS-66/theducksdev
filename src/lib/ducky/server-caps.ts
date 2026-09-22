@@ -10,6 +10,7 @@ import { useDuckyStore } from "@/lib/ducky/store";
 
 let serverLive = false;
 let modelIdSet = false;
+let provider: string | null = null;
 
 /** Update the live flag; returns true when the value changed (so UI can refresh). */
 export function setServerLive(live: boolean): boolean {
@@ -33,4 +34,14 @@ export function setModelIdSet(set: boolean): boolean {
 
 export function isModelIdSet(): boolean {
   return modelIdSet;
+}
+
+/** Server provider label ("nvidia") — display only, never a secret. */
+export function setProvider(p: string | null): void {
+  provider = p;
+  useDuckyStore.setState({ provider: p });
+}
+
+export function getProvider(): string | null {
+  return provider;
 }

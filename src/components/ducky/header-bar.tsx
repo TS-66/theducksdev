@@ -42,7 +42,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
       : (activeProject?.name ?? "no project"));
 
   return (
-    <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur">
+    <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/85 px-3 shadow-[0_1px_0_rgba(253,192,10,0.08)] backdrop-blur-xl">
       {/* Left */}
       <Button
         size="icon"
@@ -59,9 +59,9 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
         <img
           src="/ducky-mark.png"
           alt="Ducky AI logo"
-          className="size-6 shrink-0 rounded-md border border-[#FDC00A]/25 bg-black"
+          className="size-6 shrink-0 rounded-md border border-[#FDC00A]/30 bg-black shadow-[0_0_12px_-2px_rgba(253,192,10,0.5)]"
         />
-        <span className="whitespace-nowrap font-bold leading-none">
+        <span className="whitespace-nowrap font-bold leading-none tracking-tight">
           Ducky AI{" "}
           <span className="hidden font-mono font-semibold text-muted-foreground sm:inline">
             | Coder
@@ -69,9 +69,9 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
         </span>
         <Badge
           variant="outline"
-          className="hidden px-1.5 py-0 font-mono text-[10px] text-muted-foreground sm:inline-flex"
+          className="hidden border-[#FDC00A]/25 bg-[#FDC00A]/5 px-1.5 py-0 font-mono text-[10px] text-[#FDC00A] sm:inline-flex"
         >
-          v1.0
+          v1.0 · ide
         </Badge>
       </div>
 

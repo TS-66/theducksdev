@@ -3,10 +3,20 @@
  *
  * Serverless-safe: pure fetch, no Node APIs (only `process.env`). The
  * endpoint, credentials and backend model id are **deployment secrets** that
- * live exclusively in server environment variables — they are never sent to,
+ * live exclusively in server environment variables (or the JSON file your
+ * own database writes to DUCKY_SECRETS_FILE) — they are never sent to,
  * stored by, or visible from the client.
  *
- * Environment variables (set these in your hosting dashboard):
+ * THE one provider: NVIDIA Build serving Nemotron 3 Ultra
+ * (frontier reasoning + agentic coding, tool calling, streaming reasoning).
+ * Get a free key at build.nvidia.com → Generate Key, then on the server:
+ *   ducky setup                       # paste nvapi-... once, hidden input
+ * or set env directly:
+ *   AI_API_KEY=nvapi-...              # server env ONLY — never in UI/git
+ * (base URL + model fill in automatically; AI_MODEL_ID / AI_BASE_URL
+ * override them only if you know what you're doing)
+ *
+ * Generic OpenAI-compatible endpoint:
  *   AI_BASE_URL   – OpenAI-compatible base URL  (e.g. https://api.example.com/v1)
  *   AI_API_KEY    – bearer key for that endpoint
  *   AI_MODEL_ID   – upstream model id that powers "Ducky 3.5 Coder"
@@ -17,9 +27,11 @@
  *   https://api.example.com/v1/chat/completions ← full endpoint path is stripped
  *
  * The user-facing model id is always `ducky-3.5-coder` (Ducky 3.5 Coder).
- * It is translated to `AI_MODEL_ID` server-side so the upstream name never
- * reaches the client.
+ * It is translated to the server-resolved upstream model here so the
+ * upstream id never reaches the client.
  */
+
+import { resolveProviderEnv } from "../providers";
 
 export const maxDuration = 60;
 
@@ -108,22 +120,27 @@ export async function POST(req: Request): Promise<Response> {
   // Resolution order: server env (deployment config wins) → client-provided
   // (local-dev convenience only). Stale browser-side values persisted by
   // older app versions must never override a correctly configured deployment.
-  const apiKey = clean(process.env.AI_API_KEY) || clean(body.apiKey);
+  // Single provider (NVIDIA): base URL + model fill in automatically, so one
+  // server-side key is the whole setup. Keys may also arrive via your
+  // database through DUCKY_SECRETS_FILE — either way they never leave this
+  // process.
+  const server = resolveProviderEnv();
+  const apiKey = server.apiKey || clean(body.apiKey);
   if (!apiKey) {
     return jsonError(
       400,
-      'No API key configured. Set AI_API_KEY (and AI_BASE_URL) as server environment variables.',
+      'No API key configured. Run `ducky setup` on the server (one free NVIDIA key) or set AI_API_KEY as a server env var — the key is never entered in the browser.',
     );
   }
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return jsonError(400, 'Missing required field: messages.');
   }
 
-  const rawBase = clean(process.env.AI_BASE_URL) || clean(body.baseUrl);
+  const rawBase = server.baseUrl || clean(body.baseUrl);
   if (!rawBase) {
     return jsonError(
       400,
-      'No endpoint configured. Set AI_BASE_URL in the server environment.',
+      'No endpoint configured. Run `ducky setup` on the server (or set AI_BASE_URL in the server environment).',
     );
   }
   const base = normalizeBase(rawBase);
@@ -139,15 +156,15 @@ export async function POST(req: Request): Promise<Response> {
 
   // Forward everything verbatim except our own proxy-control fields; force
   // streaming with usage accounting when tools are in play. The public
-  // "ducky-3.5-coder" id is translated to the configured backend model here
-  // so the upstream id never reaches the client.
+  // "ducky-3.5-coder" id is translated to Nemotron 3 Ultra (or AI_MODEL_ID)
+  // here so the upstream id — and the key — never reach the client.
   const { baseUrl: _b, apiKey: _k, ...forward } = body;
   void _b;
   void _k;
 
   const payload: ChatProxyPayload = {
     ...forward,
-    model: clean(process.env.AI_MODEL_ID) || 'ducky-3.5-coder',
+    model: server.model,
     stream: true,
     ...(Array.isArray(body.tools) && body.tools.length > 0
       ? { stream_options: { include_usage: true } }
@@ -201,13 +218,10 @@ export async function POST(req: Request): Promise<Response> {
 
     if (!message) message = `Upstream error (HTTP ${status}).`;
     if (status === 401) {
-      message = `${message} — check AI_API_KEY in the server environment.`.trim();
-    }
-    if (status === 404 && !clean(process.env.AI_MODEL_ID)) {
-      message = `${message} — hint: AI_MODEL_ID is not set on the server, so the request asked for the literal model id "ducky-3.5-coder". Set AI_MODEL_ID to a model your endpoint actually serves.`.trim();
+      message = `${message} — the server key was rejected. Re-run \`ducky setup\` on the server with a fresh provider key (never in the browser).`.trim();
     }
     if (status === 404) {
-      message = `${message} — also verify AI_BASE_URL points at an OpenAI-compatible /v1 endpoint.`.trim();
+      message = `${message} — the model id "${server.model}" was not found. Set AI_MODEL_ID to a model your endpoint serves.`.trim();
     }
     return jsonError(status, message);
   }

@@ -30,6 +30,25 @@ import {
   formatDiskListing,
   useDiskStore,
 } from './disk';
+import {
+  applyEdits,
+  b64decode,
+  b64encode,
+  evaluateExpression,
+  fileInfoSummary,
+  getJsonPath,
+  lineDiff,
+  sha256Hex,
+} from './tools-extra';
+import { getSkill, SKILLS } from './skills';
+import {
+  closeTab,
+  getActiveTab,
+  listTabs,
+  openTab,
+  setActiveTab,
+} from './browser-tabs';
+import { captureScreenToWorkspace } from './screen';
 
 export const PLUGIN_PREFIX = '@ducky-ai/';
 
@@ -137,6 +156,146 @@ export const PLUGINS: PluginManifest[] = [
     category: 'interaction',
     defaultEnabled: true,
   },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-fs-plus`,
+    name: 'ducky-tool-fs-plus',
+    version: '1.0.0',
+    description:
+      'Workspace file management beyond read/write: list directories, inspect sizes, copy/move/delete/append, and hand any file to the browser download shelf.',
+    tools: ['list_files', 'file_info', 'copy_file', 'move_file', 'delete_file', 'append_file', 'download_file'],
+    category: 'filesystem',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-patch`,
+    name: 'ducky-tool-patch',
+    version: '1.0.0',
+    description:
+      'Surgical multi-file editing: batch literal edits in one call, create many files at once, and diff any two workspace files line by line.',
+    tools: ['multi_edit', 'create_files', 'diff_files'],
+    category: 'filesystem',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-screen`,
+    name: 'ducky-tool-screen',
+    version: '1.0.0',
+    description:
+      'COMPUTER USE (perception): captures one frame of the user-shared screen into images/ — the human picks what to share in the browser picker, then vision_describe reads it. The eyes of the computer-use loop.',
+    tools: ['screen_capture'],
+    category: 'interaction',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-browser`,
+    name: 'ducky-tool-browser',
+    version: '1.0.0',
+    description:
+      'BROWSER USE: opens real pages in the IDE browser panel, reads their text through the server proxy, and manages tabs. The hands of the browse-and-read loop (page JS stays sandboxed — the agent reads, the human clicks).',
+    tools: ['browser_open', 'browser_snapshot', 'browser_tabs', 'browser_close'],
+    category: 'web',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-memory`,
+    name: 'ducky-tool-memory',
+    version: '1.0.0',
+    description:
+      'Durable cross-session memory: save facts that survive reloads (injected into every system prompt), list them, forget by id. Small, explicit, user-visible.',
+    tools: ['memory_save', 'memory_list', 'memory_forget'],
+    category: 'planning',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-notes`,
+    name: 'ducky-tool-notes',
+    version: '1.0.0',
+    description:
+      'Per-session scratchpad for working state that is not a todo: dump context, cache intermediate findings, keep a lab journal across long tasks.',
+    tools: ['note_write', 'note_read', 'note_list'],
+    category: 'planning',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-session`,
+    name: 'ducky-tool-session',
+    version: '1.0.0',
+    description:
+      'Session introspection: token/tool/file counters and a full Markdown transcript rendered into context for summarization and handoffs.',
+    tools: ['session_stats', 'session_export'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-calc`,
+    name: 'ducky-tool-calc',
+    version: '1.0.0',
+    description:
+      'Exact arithmetic without model hallucinations: safe expression evaluator (no eval) with functions and constants.',
+    tools: ['calc'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-text`,
+    name: 'ducky-tool-text',
+    version: '1.0.0',
+    description:
+      'Text codecs and inspectors: base64, SHA-256, JSON validation and dot-path queries over JSON strings.',
+    tools: ['base64_encode', 'base64_decode', 'sha256', 'json_parse', 'json_query'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-time`,
+    name: 'ducky-tool-time',
+    version: '1.0.0',
+    description:
+      'Ground truth for "now": current UTC/local timestamps in ISO and human form. Models must not guess the date.',
+    tools: ['now'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-id`,
+    name: 'ducky-tool-id',
+    version: '1.0.0',
+    description:
+      'Fresh randomness from the platform CSPRNG: UUIDs and URL-safe tokens for ids, secrets and filenames.',
+    tools: ['uuid', 'random_token'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-clipboard`,
+    name: 'ducky-tool-clipboard',
+    version: '1.0.0',
+    description:
+      'OS clipboard bridge: copy text out for the human, read text the human copied in. Permission-gated like every external action.',
+    tools: ['clipboard_copy', 'clipboard_read'],
+    category: 'interaction',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-notify`,
+    name: 'ducky-tool-notify',
+    version: '1.0.0',
+    description:
+      'Tap the human on the shoulder when a long run finishes: native notification when granted, toast fallback otherwise.',
+    tools: ['notify_user'],
+    category: 'interaction',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-skills`,
+    name: 'ducky-tool-skills',
+    version: '1.0.0',
+    description:
+      'Skill playbooks: code-review, debug, refactor, plan, commit, docs, test-gen, web-research. List them, then pull one into context before starting that kind of work.',
+    tools: ['skill_list', 'skill_show'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
 ];
 
 /** Plugin ids enabled by default once `disabledPlugins` is empty-ish. */
@@ -183,6 +342,11 @@ const obj = (
 const str = (description: string): Record<string, unknown> => ({ type: 'string', description });
 const bool = (description: string): Record<string, unknown> => ({ type: 'boolean', description });
 const num = (description: string): Record<string, unknown> => ({ type: 'number', description });
+const arr = (description: string, items: Record<string, unknown>): Record<string, unknown> => ({
+  type: 'array',
+  description,
+  items,
+});
 
 /**
  * All shipped tool definitions, each mapped to its owning plugin.
@@ -453,6 +617,355 @@ export function buildToolDefinitions(): ToolDefinition[] {
       ),
     },
     {
+      name: 'list_files',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'List entries directly inside a workspace directory (non-recursive). Directories end with "/". Prefer this over glob when you want to see what is in one folder.',
+      parameters: obj(
+        {
+          path: str('Directory to list, relative to the workspace root. Defaults to the root.'),
+        },
+        [],
+      ),
+    },
+    {
+      name: 'file_info',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Report size metadata for a workspace file: lines, words, characters, bytes. Cheap — use it before deciding to read a huge file.',
+      parameters: obj({ path: str('Workspace-relative path of the file.') }, ['path']),
+    },
+    {
+      name: 'copy_file',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Copy a workspace file to a new path (overwrites the target). Fails when the source is missing.',
+      parameters: obj(
+        {
+          from: str('Workspace-relative source path.'),
+          to: str('Workspace-relative destination path.'),
+        },
+        ['from', 'to'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'move_file',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Move/rename a workspace file atomically. Fails when the source is missing or the target already exists.',
+      parameters: obj(
+        {
+          from: str('Workspace-relative source path.'),
+          to: str('Workspace-relative destination path.'),
+        },
+        ['from', 'to'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'delete_file',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Delete a workspace file. Cannot be undone — confirm the path with list_files or glob first.',
+      parameters: obj({ path: str('Workspace-relative path to delete.') }, ['path']),
+      sideEffects: true,
+    },
+    {
+      name: 'append_file',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Append text to the end of a workspace file (creates it when missing). Use for logs, journals and incremental writes instead of rewriting whole files.',
+      parameters: obj(
+        {
+          path: str('Workspace-relative path to append to.'),
+          content: str('UTF-8 text to append.'),
+        },
+        ['path', 'content'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'download_file',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-fs-plus`).id,
+      description:
+        'Hand a workspace file to the browser download shelf so the human gets a real file. Images download as real bytes.',
+      parameters: obj({ path: str('Workspace-relative path to download.') }, ['path']),
+      sideEffects: true,
+    },
+    {
+      name: 'multi_edit',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-patch`).id,
+      description:
+        'Apply several literal old→new replacements to one workspace file in a single call, in order. Each item follows edit_file strictness (read first, unique match unless replace_all). Stops at the first failing item — earlier items ARE applied.',
+      parameters: obj(
+        {
+          path: str('Workspace-relative path to edit.'),
+          edits: arr('Ordered replacements to apply.', {
+            type: 'object',
+            properties: {
+              old_str: str('Literal text to replace. Must match exactly.'),
+              new_str: str('Literal replacement text.'),
+            },
+            required: ['old_str', 'new_str'],
+          }),
+          replace_all: bool('Apply each replacement to all occurrences. Defaults to false.'),
+        },
+        ['path', 'edits'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'create_files',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-patch`).id,
+      description:
+        'Create or overwrite MANY workspace files in one call — the fast path for scaffolding. Each item is a full-file write.',
+      parameters: obj(
+        {
+          files: arr('Files to write.', {
+            type: 'object',
+            properties: {
+              path: str('Workspace-relative path to write.'),
+              content: str('Full UTF-8 text content.'),
+            },
+            required: ['path', 'content'],
+          }),
+        },
+        ['files'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'diff_files',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-patch`).id,
+      description:
+        'Line-by-line diff of two workspace files (a vs b). Use before overwriting, or to show the human what changed.',
+      parameters: obj(
+        {
+          a: str('Workspace-relative path of the "before" file.'),
+          b: str('Workspace-relative path of the "after" file.'),
+        },
+        ['a', 'b'],
+      ),
+    },
+    {
+      name: 'screen_capture',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-screen`).id,
+      description:
+        'COMPUTER USE: capture one frame of the user-shared screen into images/ and return its path. The browser ALWAYS shows its share picker first — the human chooses screen/window/tab, nothing is captured silently. Follow with vision_describe on the returned path to actually see it.',
+      parameters: obj({}, []),
+      sideEffects: true,
+    },
+    {
+      name: 'browser_open',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-browser`).id,
+      description:
+        'BROWSER USE: open an http(s) URL in the IDE browser panel (visible to the human) and register the tab. Follow with browser_snapshot to read the page text through the server proxy.',
+      parameters: obj({ url: str('Absolute http(s) URL to open.') }, ['url']),
+    },
+    {
+      name: 'browser_snapshot',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-browser`).id,
+      description:
+        'BROWSER USE: read the active (or given) browser tab as text via the server proxy — same readable extraction as web_fetch, but addressed to an open tab.',
+      parameters: obj(
+        {
+          tab_id: str('Tab id prefix (from browser_tabs). Defaults to the active tab.'),
+          max_chars: num('Maximum characters returned. Defaults to 8000.'),
+        },
+        [],
+      ),
+    },
+    {
+      name: 'browser_tabs',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-browser`).id,
+      description: 'BROWSER USE: list open browser tabs (id, title, url) and which is active.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'browser_close',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-browser`).id,
+      description: 'BROWSER USE: close a browser tab by id prefix.',
+      parameters: obj({ tab_id: str('Tab id prefix to close.') }, ['tab_id']),
+    },
+    {
+      name: 'memory_save',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-memory`).id,
+      description:
+        'Save one durable fact (≤500 chars) to cross-session memory — injected into every future system prompt. Use for user preferences, project conventions, "never do X". Do NOT store secrets.',
+      parameters: obj({ text: str('The fact to remember, phrased standalone.') }, ['text']),
+    },
+    {
+      name: 'memory_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-memory`).id,
+      description: 'List all stored cross-session memories with their ids.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'memory_forget',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-memory`).id,
+      description: 'Forget one memory by id (first 8 characters are enough — see memory_list).',
+      parameters: obj({ id: str('Id prefix of the memory to forget.') }, ['id']),
+    },
+    {
+      name: 'note_write',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-notes`).id,
+      description:
+        'Write a named note to this session scratchpad (up to 20 notes, 8000 chars each). For working state: findings, context dumps, lab journal — not todos (use todo_write).',
+      parameters: obj(
+        {
+          name: str('Short note name (slugified). Overwrites the same name.'),
+          content: str('Note content.'),
+        },
+        ['name', 'content'],
+      ),
+    },
+    {
+      name: 'note_read',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-notes`).id,
+      description: 'Read one session note by name.',
+      parameters: obj({ name: str('Note name.') }, ['name']),
+    },
+    {
+      name: 'note_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-notes`).id,
+      description: 'List session note names with sizes and update times.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'session_stats',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-session`).id,
+      description:
+        'Report live session counters: prompt/completion tokens, tool calls executed, messages, workspace files. Ground truth for "how big is this session".',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'session_export',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-session`).id,
+      description:
+        'Render the full session transcript (roles + tool calls) as Markdown into context — for summaries, handoffs to a subagent, or reviews. Capped to stay in context.',
+      parameters: obj(
+        {
+          max_chars: num('Maximum characters returned. Defaults to 20000.'),
+        },
+        [],
+      ),
+    },
+    {
+      name: 'calc',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-calc`).id,
+      description:
+        'Exact arithmetic: evaluate an expression with + - * / % ^, parens, sqrt/abs/floor/ceil/round/sin/cos/pow/min/max and pi/e. Never estimate numbers in prose when you can compute.',
+      parameters: obj({ expression: str('Expression, e.g. "(12.5*8 - 3^2) / sqrt(16)".') }, ['expression']),
+    },
+    {
+      name: 'base64_encode',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description: 'UTF-8-safe base64 encode of a string.',
+      parameters: obj({ text: str('Text to encode.') }, ['text']),
+    },
+    {
+      name: 'base64_decode',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description: 'Decode a base64 string back to UTF-8 text. Errors clearly on invalid input.',
+      parameters: obj({ text: str('Base64 to decode.') }, ['text']),
+    },
+    {
+      name: 'sha256',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description: 'Hex SHA-256 digest of UTF-8 text (change detection, dedupe, cache keys).',
+      parameters: obj({ text: str('Text to hash.') }, ['text']),
+    },
+    {
+      name: 'json_parse',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description:
+        'Validate a JSON string and return it pretty-printed with its top-level shape. Errors pinpoint the failure.',
+      parameters: obj({ text: str('JSON string to validate.') }, ['text']),
+    },
+    {
+      name: 'json_query',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-text`).id,
+      description:
+        'Extract one value from a JSON string with a dot path (a.b[0].c, "$.a.b" also accepted). Returns the value as JSON.',
+      parameters: obj(
+        {
+          text: str('JSON string to query.'),
+          path: str('Dot path, e.g. "store.book[0].title".'),
+        },
+        ['text', 'path'],
+      ),
+    },
+    {
+      name: 'now',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-time`).id,
+      description:
+        'Current date/time: UTC ISO, local ISO with offset, and Unix millis. Call it instead of guessing dates.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'uuid',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-id`).id,
+      description: 'Generate cryptographically random UUIDv4s (default 1, max 20).',
+      parameters: obj({ count: num('How many UUIDs. Defaults to 1.') }, []),
+    },
+    {
+      name: 'random_token',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-id`).id,
+      description:
+        'URL-safe random token from the platform CSPRNG — for ids, filenames, nonces. NOT a substitute for a real secrets manager at scale.',
+      parameters: obj(
+        {
+          bytes: num('Random bytes (1-64, default 16 → 22 chars).'),
+        },
+        [],
+      ),
+    },
+    {
+      name: 'clipboard_copy',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-clipboard`).id,
+      description:
+        'Copy text to the OS clipboard so the human can paste it anywhere. Text only, ≤100k chars.',
+      parameters: obj({ text: str('Text to copy.') }, ['text']),
+      sideEffects: true,
+    },
+    {
+      name: 'clipboard_read',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-clipboard`).id,
+      description:
+        'Read text from the OS clipboard (what the human copied). Needs the browser clipboard permission — fails clearly when denied.',
+      parameters: obj({}, []),
+      sideEffects: true,
+    },
+    {
+      name: 'notify_user',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-notify`).id,
+      description:
+        'Ping the human when a long run finishes or input is truly needed: native notification when permitted, in-app toast fallback otherwise. Keep the title ≤60 chars.',
+      parameters: obj(
+        {
+          title: str('Short title.'),
+          body: str('One-line detail (optional).'),
+        },
+        ['title'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'skill_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-skills`).id,
+      description:
+        'List built-in skill playbooks (code-review, debug, refactor, plan, commit, docs, test-gen, web-research) with one-line descriptions. Call BEFORE starting that kind of work, then skill_show.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'skill_show',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-skills`).id,
+      description:
+        'Pull one skill playbook into context and FOLLOW it step by step for the current task.',
+      parameters: obj({ name: str('Skill name from skill_list.') }, ['name']),
+    },
+    {
       name: 'ask_user_question',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-ask-user`).id,
       description:
@@ -534,6 +1047,22 @@ export interface ToolExecutionContext {
   webFetch(url: string): Promise<string>;
   /** server-side multimodal description of a vFS image (data URL) */
   visionDescribe(imageDataUrl: string, question?: string): Promise<string>;
+  /* -------- extra-tool backends (memory/notes/session introspection) ------ */
+  saveMemoryText(text: string): string;
+  listMemoryEntries(): Array<{ id: string; text: string; createdAt: number }>;
+  forgetMemoryEntry(idPrefix: string): boolean;
+  writeSessionNote(name: string, content: string): { name: string; chars: number };
+  readSessionNote(name: string): string | null;
+  listSessionNotes(): Array<{ name: string; chars: number; updatedAt: number }>;
+  getSessionStats(): {
+    title: string;
+    promptTokens: number;
+    completionTokens: number;
+    toolCalls: number;
+    messages: number;
+    files: number;
+  };
+  getTranscript(): Array<{ role: string; content: string; tools?: string[] }>;
 }
 
 export type ToolExecutor = (args: Record<string, unknown>) => Promise<string>;
@@ -785,4 +1314,505 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
         throw new Error(`vision_describe failed on ${p}: ${(e as Error).message}`);
       }
     },
+
+  /* ------------------------------ fs-plus -------------------------------- */
+
+  list_files:
+    (ctx) =>
+    async (args) => {
+      const dir = normalizePath(asString(args.path));
+      const prefix = dir ? `${dir}/` : '';
+      const files = ctx.listWorkspaceFiles();
+      const dirs = new Set<string>();
+      const direct: string[] = [];
+      for (const f of files) {
+        if (!f.startsWith(prefix)) continue;
+        const rest = f.slice(prefix.length);
+        if (!rest) continue;
+        const seg = rest.indexOf('/');
+        if (seg === -1) direct.push(rest);
+        else dirs.add(rest.slice(0, seg));
+      }
+      const lines = [...[...dirs].sort().map((d) => `${d}/`), ...direct.sort()];
+      if (!lines.length) return dir ? `Directory is empty: ${dir}/` : 'Workspace is empty.';
+      return lines.join('\n');
+    },
+
+  file_info:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('file_info: "path" is required');
+      const content = ctx.readFile(p);
+      if (content === null) throw new Error(`File not found: ${p}`);
+      const s = fileInfoSummary(content);
+      return `${p}: ${s.lines} lines · ${s.words} words · ${s.chars} chars · ${s.bytes} bytes`;
+    },
+
+  copy_file:
+    (ctx) =>
+    async (args) => {
+      const from = normalizePath(asString(args.from));
+      const to = normalizePath(asString(args.to));
+      if (!from || !to) throw new Error('copy_file: "from" and "to" are required');
+      const content = ctx.readFile(from);
+      if (content === null) throw new Error(`File not found: ${from}`);
+      ctx.writeFile(to, content);
+      return `Copied ${from} → ${to} (${content.length} chars).`;
+    },
+
+  move_file:
+    (ctx) =>
+    async (args) => {
+      const from = normalizePath(asString(args.from));
+      const to = normalizePath(asString(args.to));
+      if (!from || !to) throw new Error('move_file: "from" and "to" are required');
+      const content = ctx.readFile(from);
+      if (content === null) throw new Error(`File not found: ${from}`);
+      if (ctx.readFile(to) !== null) throw new Error(`Target already exists: ${to} (delete it first)`);
+      ctx.writeFile(to, content);
+      ctx.deleteFileEntry(from);
+      return `Moved ${from} → ${to}.`;
+    },
+
+  delete_file:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('delete_file: "path" is required');
+      const ok = ctx.deleteFileEntry(p);
+      if (!ok) throw new Error(`File not found: ${p}`);
+      return `Deleted ${p}.`;
+    },
+
+  append_file:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('append_file: "path" is required');
+      const add = asString(args.content);
+      const cur = ctx.readFile(p) ?? '';
+      ctx.writeFile(p, cur + add);
+      return `Appended ${add.length} chars to ${p} (${cur.length + add.length} total).`;
+    },
+
+  download_file:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('download_file: "path" is required');
+      if (typeof document === 'undefined') throw new Error('download_file: needs a real browser');
+      const content = ctx.readFile(p);
+      if (content === null) throw new Error(`File not found: ${p}`);
+      const isImage = content.startsWith('data:image/');
+      const a = document.createElement('a');
+      if (isImage) {
+        a.href = content;
+      } else {
+        const blob = new Blob([content], { type: 'text/plain' });
+        a.href = URL.createObjectURL(blob);
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      a.download = p.split('/').pop() ?? 'file';
+      a.click();
+      return `Sent ${p} to the browser download shelf.`;
+    },
+
+  /* -------------------------------- patch --------------------------------- */
+
+  multi_edit:
+    (ctx) =>
+    async (args) => {
+      const p = normalizePath(asString(args.path));
+      if (!p) throw new Error('multi_edit: "path" is required');
+      const content = ctx.readFile(p);
+      if (content === null) throw new Error(`File not found: ${p} (read it first)`);
+      const raw = Array.isArray(args.edits) ? args.edits : null;
+      if (!raw || raw.length === 0) throw new Error('multi_edit: non-empty "edits" array is required');
+      if (raw.length > 20) throw new Error('multi_edit: at most 20 edits per call');
+      const edits = raw.map((e, i) => {
+        const rec = e as Record<string, unknown>;
+        if (typeof rec.old_str !== 'string' || typeof rec.new_str !== 'string') {
+          throw new Error(`multi_edit: item ${i} needs string old_str/new_str`);
+        }
+        return { oldStr: rec.old_str, newStr: rec.new_str };
+      });
+      const { next, applied } = applyEdits(content, edits, args.replace_all === true);
+      ctx.writeFile(p, next);
+      return `Edited ${p}: ${applied} replacement(s) across ${edits.length} item(s).`;
+    },
+
+  create_files:
+    (ctx) =>
+    async (args) => {
+      const raw = Array.isArray(args.files) ? args.files : null;
+      if (!raw || raw.length === 0) throw new Error('create_files: non-empty "files" array is required');
+      if (raw.length > 20) throw new Error('create_files: at most 20 files per call');
+      let bytes = 0;
+      raw.forEach((f, i) => {
+        const rec = f as Record<string, unknown>;
+        const p = normalizePath(asString(rec.path));
+        if (!p) throw new Error(`create_files: item ${i} has an empty path`);
+        const content = asString(rec.content);
+        if (content.length > 200_000) throw new Error(`create_files: item ${i} exceeds 200k chars`);
+        ctx.writeFile(p, content);
+        bytes += content.length;
+      });
+      return `Wrote ${raw.length} file(s), ${bytes} chars total.`;
+    },
+
+  diff_files:
+    (ctx) =>
+    async (args) => {
+      const a = normalizePath(asString(args.a));
+      const b = normalizePath(asString(args.b));
+      if (!a || !b) throw new Error('diff_files: "a" and "b" are required');
+      const ca = ctx.readFile(a);
+      const cb = ctx.readFile(b);
+      if (ca === null) throw new Error(`File not found: ${a}`);
+      if (cb === null) throw new Error(`File not found: ${b}`);
+      return lineDiff(ca, cb);
+    },
+
+  /* --------------------------- screen (computer) -------------------------- */
+
+  screen_capture:
+    (ctx) =>
+    async () => {
+      return captureScreenToWorkspace(ctx.sessionId, (path, content) => ctx.writeFile(path, content));
+    },
+
+  /* ---------------------------- browser (web use) ------------------------- */
+
+  browser_open:
+    () =>
+    async (args) => {
+      const url = asString(args.url).trim();
+      if (!/^https?:\/\//i.test(url)) throw new Error('browser_open: "url" must be an absolute http(s) URL');
+      const tab = openTab(url);
+      return `Opened in the browser panel: ${tab.title}\n  tab: ${tab.id.slice(0, 8)} · ${tab.url}\nUse browser_snapshot to read the page text.`;
+    },
+
+  browser_snapshot:
+    (ctx) =>
+    async (args) => {
+      const prefix = asString(args.tab_id).trim();
+      const tab = prefix ? [...listTabs()].find((t) => t.id.startsWith(prefix)) : getActiveTab();
+      if (!tab) throw new Error('browser_snapshot: no such tab (see browser_tabs)');
+      const max = Math.min(20000, Math.max(500, asNumber(args.max_chars) ?? 8000));
+      const text = await ctx.webFetch(tab.url);
+      return `# ${tab.title}\n${tab.url}\n\n${text.slice(0, max)}${text.length > max ? `\n[ducky: capped at ${max} chars]` : ''}`;
+    },
+
+  browser_tabs:
+    () =>
+    async () => {
+      const tabs = listTabs();
+      if (!tabs.length) return 'No browser tabs open. Use browser_open with an http(s) URL.';
+      const active = getActiveTab();
+      return tabs
+        .map((t) => `${t.id === active?.id ? '●' : '○'} ${t.id.slice(0, 8)}  ${t.title}\n  ${t.url}`)
+        .join('\n');
+    },
+
+  browser_close:
+    () =>
+    async (args) => {
+      const prefix = asString(args.tab_id).trim();
+      if (!prefix) throw new Error('browser_close: "tab_id" is required (see browser_tabs)');
+      const ok = closeTab(prefix);
+      if (!ok) throw new Error(`browser_close: no tab starts with "${prefix}"`);
+      return 'Tab closed.';
+    },
+
+  /* -------------------------------- memory -------------------------------- */
+
+  memory_save:
+    (ctx) =>
+    async (args) => {
+      const text = asString(args.text).trim();
+      if (!text) throw new Error('memory_save: "text" is required');
+      const id = ctx.saveMemoryText(text);
+      return `Remembered (${id.slice(0, 8)}). It will appear in future system prompts.`;
+    },
+
+  memory_list:
+    (ctx) =>
+    async () => {
+      const items = ctx.listMemoryEntries();
+      if (!items.length) return 'No memories stored.';
+      return items.map((m) => `${m.id.slice(0, 8)} · ${m.text}`).join('\n');
+    },
+
+  memory_forget:
+    (ctx) =>
+    async (args) => {
+      const id = asString(args.id).trim();
+      if (!id) throw new Error('memory_forget: "id" is required (see memory_list)');
+      const ok = ctx.forgetMemoryEntry(id);
+      if (!ok) throw new Error(`memory_forget: no memory starts with "${id}"`);
+      return 'Forgotten.';
+    },
+
+  /* --------------------------------- notes --------------------------------- */
+
+  note_write:
+    (ctx) =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('note_write: "name" is required');
+      const entry = ctx.writeSessionNote(name, asString(args.content));
+      return `Note "${entry.name}" saved (${entry.chars} chars).`;
+    },
+
+  note_read:
+    (ctx) =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('note_read: "name" is required');
+      const content = ctx.readSessionNote(name);
+      if (content === null) throw new Error(`note_read: no note named "${name}" (see note_list)`);
+      return content || '(empty note)';
+    },
+
+  note_list:
+    (ctx) =>
+    async () => {
+      const items = ctx.listSessionNotes();
+      if (!items.length) return 'Scratchpad is empty.';
+      return items
+        .map((n) => `${n.name} · ${n.chars} chars · ${new Date(n.updatedAt).toISOString()}`)
+        .join('\n');
+    },
+
+  /* -------------------------------- session ------------------------------- */
+
+  session_stats:
+    (ctx) =>
+    async () => {
+      const s = ctx.getSessionStats();
+      return [
+        `Session "${s.title}":`,
+        `tokens: ${s.promptTokens} prompt + ${s.completionTokens} completion`,
+        `tool calls: ${s.toolCalls} · messages: ${s.messages} · workspace files: ${s.files}`,
+      ].join('\n');
+    },
+
+  session_export:
+    (ctx) =>
+    async (args) => {
+      const max = Math.min(60000, Math.max(1000, asNumber(args.max_chars) ?? 20000));
+      const turns = ctx.getTranscript();
+      if (!turns.length) return '(empty transcript)';
+      const lines = turns.map((t) => {
+        const head = t.role === 'user' ? '## user' : t.role === 'assistant' ? '## ducky' : `## tool${t.tools?.length ? ` (${t.tools.join(', ')})` : ''}`;
+        return `${head}\n\n${t.content}`;
+      });
+      const full = lines.join('\n\n---\n\n');
+      return full.length > max ? `${full.slice(0, max)}\n\n[ducky: transcript capped at ${max} chars]` : full;
+    },
+
+  /* ---------------------------------- calc --------------------------------- */
+
+  calc:
+    () =>
+    async (args) => {
+      const expr = asString(args.expression).trim();
+      if (!expr) throw new Error('calc: "expression" is required');
+      if (expr.length > 500) throw new Error('calc: expression too long (≤500 chars)');
+      try {
+        const v = evaluateExpression(expr);
+        return `${expr} = ${Number.isInteger(v) ? String(v) : String(Math.round(v * 1e10) / 1e10)}`;
+      } catch (e) {
+        throw new Error(`calc: ${(e as Error).message}`);
+      }
+    },
+
+  /* ---------------------------------- text --------------------------------- */
+
+  base64_encode:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('base64_encode: "text" is required');
+      return b64encode(text);
+    },
+
+  base64_decode:
+    () =>
+    async (args) => {
+      const text = asString(args.text).trim();
+      if (!text) throw new Error('base64_decode: "text" is required');
+      try {
+        return b64decode(text);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  sha256:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('sha256: "text" is required');
+      try {
+        return await sha256Hex(text);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  json_parse:
+    () =>
+    async (args) => {
+      const text = asString(args.text).trim();
+      if (!text) throw new Error('json_parse: "text" is required');
+      try {
+        const v = JSON.parse(text) as unknown;
+        const shape = Array.isArray(v) ? `array[${v.length}]` : typeof v;
+        return `Valid JSON (${shape}):\n${JSON.stringify(v, null, 2).slice(0, 8000)}`;
+      } catch (e) {
+        throw new Error(`json_parse: invalid JSON — ${(e as Error).message}`);
+      }
+    },
+
+  json_query:
+    () =>
+    async (args) => {
+      const text = asString(args.text).trim();
+      const path = asString(args.path).trim();
+      if (!text) throw new Error('json_query: "text" is required');
+      if (!path) throw new Error('json_query: "path" is required (e.g. "a.b[0].c")');
+      let v: unknown;
+      try {
+        v = JSON.parse(text) as unknown;
+      } catch (e) {
+        throw new Error(`json_query: invalid JSON — ${(e as Error).message}`);
+      }
+      try {
+        return JSON.stringify(getJsonPath(v, path), null, 2) ?? 'null';
+      } catch (e) {
+        throw new Error(`json_query: ${(e as Error).message}`);
+      }
+    },
+
+  /* ---------------------------------- time --------------------------------- */
+
+  now: () => async () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const off = -d.getTimezoneOffset();
+    const sign = off >= 0 ? '+' : '-';
+    const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+    return [`UTC:   ${d.toISOString()}`, `local: ${local}`, `unix:  ${d.getTime()} ms`].join('\n');
+  },
+
+  /* ----------------------------------- id ---------------------------------- */
+
+  uuid: () => async (args) => {
+    const n = Math.min(20, Math.max(1, Math.round(asNumber(args.count) ?? 1)));
+    const out: string[] = [];
+    for (let i = 0; i < n; i++) {
+      out.push(
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `id_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 10)}`,
+      );
+    }
+    return out.join('\n');
+  },
+
+  random_token:
+    () =>
+    async (args) => {
+      const bytes = Math.min(64, Math.max(1, Math.round(asNumber(args.bytes) ?? 16)));
+      const c = typeof crypto !== 'undefined' ? crypto : undefined;
+      if (!c?.getRandomValues) throw new Error('random_token: secure randomness unavailable here');
+      const buf = new Uint8Array(bytes);
+      c.getRandomValues(buf);
+      let bin = '';
+      for (const b of buf) bin += String.fromCharCode(b);
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    },
+
+  /* -------------------------------- clipboard ------------------------------ */
+
+  clipboard_copy:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('clipboard_copy: "text" is required');
+      if (text.length > 100_000) throw new Error('clipboard_copy: text too long (≤100k chars)');
+      const nav = typeof navigator !== 'undefined' ? navigator : undefined;
+      if (!nav?.clipboard?.writeText) {
+        throw new Error('clipboard_copy: clipboard unavailable (needs a secure context + permission)');
+      }
+      try {
+        await nav.clipboard.writeText(text);
+      } catch (e) {
+        throw new Error(`clipboard_copy: denied or failed (${(e as Error).message})`);
+      }
+      return `Copied ${text.length} chars to the clipboard.`;
+    },
+
+  clipboard_read:
+    () =>
+    async () => {
+      const nav = typeof navigator !== 'undefined' ? navigator : undefined;
+      if (!nav?.clipboard?.readText) {
+        throw new Error('clipboard_read: clipboard unavailable (needs a secure context + permission)');
+      }
+      try {
+        const text = await nav.clipboard.readText();
+        return text || '(clipboard is empty)';
+      } catch (e) {
+        throw new Error(`clipboard_read: denied or failed (${(e as Error).message})`);
+      }
+    },
+
+  /* --------------------------------- notify -------------------------------- */
+
+  notify_user:
+    () =>
+    async (args) => {
+      const title = asString(args.title).trim().slice(0, 60);
+      if (!title) throw new Error('notify_user: "title" is required');
+      const body = asString(args.body).trim().slice(0, 200);
+      try {
+        const N = typeof Notification !== 'undefined' ? Notification : undefined;
+        if (N && N.permission === 'granted') {
+          new N(title, body ? { body } : undefined);
+          return 'Native notification sent.';
+        }
+        if (N && N.permission === 'default') {
+          const perm = await N.requestPermission().catch(() => 'denied' as NotificationPermission);
+          if (perm === 'granted') {
+            new N(title, body ? { body } : undefined);
+            return 'Native notification sent.';
+          }
+        }
+      } catch {
+        // fall through to the in-app note
+      }
+      try {
+        const { toast } = await import('sonner');
+        toast.info(title, body ? { description: body } : undefined);
+        return 'Shown as an in-app toast (native notifications unavailable or not granted).';
+      } catch {
+        return `Noted: ${title}${body ? ` — ${body}` : ''} (no toast surface here).`;
+      }
+    },
+
+  /* --------------------------------- skills -------------------------------- */
+
+  skill_list: () => async () => {
+    return SKILLS.map((s) => `${s.name} — ${s.description}`).join('\n');
+  },
+
+  skill_show: () => async (args) => {
+    const name = asString(args.name).trim();
+    const skill = getSkill(name);
+    if (!skill) throw new Error(`skill_show: unknown skill "${name}" (see skill_list)`);
+    return `${skill.body}\n\n[ducky: follow this playbook step by step for the current task.]`;
+  },
 };

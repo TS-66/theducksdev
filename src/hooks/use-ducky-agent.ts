@@ -19,6 +19,8 @@ import {
   type RunLoopOptionsExt,
 } from '@/lib/ducky/agent-loop';
 import { PLUGINS, resolveEnabledPluginIds } from '@/lib/ducky/plugins';
+import { renderMemoriesForPrompt } from '@/lib/ducky/memory';
+import { SKILLS } from '@/lib/ducky/skills';
 import { renderTree } from '@/lib/ducky/tools-vfs';
 import { useDiskStore, type DiskStatus } from '@/lib/ducky/disk';
 import { isServerLive } from '@/lib/ducky/server-caps';
@@ -103,6 +105,7 @@ function buildSystemPrompt(opts: {
   planMode: boolean;
   planDraft?: string;
   systemPromptExtra: string;
+  memoryBlock: string;
   disk: { status: DiskStatus; rootName: string };
 }): string {
   const now = new Date();
@@ -132,6 +135,12 @@ function buildSystemPrompt(opts: {
           })
           .join('\n')
       : '(empty)',
+    '',
+    '# Durable memory (from memory_save — treat as standing instructions)',
+    opts.memoryBlock.trim() ? opts.memoryBlock : '(empty)',
+    '',
+    '# Skill playbooks (call skill_show to load one before that kind of work)',
+    SKILLS.map((s) => `- ${s.name}: ${s.description}`).join('\n'),
   ];
 
   if (opts.disk.status === 'connected') {
@@ -247,6 +256,7 @@ export function useDuckyAgent() {
       planMode: session.planMode,
       planDraft: session.planDraft,
       systemPromptExtra: settings.systemPromptExtra,
+      memoryBlock: renderMemoriesForPrompt(10),
       disk: {
         status: useDiskStore.getState().status,
         rootName: useDiskStore.getState().rootName,

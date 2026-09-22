@@ -141,6 +141,7 @@ export function StatusBar({
   const disabledPlugins = useDuckyStore((s) => s.disabledPlugins);
   const serverLive = useDuckyStore((s) => s.serverLive);
   const modelIdSet = useDuckyStore((s) => s.modelIdSet);
+  const provider = useDuckyStore((s) => s.provider);
 
   const [now, setNow] = React.useState<string>("");
   React.useEffect(() => {
@@ -251,9 +252,23 @@ export function StatusBar({
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              This deployment has no model endpoint configured. Set AI_BASE_URL and
-              AI_API_KEY as server environment variables — then REDEPLOY (env changes
-              never apply to existing deployments).
+              No server key configured. On the server run
+              `ducky setup` (one free key, ~30 seconds, stays on
+              the server) — then restart. Never paste keys in the browser.
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {serverLive && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
+                <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-400" />
+                {provider ?? "server"} · key hidden
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Model key lives only in server env (`AI_API_KEY`) — it never
+              reaches the browser, devtools, or git. Users just chat.
             </TooltipContent>
           </Tooltip>
         )}

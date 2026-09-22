@@ -214,6 +214,8 @@ export type DshStore = StoredState &
     serverLive: boolean;
     /** deployment configured AI_MODEL_ID (upstream model id) */
     modelIdSet: boolean;
+    /** server provider label from /api/config ("nvidia") — never a key/URL */
+    provider: string | null;
   };
 
 const mapSession = (
@@ -295,6 +297,7 @@ export const useDuckyStore = create<DshStore>()(
       hydrated: false,
       serverLive: false,
       modelIdSet: false,
+      provider: null,
 
       /* ------------------------------ projects ---------------------------- */
 

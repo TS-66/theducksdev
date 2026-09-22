@@ -170,6 +170,11 @@ export function Hero({
       className="relative flex min-h-full min-w-0 flex-col items-center justify-center overflow-hidden py-8 text-center"
     >
       {/* giant faint pixel-duck watermark — zcode-style backdrop */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-6 size-72 -translate-x-1/2 rounded-full bg-[#FDC00A]/10 blur-[100px] md:size-96" />
+        <div className="absolute left-1/4 top-40 size-48 rounded-full bg-violet-500/10 blur-[80px]" />
+        <div className="absolute right-1/4 top-32 size-48 rounded-full bg-cyan-500/10 blur-[80px]" />
+      </div>
       <img
         src="/ducky-mark.png"
         alt=""
@@ -179,9 +184,12 @@ export function Hero({
       />
 
       {/* greeting */}
-      <h1 className="relative mt-14 text-3xl font-bold tracking-tight text-foreground md:mt-20 md:text-4xl">
+      <h1 className="relative mt-14 bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-3xl font-bold tracking-tight text-transparent md:mt-20 md:text-5xl">
         {greeting}
       </h1>
+      <p className="relative mt-1 font-mono text-[11px] uppercase tracking-[0.2em] text-[#FDC00A]/80">
+        ducky ai · coder ide
+      </p>
 
       {/* project context line — quiet, honest about the empty slate */}
       <p className="relative z-10 mt-2 text-xs text-muted-foreground">
@@ -271,8 +279,8 @@ export function Hero({
               if (c.prompt) onPick(c.prompt, c.planMode ? { planMode: true } : undefined);
             }}
             className={cn(
-              "group rounded-xl border bg-card/60 p-3.5 text-left shadow-sm transition-all",
-              "hover:border-ring hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              "group rounded-xl border bg-card/70 p-3.5 text-left shadow-sm backdrop-blur transition-all duration-200",
+              "hover:-translate-y-0.5 hover:border-[#FDC00A]/40 hover:bg-accent hover:shadow-[0_12px_32px_-12px_rgba(253,192,10,0.35)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               c.violetTint && "border-violet-500/25 hover:border-violet-400/50",
             )}
           >

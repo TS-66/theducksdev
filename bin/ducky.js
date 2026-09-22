@@ -1,0 +1,631 @@
+#!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
+/**
+ * ducky --web
+ * Local launcher for Ducky AI | Coder (zcode-style web UI).
+ *
+ *   ducky --web [--port 3000] [--host localhost] [--dev] [--no-open] [--no-build]
+ *   ducky --help
+ *   ducky --version
+ *
+ * Zero extra deps: Node builtins only.
+ * Resolves the app dir from this file location, ensures a production
+ * build exists (or builds once), starts `next start`, waits for ready,
+ * then opens the system browser.
+ */
+
+const { spawn, spawnSync, execSync } = require("child_process");
+const fs = require("fs");
+const net = require("net");
+const path = require("path");
+const os = require("os");
+
+// Package root = parent of bin/
+const APP_DIR = path.resolve(__dirname, "..");
+const PKG_PATH = path.join(APP_DIR, "package.json");
+
+function readPkg() {
+  try {
+    return JSON.parse(fs.readFileSync(PKG_PATH, "utf8"));
+  } catch {
+    return { name: "ducky-ai-coder", version: "0.0.0" };
+  }
+}
+const PKG = readPkg();
+
+const ARGS = process.argv.slice(2);
+
+function has(flag) {
+  return ARGS.includes(flag);
+}
+
+function valueOf(flag, fallback) {
+  const i = ARGS.indexOf(flag);
+  if (i !== -1 && ARGS[i + 1] && !ARGS[i + 1].startsWith("--")) return ARGS[i + 1];
+  // support --port=3000 form
+  const pref = ARGS.find((a) => a.startsWith(flag + "="));
+  if (pref) return pref.split("=").slice(1).join("=");
+  return fallback;
+}
+
+function printHelp() {
+  console.log(`
+  \x1b[33m▲ ducky\x1b[0m — Ducky AI | Coder web launcher (v${PKG.version})
+
+  Usage:
+    ducky --web [options]       start the coder web UI and open a browser
+    ducky setup [options]       connect a free cloud key ONCE on this server (never in browser/git)
+    ducky --help                show this help
+    ducky --version             print version
+
+  Setup (server-only key — no one ever sees it):
+    ducky setup                     guided setup: paste 1 free NVIDIA key.
+                                build.nvidia.com → sign in → model
+                                "nemotron-3-ultra-550b-a55b" → "Get API Key"
+                                (free credits, no card → key starts nvapi-...).
+                                Powers Nemotron 3 Ultra: frontier reasoning +
+                                agentic coding, tool calling, streaming thinking.
+                                Key goes to your OS keychain first (macOS Keychain /
+                                Linux Secret Service — nothing on disk, nothing in git);
+                                locked .env.local file only as fallback.
+                                Browsers only ever see "nvidia · key hidden".
+    ducky setup --key nvapi-...     non-interactive variant (CI / SSH).
+    ducky setup --check         verify server key WITHOUT printing it (masked output only).
+                                Add --file <path> to use a different env file (default: .env.local).
+
+  Web options:
+    --web                       start web UI (default when no command given)
+    -p, --port <n>              port to listen on (default: 3000, auto-bumps if busy)
+    --host <addr>               host to bind (default: 127.0.0.1 = this machine only)
+    --dev                       run Next dev server instead of production build
+    --no-open                   don't auto-open the browser, just print the URL
+    --no-build                  skip auto ` + "`next build`" + ` even if .next is missing
+    -h, --help                  help
+    -v, --version               version
+
+  Install (global):
+    npm i -g ./theducksdev        # or: npm i -g ducky-ai-coder
+    ducky setup                   # one time, on the server (~30 seconds)
+    ducky --web
+
+  Local (no install):
+    npm install && npm run build
+    node ./bin/ducky.js setup
+    node ./bin/ducky.js --web
+
+  Database-backed secrets (your own DB writes the file, live rotation, no restart):
+    DUCKY_SECRETS_FILE=/run/ducky/secrets.json ducky --web
+    file: {"apiKey":"nvapi-...","model":"nvidia/nemotron-3-ultra-550b-a55b"}
+
+  How the key stays hidden:
+    • key lives ONLY in server memory/env: OS keychain → shell env → locked file
+    • never in code, git, browser, devtools, or chat — /api/config returns booleans only
+    • --web binds localhost (this machine): a LOCAL popup, not a website.
+      Never use --host 0.0.0.0 unless you accept LAN users spending your key.
+`);
+}
+
+function maskKey(k) {
+  const s = String(k || "");
+  if (!s) return "(not set)";
+  if (s.length <= 8) return "•••• (len " + s.length + ", set)";
+  return s.slice(0, 6) + "-…•••• (len " + s.length + ", set)";
+}
+
+function parseEnvFile(p) {
+  const out = { lines: [], map: new Map() };
+  let raw = "";
+  try {
+    raw = fs.readFileSync(p, "utf8");
+  } catch {
+    return out;
+  }
+  for (const line of raw.split("\n")) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (m) out.map.set(m[1], m[2]);
+    out.lines.push(line);
+  }
+  return out;
+}
+
+function writeEnvFile(p, entries) {
+  const parsed = parseEnvFile(p);
+  const seen = new Set();
+  const next = parsed.lines.map((line) => {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (m && Object.prototype.hasOwnProperty.call(entries, m[1])) {
+      seen.add(m[1]);
+      return `${m[1]}=${entries[m[1]]}`;
+    }
+    return line;
+  });
+  for (const [k, v] of Object.entries(entries)) {
+    if (!seen.has(k)) {
+      if (next.length && next[next.length - 1].trim() !== "") next.push("");
+      next.push(`${k}=${v}`);
+    }
+  }
+  fs.writeFileSync(p, next.join("\n").replace(/\n+$/, "\n"), { mode: 0o600 });
+  try {
+    fs.chmodSync(p, 0o600);
+  } catch { /* windows */ }
+}
+
+function promptText(q) {
+  const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => rl.question(q, (a) => {
+    rl.close();
+    resolve(a.trim());
+  }));
+}
+
+/* ── OS-keychain vault (new hidden-key system) ──────────────────────────
+ * Priority: shell env → OS keychain → .env.local file.
+ * The keychain (macOS Keychain / Linux Secret Service) keeps the secret out
+ * of ALL files: nothing in git, nothing on disk in plaintext, nothing in the
+ * browser. Non-secret settings (provider/model) stay in .env.local.
+ * Windows has no dependency-free readable credential store → locked file. */
+
+const KEYCHAIN_SERVICE = "ducky-ai-coder";
+const KEYCHAIN_ACCOUNT = "provider-api-key";
+const KEYCHAIN_ACCOUNT_LEGACY = "nvidia-api-key"; // read-only fallback, migrated on next setup
+
+function keychainBackend() {
+  if (process.platform === "darwin") {
+    const r = spawnSync("security", ["-h"], { stdio: "ignore" });
+    if (r.error) return null;
+    return "macos";
+  }
+  if (process.platform === "linux") {
+    const r = spawnSync("secret-tool", ["--help"], { stdio: "ignore" });
+    if (r.error) return null;
+    return "linux";
+  }
+  return null;
+}
+
+function keychainSet(secret) {
+  const be = keychainBackend();
+  if (!be) return { ok: false, reason: "no OS keychain tool (macOS Keychain / secret-tool) found" };
+  try {
+    if (be === "macos") {
+      const r = spawnSync("security", ["add-generic-password", "-s", KEYCHAIN_SERVICE, "-a", KEYCHAIN_ACCOUNT, "-w", secret, "-U"], { stdio: "ignore" });
+      if (r.status !== 0) return { ok: false, reason: "`security add-generic-password` failed" };
+      return { ok: true, where: "macOS Keychain" };
+    }
+    const r = spawnSync("secret-tool", ["store", "--label=Ducky AI Coder (provider API key)", "service", KEYCHAIN_SERVICE, "account", KEYCHAIN_ACCOUNT], { input: secret, stdio: ["pipe", "ignore", "ignore"] });
+    if (r.status !== 0) return { ok: false, reason: "`secret-tool store` failed (is a Secret Service daemon running?)" };
+    return { ok: true, where: "Linux Secret Service" };
+  } catch (e) {
+    return { ok: false, reason: String((e && e.message) || e) };
+  }
+}
+
+function keychainGetOne(account) {
+  const be = keychainBackend();
+  if (!be) return { key: "", where: "" };
+  try {
+    if (be === "macos") {
+      const r = spawnSync("security", ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", account, "-w"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      if (r.status !== 0) return { key: "", where: "" };
+      return { key: String(r.stdout || "").replace(/[\r\n]+$/, "").trim(), where: "macOS Keychain" };
+    }
+    const r = spawnSync("secret-tool", ["lookup", "service", KEYCHAIN_SERVICE, "account", account], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    if (r.status !== 0) return { key: "", where: "" };
+    return { key: String(r.stdout || "").replace(/[\r\n]+$/, "").trim(), where: "Linux Secret Service" };
+  } catch {
+    return { key: "", where: "" };
+  }
+}
+
+function keychainGet() {
+  const cur = keychainGetOne(KEYCHAIN_ACCOUNT);
+  if (cur.key) return cur;
+  return keychainGetOne(KEYCHAIN_ACCOUNT_LEGACY);
+}
+
+/** Remove a plaintext key line from the env file (used after keychain save). */
+function scrubKeyFromEnvFile(p) {
+  let raw = "";
+  try {
+    raw = fs.readFileSync(p, "utf8");
+  } catch {
+    return false;
+  }
+  const kept = raw.split("\n").filter((line) => !/^\s*AI_API_KEY\s*=/.test(line));
+  if (kept.length === raw.split("\n").length) return false;
+  fs.writeFileSync(p, kept.join("\n").replace(/\n+$/, "\n"), { mode: 0o600 });
+  try {
+    fs.chmodSync(p, 0o600);
+  } catch { /* windows */ }
+  return true;
+}
+
+function promptHidden(q) {
+  // POSIX: disable echo via stty; fallback to visible prompt on Windows/odd ttys.
+  if (process.platform !== "win32" && process.stdin.isTTY) {
+    process.stdout.write(q);
+    let raw = "";
+    try {
+      const { spawnSync } = require("child_process");
+      spawnSync("stty", ["-echo"], { stdio: ["inherit", "ignore", "ignore"] });
+      const buf = Buffer.alloc(4096);
+      let n = 0;
+      try {
+        n = fs.readSync(process.stdin.fd, buf, 0, 4096, null);
+      } catch { n = 0; }
+      raw = buf.slice(0, Math.max(0, n)).toString("utf8").replace(/[\r\n]+$/, "");
+    } finally {
+      try {
+        const { spawnSync } = require("child_process");
+        spawnSync("stty", ["echo"], { stdio: ["inherit", "ignore", "ignore"] });
+      } catch { /* noop */ }
+      process.stdout.write("\n");
+    }
+    return Promise.resolve(raw.trim());
+  }
+  return promptText(q);
+}
+
+async function runSetup() {
+  const provider = (valueOf("--provider", "nvidia") || "nvidia").toLowerCase();
+  // NOTE: flag is --file (not --env-file): Node 20.6+ natively pre-parses
+  // --env-file anywhere on the command line and would swallow ours.
+  const envFile = valueOf("--file", path.join(APP_DIR, ".env.local"));
+  const checkOnly = has("--check");
+
+  const readKey = () => {
+    if (process.env.AI_API_KEY && !has("--key")) return null; // env already provides it
+    return null;
+  };
+  void readKey;
+
+  if (checkOnly) {
+    // Never print the key value — masked metadata only.
+    const fromFile = parseEnvFile(envFile).map;
+    const kc = keychainGet();
+    let key = (process.env.AI_API_KEY || "").trim();
+    let source = key ? "shell env" : "";
+    if (!key && kc.key) {
+      key = kc.key;
+      source = kc.where;
+    }
+    if (!key && fromFile.get("AI_API_KEY")) {
+      key = String(fromFile.get("AI_API_KEY")).trim();
+      source = envFile + " (mode " + ((fs.statSync(envFile).mode & 0o777).toString(8) || "?") + ")";
+    }
+    const rawProv = (process.env.AI_PROVIDER || fromFile.get("AI_PROVIDER") || "").trim();
+    const prov = !rawProv ? "(not set)" : rawProv.toLowerCase() === "nvidia" ? "nvidia" : "server";
+    const model = (process.env.AI_MODEL_ID || fromFile.get("AI_MODEL_ID") || "").trim() || "(preset default)";
+    const base = (process.env.AI_BASE_URL || fromFile.get("AI_BASE_URL") || "").trim() || (prov && prov !== "(not set)" ? "(preset default)" : "(not set)");
+    console.log(`
+  \x1b[33m▲ ducky setup --check\x1b[0m  (values masked — key is never printed)
+  ─────────────────────────────────────────────
+   env file   ${envFile} ${fs.existsSync(envFile) ? "(exists)" : "(missing)"}
+   provider   ${prov}
+   base url   ${base}
+   model      ${model}
+   key        ${maskKey(key)}
+   stored in  ${key ? source : "(nowhere)"}
+   status     ${key ? "\x1b[32mkey present on server — browsers see only 'key hidden'\x1b[0m" : "\x1b[31mNO KEY — run: ducky setup\x1b[0m"}
+  ─────────────────────────────────────────────
+`);
+    process.exit(key ? 0 : 1);
+  }
+
+  if (provider !== "nvidia" && provider !== "custom") {
+    fail(`Unknown provider: ${provider}. There is exactly one provider: --provider nvidia (or --provider custom for your own endpoint).`);
+  }
+
+  console.log(`
+  \x1b[33m▲ ducky setup\x1b[0m — server-only key connect
+  Order of hiding: OS keychain first (nothing on disk) → locked file fallback.
+  Browsers will only ever see "key hidden".
+`);
+
+  let key = valueOf("--key", "");
+  let model = valueOf("--model", "");
+  let baseUrl = valueOf("--base-url", "");
+
+  // Non-interactive (CI/SSH pipes): never block on prompts. The key must
+  // come via --key; anything optional falls back to the preset default.
+  const tty = Boolean(process.stdin.isTTY);
+  const askText = async (q) => {
+    if (!tty) return "";
+    return promptText(q);
+  };
+
+  if (provider === "nvidia") {
+    console.log(`  1. Open build.nvidia.com  →  sign in  →  open "nemotron-3-ultra-550b-a55b"  →  "Get API Key"`);
+    console.log(`  2. Paste the key below (input hidden). Free credits, no card.\n`);
+    if (!key) {
+      if (!tty) fail("No API key: re-run with --key nvapi-... (non-interactive shells can't prompt). Nothing was written.");
+      key = await promptHidden("  NVIDIA API key (nvapi-...): ");
+    }
+    if (!key) fail("No key entered. Aborting — nothing was written.");
+    if (!key.startsWith("nvapi-")) {
+      console.warn("  \x1b[33m[ducky]\x1b[0m  warning: NVIDIA keys usually start with 'nvapi-'. Continuing anyway…");
+    }
+    if (!model) {
+      model = await askText("  Model [nvidia/nemotron-3-ultra-550b-a55b, Enter for default]: ");
+    }
+  } else {
+    // generic path (also used by legacy provider ids — never named in output)
+    if (!key) {
+      if (!tty) fail("No API key: re-run with --key ... (non-interactive shells can't prompt). Nothing was written.");
+      key = await promptHidden("  API key (hidden input): ");
+    }
+    if (!key) fail("No key entered. Aborting — nothing was written.");
+    if (!baseUrl) baseUrl = await askText("  Base URL (Enter for preset default): ");
+    if (!model) model = await askText("  Model id (Enter for preset default): ");
+  }
+
+  // Non-secrets always go to the env file (safe to keep, gitignored anyway).
+  const entries = { AI_PROVIDER: provider };
+  if (model) entries.AI_MODEL_ID = model;
+  if (baseUrl) entries.AI_BASE_URL = baseUrl;
+  writeEnvFile(envFile, entries);
+
+  // Secret: OS keychain first (nothing on disk, nothing in git — ever).
+  // Locked file (chmod 600) only when no keychain tool exists.
+  const kc = keychainSet(key);
+  let storedIn;
+  if (kc.ok) {
+    const scrubbed = scrubKeyFromEnvFile(envFile);
+    storedIn = `${kc.where} (plaintext copies scrubbed${scrubbed ? "" : " — none found"})`;
+  } else {
+    warn(`OS keychain unavailable (${kc.reason}) — falling back to locked file.`);
+    writeEnvFile(envFile, { AI_API_KEY: key });
+    storedIn = `${envFile} (mode 600, gitignored)`;
+  }
+
+  console.log(`
+  \x1b[32m✓ saved\x1b[0m — never commit it or paste it in chat
+    provider   ${provider === "nvidia" ? "nvidia" : "server"}
+    model      ${model || "(preset default)"}
+    key        ${maskKey(key)}
+    stored in  ${storedIn}
+  Next:
+    1. Restart the server:  ducky --web   (local popup only, key stays on this machine)
+    2. Verify masked:       ducky setup --check
+    3. Users just open the URL — no key field exists in the UI.
+`);
+  process.exit(0);
+}
+
+if (has("--help") || has("-h")) {
+  printHelp();
+  process.exit(0);
+}
+if (has("--version") || has("-v")) {
+  console.log(PKG.version);
+  process.exit(0);
+}
+
+if (ARGS[0] === "setup") {
+  runSetup().catch((e) => fail(e instanceof Error ? e.message : String(e)));
+  return;
+}
+
+const wantsWeb = has("--web") || ARGS.length === 0 || ARGS[0].startsWith("-");
+if (!wantsWeb) {
+  console.error(`Unknown command: ${ARGS[0]}\nTry: ducky --web / ducky setup / ducky --help`);
+  process.exit(1);
+}
+
+const DEV = has("--dev");
+const NO_OPEN = has("--no-open");
+const NO_BUILD = has("--no-build");
+let port = parseInt(valueOf("--port", valueOf("-p", "3000")), 10);
+if (!Number.isFinite(port) || port < 1 || port > 65535) port = 3000;
+// Default is explicit IPv4 loopback (not "localhost"): on some machines
+// "localhost" binds ::1 while the browser dials 127.0.0.1 (or vice versa),
+// leaving an empty popup. 127.0.0.1 is always this machine, never the web.
+const host = valueOf("--host", "127.0.0.1");
+
+function log(...m) {
+  console.log("\x1b[33m[ducky]\x1b[0m", ...m);
+}
+function warn(...m) {
+  console.warn("\x1b[33m[ducky]\x1b[0m", ...m);
+}
+function fail(msg, code = 1) {
+  console.error("\x1b[31m[ducky:error]\x1b[0m", msg);
+  process.exit(code);
+}
+
+if (!fs.existsSync(PKG_PATH)) fail(`package.json not found at ${PKG_PATH}`);
+if (!fs.existsSync(path.join(APP_DIR, "node_modules"))) {
+  fail(
+    `Dependencies missing in ${APP_DIR}.\n  Run first:  cd ${APP_DIR} && npm install  (or: bun install)`
+  );
+}
+
+const localNextBin = path.join(APP_DIR, "node_modules", ".bin", process.platform === "win32" ? "next.cmd" : "next");
+const hasLocalNext = fs.existsSync(localNextBin);
+const nextCmd = hasLocalNext ? localNextBin : "npx";
+const nextPrefixArgs = hasLocalNext ? [] : ["--yes", "next@^16.1.1"];
+
+function runNextBuild() {
+  log("Production build missing (.next) — running `next build` once…");
+  const res = spawnSync(hasLocalNext ? localNextBin : "npx", [...nextPrefixArgs, "build"], {
+    cwd: APP_DIR,
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (res.status !== 0) fail("`next build` failed. Fix errors above and retry (or use --dev).");
+}
+
+if (!DEV && !NO_BUILD && !fs.existsSync(path.join(APP_DIR, ".next"))) {
+  // Allow CI-style isolated dist dir too
+  if (process.env.NEXT_DIST_DIR && fs.existsSync(path.join(APP_DIR, process.env.NEXT_DIST_DIR))) {
+    // ok
+  } else {
+    runNextBuild();
+  }
+}
+
+function isPortFree(p, h) {
+  return new Promise((resolve) => {
+    const s = net.createServer();
+    s.once("error", () => resolve(false));
+    s.once("listening", () => s.close(() => resolve(true)));
+    // bind on requested host; fall back to all interfaces check
+    try {
+      s.listen(p, h === "localhost" ? "127.0.0.1" : h);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function pickPort(p, h) {
+  for (let i = 0; i < 20; i++) {
+    const candidate = p + i;
+    if (await isPortFree(candidate, h)) {
+      if (i > 0) warn(`Port ${p} busy — using ${candidate} instead.`);
+      return candidate;
+    }
+  }
+  fail(`No free port found near ${p}. Pass --port <n>.`);
+  return p;
+}
+
+function openBrowser(url) {
+  if (NO_OPEN) return;
+  const plat = process.platform;
+  try {
+    if (plat === "darwin") execSync(`open ${JSON.stringify(url)}`, { stdio: "ignore" });
+    else if (plat === "win32") execSync(`start "" ${JSON.stringify(url)}`, { stdio: "ignore", shell: true });
+    else {
+      // linux / wsl / chromebooks
+      try {
+        execSync(`xdg-open ${JSON.stringify(url)}`, { stdio: "ignore" });
+      } catch {
+        try {
+          execSync(`sensible-browser ${JSON.stringify(url)}`, { stdio: "ignore" });
+        } catch {
+          warn(`Please open manually: ${url}`);
+        }
+      }
+    }
+  } catch {
+    warn(`Please open manually: ${url}`);
+  }
+}
+
+function waitForReady(url, timeoutMs = 60000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const req = (url.startsWith("https") ? require("https") : require("http")).get(
+        url,
+        (res) => {
+          res.resume();
+          if (res.statusCode && res.statusCode < 500) return resolve(true);
+          retry();
+        }
+      );
+      req.on("error", retry);
+      req.setTimeout(2500, () => {
+        req.destroy();
+        retry();
+      });
+      function retry() {
+        if (Date.now() - start > timeoutMs) return reject(new Error("Timed out waiting for server"));
+        setTimeout(tick, 400);
+      }
+    };
+    tick();
+  });
+}
+
+(async () => {
+  const freePort = await pickPort(port, host);
+  const mode = DEV ? "dev" : "start";
+  const args = [...nextPrefixArgs, mode, "-p", String(freePort), "-H", host];
+  const displayHost = host === "0.0.0.0" ? "localhost" : host;
+  const url = `http://${displayHost}:${freePort}`;
+
+  // Local-only guard: loopback (localhost/127.0.0.1) keeps the key-spending
+  // proxy on THIS machine. Binding 0.0.0.0/LAN would let anyone with network
+  // access spend your provider credits through the local proxy.
+  const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  if (!loopback) {
+    warn(`--host ${host} exposes the UI beyond this machine. Anyone reaching it can use YOUR server key via the proxy. Prefer the default (localhost).`);
+  }
+
+  // Key resolution for the child server (in-memory only, never printed):
+  // shell env → OS keychain → .env.local (loaded by Next itself).
+  const childEnv = { ...process.env, PORT: String(freePort) };
+  let keySource = "";
+  if ((childEnv.AI_API_KEY || "").trim()) {
+    keySource = "shell env";
+  } else {
+    const kc = keychainGet();
+    if (kc.key) {
+      childEnv.AI_API_KEY = kc.key;
+      keySource = kc.where + " (injected in-memory, never written to disk)";
+    } else {
+      keySource = "file env (.env.local) or not configured";
+    }
+  }
+
+  // Provider label only — key value is never read or printed here.
+  // Legacy ids are never named in output; only the default preset is shown.
+  let providerLabel = (childEnv.AI_PROVIDER || "").trim().toLowerCase();
+  if (!providerLabel) {
+    try {
+      const raw = fs.readFileSync(path.join(APP_DIR, ".env.local"), "utf8");
+      const m = raw.match(/^\s*AI_PROVIDER\s*=\s*(.+)\s*$/m);
+      if (m) providerLabel = m[1].trim().toLowerCase();
+    } catch { /* no env file — setup not run yet */ }
+  }
+  if (providerLabel && providerLabel !== "nvidia") providerLabel = "server";
+
+  console.log(`
+  \x1b[33m▲ ducky ai | coder\x1b[0m  v${PKG.version}  ·  ${DEV ? "dev" : "web"}  ·  LOCAL ONLY${loopback ? "" : " (EXPOSED — see warning above)"}
+  ─────────────────────────────────────────────
+   app      ${APP_DIR}
+   url      \x1b[36m${url}\x1b[0m  ← local popup on this machine, NOT a website
+   mode     ${DEV ? "next dev (hot reload)" : "next start (production)"}
+   model    ${providerLabel ? providerLabel + " · key hidden on server (" + keySource + ")" : "not configured — run: ducky setup"}
+   browser  ${NO_OPEN ? "manual (--no-open)" : "auto-open"}
+  ─────────────────────────────────────────────
+`);
+
+  log(`Starting \`next ${mode}\` on ${host}:${freePort}…`);
+  const child = spawn(nextCmd, args, {
+    cwd: APP_DIR,
+    stdio: "inherit",
+    env: childEnv,
+    shell: process.platform === "win32",
+  });
+
+  let opened = false;
+  const openOnce = () => {
+    if (opened || NO_OPEN) return;
+    opened = true;
+    log(`Opening ${url} …`);
+    openBrowser(url);
+  };
+
+  // Open fast: try as soon as server responds, with a 2.5s fallback.
+  waitForReady(url).then(openOnce).catch(() => openOnce());
+  setTimeout(openOnce, 3500);
+
+  const shutdown = (sig) => {
+    log(`Received ${sig} — stopping…`);
+    try {
+      child.kill(sig);
+    } catch {}
+    setTimeout(() => process.exit(0), 800).unref();
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  child.on("exit", (code) => {
+    log(`Server exited (code ${code ?? "?"}). Bye! ${os.EOL}  Tip: ducky --web --port ${freePort + 1} to run a second copy.`);
+    process.exit(code ?? 0);
+  });
+})();

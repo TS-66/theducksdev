@@ -96,12 +96,14 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         transition={{ duration: 0.22, ease: "easeOut" }}
         className="flex items-start justify-between gap-3"
       >
-        <p className="min-w-0 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-          <span aria-hidden className="mr-2 select-none font-mono text-primary">
-            ❯
-          </span>
-          {m.content}
-        </p>
+        <div className="min-w-0 flex-1 rounded-xl border border-[#FDC00A]/20 bg-gradient-to-b from-accent/70 to-accent/30 px-3.5 py-2.5 shadow-sm">
+          <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed">
+            <span aria-hidden className="mr-2 select-none font-mono text-[#FDC00A]">
+              ❯
+            </span>
+            {m.content}
+          </p>
+        </div>
         <Stamp t={m.createdAt} />
       </motion.div>
     );

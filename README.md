@@ -11,7 +11,10 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **One model: Ducky 3.5 Coder** — the only model you'll ever see. Which endpoint serves it is a pure deployment concern: `/api/chat` maps the public id to a server-side `AI_MODEL_ID` so the upstream name never reaches the client.
 - **Streaming chat with tools** — the model calls tools across multiple iterations; results stream back as tool cards (per-tool icons, diff previews for edits, live output).
 - **Virtual workspace** — a sandboxed filesystem stored in your browser (seeded with a sample repo). `read_file`, `write_file`, `edit_file`, `glob`, `grep` and a simulated `bash` (pipes, redirects, `&&` chains) all operate on it. Paste or import images, preview them, export everything as a valid `.zip`.
-- **Everything is a plugin** — the plugin manager mirrors package-style ids (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-todo`, …). Toggling a plugin unloads its tools from the model's schema.
+- **Everything is a plugin** — 24 plugins / 57 tools (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-todo`, …). Toggling a plugin unloads its tools from the model's schema. `npm run test:tools` executes every tool (30 checks green).
+- **Computer use** — `screen_capture` grabs a user-shared screen frame into `images/` (browser picker first, never silent) and `vision_describe` reads it; `disk_*` tools act on the real folder.
+- **Browser use** — `browser_open` loads pages in the IDE browser panel, `browser_snapshot` reads their text, `browser_tabs`/`browser_close` manage tabs.
+- **Memory + skills** — `memory_save` persists facts across sessions (injected into the system prompt), `note_*` is the session scratchpad, and 8 skill playbooks (`skill_list`/`skill_show`: code-review, debug, refactor, plan, commit, docs, test-gen, web-research) discipline the agent.
 - **Permission gates** — `auto` / `ask` / `readonly` policies; side-effecting tools raise an inline approval card.
 - **Plan mode** — read-only research phase ending in an `exit_plan_mode` approval.
 - **Subagents** — the `subagent` tool spawns a focused child agent loop with a restricted toolset and returns its report.
@@ -19,21 +22,34 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **Activity ledger** — a git-log-style timeline of every prompt, tool call and file change, with filters, copyable shas, workspace rewind (time-travel) and conversation trim.
 - **Command palette & slash commands** — `⌘P` palette plus `/new`, `/clear`, `/plan`, `/model`, `/policy`, `/plugins`, `/activity`, `/export`, `/zip`, `/backup`, `/help`.
 
+## Quickstart (`ducky --web`)
+
+```sh
+npm install
+npm i -g .              # global `ducky` command (or use node ./bin/ducky.js)
+ducky setup             # paste 1 free provider key (~30 seconds, hidden input)
+ducky --web             # local popup at http://127.0.0.1:3000 — NOT a website
+```
+
+`ducky --web` binds loopback only: the UI is a popup on your own machine. `ducky setup --check` verifies the key with masked output (values are never printed).
+
 ## Configuration
 
-Everything lives in the browser's `localStorage` — no database, no server state. Settings intentionally has **no credential fields**: set `AI_BASE_URL` + `AI_API_KEY` on the server once (below) and the full agent loop with Ducky 3.5 Coder unlocks for everyone; without them the composer reports the deployment as unconfigured.
+Sessions, workspaces and settings live in the browser's `localStorage`. The model key lives **only on the server** — Settings intentionally has **no credential fields**, the browser never receives the key, and every error message is vendor-neutral (no provider is ever named in the UI). Connect one key once and the full agent loop unlocks for everyone; without it the composer reports the deployment as unconfigured.
 
 ### Environment variables (optional)
 
-Copy `.env.example` to `.env.local` for local dev, or set them in your hosting dashboard:
+Hiding order for the key: OS keychain (set via `ducky setup`) → shell env → locked file. Copy `.env.example` to `.env.local` for local dev, or set them in your hosting dashboard:
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `AI_BASE_URL` | See note | OpenAI-compatible chat-completions base URL. Required unless users supply their own Base URL in Settings. Accepted forms: `https://api.example.com/v1` (recommended), `https://api.example.com` (the `/v1` segment is appended automatically on 404) or a pasted full `/v1/chat/completions` path (stripped automatically). |
-| `AI_API_KEY` | See note | Bearer key for the endpoint above. Required unless users paste their own key in Settings. |
-| `AI_MODEL_ID` | No | Upstream model id that powers Ducky 3.5 Coder. Defaults to passing the public id through. |
+| `AI_PROVIDER` | No | `nvidia` — the one and only provider (NVIDIA Build + Nemotron 3 Ultra). Fills base URL + model so a single pasted key is enough. |
+| `AI_API_KEY` | Yes (one source) | Bearer key (`nvapi-...`, free at build.nvidia.com) — **server only, never in UI/git**. |
+| `AI_MODEL_ID` | No | Upstream model id that powers Ducky 3.5 Coder. Defaults to `nvidia/nemotron-3-ultra-550b-a55b`. |
+| `AI_BASE_URL` | No | OpenAI-compatible base URL override. Accepted forms: `https://api.example.com/v1` (recommended), `https://api.example.com` (the `/v1` segment is appended automatically on 404) or a pasted full `/v1/chat/completions` path (stripped automatically). |
+| `DUCKY_SECRETS_FILE` | No | Path to a JSON file your own database writes: `{"apiKey":"nvapi-...","model":"nvidia/nemotron-3-ultra-550b-a55b"}`. Re-read per request, so key rotations apply live with no restart. Priority per field: env var wins, then this file. |
 
-> Note: at least one of (server env, user Settings) must provide the base URL and key, otherwise `/api/chat` returns an actionable 400.
+> Note: `/api/chat` needs a server-side key, otherwise it returns an actionable 400 telling you to run `ducky setup`. `/api/config` exposes booleans + a generic label only.
 
 ### Deploying (e.g. Vercel)
 

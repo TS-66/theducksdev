@@ -11,7 +11,6 @@ import { AskUserCard } from "@/components/ducky/ask-user-card";
 import { ChatStream } from "@/components/ducky/chat-stream";
 import { Composer } from "@/components/ducky/composer";
 import { CommandPalette } from "@/components/ducky/command-palette";
-import { FilePreviewDialog } from "@/components/ducky/file-preview-dialog";
 import { HeaderBar } from "@/components/ducky/header-bar";
 import { NewProjectDialog } from "@/components/ducky/project-picker";
 import { PluginsSheet } from "@/components/ducky/plugins-sheet";
@@ -20,9 +19,23 @@ import { Sidebar } from "@/components/ducky/sidebar";
 import { ShortcutsDialog } from "@/components/ducky/shortcuts-dialog";
 import { StatusBar } from "@/components/ducky/status-bar";
 import { TodoCard } from "@/components/ducky/message-item";
+import {
+  IdeActivityRail,
+  IdeFilePreview,
+  IdeInspector,
+  IdeTabBar,
+  type CenterTab,
+  type RailView,
+} from "@/components/ducky/ide-panels";
+import { BrowserPanel } from "@/components/ducky/browser-panel";
+import {
+  getTabsRevision,
+  listTabs,
+  subscribeTabs,
+} from "@/lib/ducky/browser-tabs";
 import { useDuckyAgent } from "@/hooks/use-ducky-agent";
 import { useDuckyStore } from "@/lib/ducky/store";
-import { setServerLive, setModelIdSet } from "@/lib/ducky/server-caps";
+import { setServerLive, setModelIdSet, setProvider } from "@/lib/ducky/server-caps";
 import { connectDisk, reconnectDisk, restoreDiskOnBoot, useDiskStore } from "@/lib/ducky/disk";
 import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
 import type { PermissionPolicy } from "@/lib/ducky/types";
@@ -47,6 +60,11 @@ export default function DuckyCoderPage() {
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = React.useState(false);
 
+  /* ── IDE shell state ── */
+  const [leftOpen, setLeftOpen] = React.useState(true);
+  const [rightOpen, setRightOpen] = React.useState(true);
+  const [centerTab, setCenterTab] = React.useState<CenterTab>("chat");
+
   const agent = useDuckyAgent();
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
@@ -56,11 +74,12 @@ export default function DuckyCoderPage() {
   React.useEffect(() => {
     let cancelled = false;
     fetch("/api/config")
-      .then((r) => (r.ok ? r.json() : { live: false, hasModelId: false }))
-      .then((d: { live?: boolean; hasModelId?: boolean }) => {
+      .then((r) => (r.ok ? r.json() : { live: false, hasModelId: false, provider: null }))
+      .then((d: { live?: boolean; hasModelId?: boolean; provider?: string | null }) => {
         if (cancelled) return;
         const changed = setServerLive(Boolean(d.live));
         setModelIdSet(Boolean(d.hasModelId));
+        setProvider(typeof d.provider === "string" ? d.provider : null);
         // poke subscribers so the status bar reflects model availability
         if (changed) useDuckyStore.setState({});
       })
@@ -123,6 +142,11 @@ export default function DuckyCoderPage() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
         e.preventDefault();
         setActivityOpen((v) => !v);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setLeftOpen((v) => !v);
         return;
       }
       if (
@@ -311,6 +335,32 @@ export default function DuckyCoderPage() {
     });
   }, []);
 
+  /* ── IDE file preview plumbing ── */
+  const handlePreviewFile = React.useCallback((p: string) => {
+    setPreviewPath(p);
+    setCenterTab("file");
+  }, []);
+  const handleCloseFile = React.useCallback(() => {
+    setPreviewPath(null);
+    setCenterTab("chat");
+  }, []);
+  const handleRail = React.useCallback((v: RailView) => {
+    if (v === "explorer" || v === "search") setLeftOpen(true);
+    if (v === "source") setActivityOpen(true);
+    if (v === "plugins") setPluginsOpen(true);
+  }, []);
+
+  // Derived tabs (no setState-in-effect): file needs a preview path,
+  // browser needs at least one open tab — otherwise we render chat.
+  const browserRev = React.useSyncExternalStore(subscribeTabs, getTabsRevision, getTabsRevision);
+  const browserCount = React.useMemo(() => listTabs().length, [browserRev]);
+  const effectiveTab: CenterTab =
+    centerTab === "file" && previewPath
+      ? "file"
+      : centerTab === "browser" && browserCount > 0
+        ? "browser"
+        : "chat";
+
   /* ── hydration splash ─────────────────────────────────────────────────── */
   if (!hydrated) {
     return (
@@ -339,21 +389,53 @@ export default function DuckyCoderPage() {
     Boolean(approvalRequest) || Boolean(askPayload) || todos.length > 0;
   /** hero (welcome) state — no visible conversation yet */
   const heroState = !activeSession || activeSession.messages.length === 0;
+  const messageCount = activeSession?.messages.filter((m) => m.role === "user" || m.role === "assistant").length ?? 0;
+  const previewContent = previewPath ? (activeSession?.workspace[previewPath] ?? "") : "";
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
+    <div className="ducky-ide-shell flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
       <HeaderBar
         onMenu={() => setMobileNavOpen(true)}
         onOpenSettings={openSettings}
         onOpenPlugins={() => setPluginsOpen(true)}
       />
 
-      {/* body row */}
+      {/* IDE body row: rail + explorer + center + inspector */}
       <div className="flex min-h-0 flex-1">
-        {/* desktop sidebar */}
-        <aside className="hidden w-[264px] shrink-0 border-r lg:flex lg:flex-col">
-          <Sidebar onPreviewFile={setPreviewPath} />
-        </aside>
+        <IdeActivityRail
+          leftOpen={leftOpen}
+          onToggleLeft={() => setLeftOpen((v) => !v)}
+          onRail={handleRail}
+          onOpenPlugins={() => setPluginsOpen(true)}
+          onOpenSettings={() => openSettings()}
+          onOpenPalette={() => setPaletteOpen(true)}
+          onOpenActivity={() => setActivityOpen(true)}
+        />
+
+        {/* desktop explorer */}
+        {leftOpen && (
+          <aside className="hidden w-[300px] shrink-0 flex-col border-r bg-muted/10 lg:flex">
+            <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Explorer
+              </span>
+              <span className="truncate font-mono text-[10px] text-muted-foreground/60">
+                {activeProject?.name ?? activeSession?.projectName ?? "no project"}
+              </span>
+              <button
+                type="button"
+                aria-label="Hide sidebar (⌘B)"
+                onClick={() => setLeftOpen(false)}
+                className="ml-auto rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">
+              <Sidebar onPreviewFile={handlePreviewFile} />
+            </div>
+          </aside>
+        )}
 
         {/* mobile sidebar */}
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -365,7 +447,7 @@ export default function DuckyCoderPage() {
             <div className="flex min-h-0 flex-1 flex-col pt-10">
               <Sidebar
                 onPreviewFile={(p) => {
-                  setPreviewPath(p);
+                  handlePreviewFile(p);
                   setMobileNavOpen(false);
                 }}
                 onAfterSelect={() => setMobileNavOpen(false)}
@@ -374,21 +456,94 @@ export default function DuckyCoderPage() {
           </SheetContent>
         </Sheet>
 
-        {/* center column */}
-        <main className="flex min-w-0 flex-1 flex-col">
-          <ChatStream
-            sessionRunning={agent.running}
-            onPick={pickPrompt}
-            heroProps={{
-              projectName: activeProject?.name ?? null,
-              projectFileCount: activeProject ? Object.keys(activeProject.files).length : 0,
-              onNewProject: () => setNewProjectOpen(true),
-              onUseSample: useSampleProject,
-              onConnectDisk: () => void handleConnectDisk(),
+        {/* center column: tabs + chat/file + composer */}
+        <main className="flex min-w-0 flex-1 flex-col bg-background">
+          <IdeTabBar
+            tab={effectiveTab}
+            onTab={(t) => {
+              if (t === "file" && !previewPath) return;
+              if (t === "browser" && browserCount === 0) return;
+              setCenterTab(t);
             }}
-            composerSlot={
+            fileName={previewPath}
+            onCloseFile={handleCloseFile}
+            sessionTitle={activeSession?.title ?? "New task"}
+            projectName={activeProject?.name ?? activeSession?.projectName ?? null}
+            messageCount={messageCount}
+            browserCount={browserCount}
+            rightOpen={rightOpen}
+            onToggleRight={() => setRightOpen((v) => !v)}
+          />
+
+          <div className="flex min-h-0 flex-1 flex-col">
+            {effectiveTab === "file" && previewPath ? (
+              <IdeFilePreview
+                path={previewPath}
+                content={previewContent}
+                onBack={() => setCenterTab("chat")}
+              />
+            ) : effectiveTab === "browser" ? (
+              <BrowserPanel />
+            ) : (
+              <>
+                <ChatStream
+                  sessionRunning={agent.running}
+                  onPick={pickPrompt}
+                  heroProps={{
+                    projectName: activeProject?.name ?? null,
+                    projectFileCount: activeProject ? Object.keys(activeProject.files).length : 0,
+                    onNewProject: () => setNewProjectOpen(true),
+                    onUseSample: useSampleProject,
+                    onConnectDisk: () => void handleConnectDisk(),
+                  }}
+                  composerSlot={
+                    <Composer
+                      variant="hero"
+                      value={input}
+                      onChange={setInput}
+                      onSend={composerSend}
+                      onStop={() => {
+                        agent.stop();
+                        toast.info("Stopped by user");
+                      }}
+                      running={agent.running}
+                      locked={Boolean(agent.pendingApproval)}
+                      hasSession={Boolean(activeSessionId)}
+                      onNewProject={() => setNewProjectOpen(true)}
+                    />
+                  }
+                />
+
+                {/* inline deck: todos -> permission gate -> ask-user */}
+                {showInlineDeck && (
+                  <div className="space-y-2 px-0 pb-2">
+                    <TodoCard todos={todos} />
+                    {approvalRequest && (
+                      <ApprovalCard
+                        request={{
+                          id: approvalRequest.id,
+                          toolName: approvalRequest.toolName,
+                          argsPreview: approvalRequest.argsPreview,
+                          reason: approvalRequest.reason,
+                        }}
+                        onRespond={(ok) =>
+                          ok ? agent.respondApproval(true) : agent.respondApproval(false)
+                        }
+                      />
+                    )}
+                    {askPayload && (
+                      <AskUserCard pendingAsk={askPayload} respondAsk={agent.respondAsk} />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* docked composer — hidden in hero welcome and in file-tab focus mode */}
+          {!heroState && effectiveTab !== "file" && (
+            <div className="ducky-composer-dock">
               <Composer
-                variant="hero"
                 value={input}
                 onChange={setInput}
                 onSend={composerSend}
@@ -399,50 +554,36 @@ export default function DuckyCoderPage() {
                 running={agent.running}
                 locked={Boolean(agent.pendingApproval)}
                 hasSession={Boolean(activeSessionId)}
-                onNewProject={() => setNewProjectOpen(true)}
               />
-            }
-          />
-
-          {/* inline deck: todos -> permission gate -> ask-user */}
-          {showInlineDeck && (
-            <div className="space-y-2 px-0 pb-2">
-              <TodoCard todos={todos} />
-              {approvalRequest && (
-                <ApprovalCard
-                  request={{
-                    id: approvalRequest.id,
-                    toolName: approvalRequest.toolName,
-                    argsPreview: approvalRequest.argsPreview,
-                    reason: approvalRequest.reason,
-                  }}
-                  onRespond={(ok) =>
-                    ok ? agent.respondApproval(true) : agent.respondApproval(false)
-                  }
-                />
-              )}
-              {askPayload && (
-                <AskUserCard pendingAsk={askPayload} respondAsk={agent.respondAsk} />
-              )}
             </div>
           )}
-
-          {/* docked composer — hidden while the hero (zcode welcome) state owns the screen */}
-          {!heroState && (
-            <Composer
-              value={input}
-              onChange={setInput}
-              onSend={composerSend}
-              onStop={() => {
-                agent.stop();
-                toast.info("Stopped by user");
-              }}
-              running={agent.running}
-              locked={Boolean(agent.pendingApproval)}
-              hasSession={Boolean(activeSessionId)}
-            />
-          )}
         </main>
+
+        {/* right inspector */}
+        {rightOpen && (
+          <aside className="hidden w-[300px] shrink-0 flex-col border-l bg-muted/10 xl:flex">
+            <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Inspector
+              </span>
+              <button
+                type="button"
+                aria-label="Hide inspector"
+                onClick={() => setRightOpen(false)}
+                className="ml-auto rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">
+              <IdeInspector
+                onOpenPlugins={() => setPluginsOpen(true)}
+                onOpenActivity={() => setActivityOpen(true)}
+                onPreviewFile={handlePreviewFile}
+              />
+            </div>
+          </aside>
+        )}
       </div>
 
       <StatusBar
@@ -459,7 +600,7 @@ export default function DuckyCoderPage() {
           setInput(t);
           toast.info("Command staged", { description: "Finish the argument and press Enter." });
         }}
-        onPreviewFile={setPreviewPath}
+        onPreviewFile={handlePreviewFile}
         onToggleActivity={() => setActivityOpen((v) => !v)}
       />
 
@@ -476,16 +617,7 @@ export default function DuckyCoderPage() {
         open={activityOpen}
         onOpenChange={setActivityOpen}
         session={activeSession}
-        onPreviewFile={setPreviewPath}
-      />
-      <FilePreviewDialog
-        path={previewPath}
-        content={
-          previewPath ? (activeSession?.workspace[previewPath] ?? "") : ""
-        }
-        onOpenChange={(open) => {
-          if (!open) setPreviewPath(null);
-        }}
+        onPreviewFile={handlePreviewFile}
       />
 
       <Toaster richColors position="bottom-right" />

@@ -21,6 +21,7 @@ import {
   Plus,
   Star,
   Terminal,
+  Wrench,
 } from "lucide-react";
 import {
   CommandDialog,
@@ -35,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
+import { buildToolDefinitions } from "@/lib/ducky/plugins";
 import { SLASH_COMMANDS } from "./composer";
 
 export function fileIconFor(path: string): React.ReactNode {
@@ -112,6 +114,27 @@ export function CommandPalette({
     [activeSession],
   );
 
+  /** agent tools (enabled plugins only) — discoverability for 50+ tools */
+  const tools = React.useMemo(() => {
+    const disabled = useDuckyStore.getState().disabledPlugins;
+    return buildToolDefinitions()
+      .filter((d) => !disabled.includes(d.pluginId))
+      .map((d) => ({
+        name: d.name,
+        plugin: d.pluginId.replace("@ducky-ai/", ""),
+        desc: d.description,
+        required: (() => {
+          try {
+            const params = d.parameters as { required?: unknown };
+            return Array.isArray(params.required) ? (params.required as string[]) : [];
+          } catch {
+            return [];
+          }
+        })(),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [open]);
+
   return (
     <CommandDialog
       open={open}
@@ -181,6 +204,42 @@ export function CommandPalette({
               {c.cmd.includes("<") && (
                 <CommandShortcut className="hidden sm:inline">stage →</CommandShortcut>
               )}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        {/* ── agent tools ──────────────────────────────────────────────── */}
+        <CommandSeparator />
+        <CommandGroup
+          heading={
+            <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest">
+              tools
+              <span className="rounded bg-muted px-1.5 py-px text-[9px] normal-case text-muted-foreground">
+                {tools.length} loaded
+              </span>
+            </span>
+          }
+        >
+          {tools.map((t) => (
+            <CommandItem
+              key={t.name}
+              value={`tool ${t.name} ${t.plugin} ${t.desc}`}
+              keywords={[t.name, t.plugin]}
+              onSelect={() => {
+                onOpenChange(false);
+                toast.info(t.name, {
+                  description: `${t.desc}${t.required.length ? ` Args: ${t.required.join(", ")}.` : ""} Ask Ducky to use it in chat.`,
+                  duration: 6000,
+                });
+              }}
+            >
+              <Wrench className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold">
+                {t.name}
+                <span className="ml-2 hidden truncate font-sans text-xs font-normal text-muted-foreground sm:inline">
+                  {t.plugin}
+                </span>
+              </span>
             </CommandItem>
           ))}
         </CommandGroup>

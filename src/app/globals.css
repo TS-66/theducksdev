@@ -246,3 +246,65 @@
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
+
+/* ───────────────────── Ducky IDE shell (zcode-grade) ─────────────────── */
+
+.ducky-ide-shell {
+  background:
+    radial-gradient(1200px 400px at 50% -10%, color-mix(in oklab, #fdc00a 7%, transparent), transparent 70%),
+    var(--background);
+}
+
+.ducky-ide-shell aside {
+  background: color-mix(in oklab, var(--card) 55%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.ducky-composer-dock {
+  border-top: 1px solid var(--border);
+  background: linear-gradient(to top, color-mix(in oklab, var(--card) 88%, transparent), transparent);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* editor tabs: crisp active underline + subtle glow */
+[role="tablist"] [role="tab"][aria-selected="true"] {
+  box-shadow: inset 0 1px 0 color-mix(in oklab, #fdc00a 35%, transparent);
+}
+
+/* chat canvas: softer grid + vignette for long sessions */
+.ducky-grid-bg {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--muted-foreground) 12%, transparent) 1px,
+    transparent 0
+  );
+}
+
+/* message hover: reveal actions without layout shift */
+.group\/msg {
+  border-radius: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  margin: 0 -0.5rem;
+  transition: background 160ms ease;
+}
+.group\/msg:hover {
+  background: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* composer glow: stronger, warmer, IDE-like */
+.group\/composer {
+  background: color-mix(in oklab, var(--card) 82%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* scrollbars: thinner, IDE-like */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* focus visibility for keyboard navigators */
+:where(button, a, input, textarea):focus-visible {
+  outline: 2px solid color-mix(in oklab, #fdc00a 65%, transparent);
+  outline-offset: 1px;
+}
