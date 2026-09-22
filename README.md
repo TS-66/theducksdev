@@ -26,18 +26,25 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **Activity ledger** — a git-log-style timeline of every prompt, tool call and file change, with filters, copyable shas, workspace rewind (time-travel) and conversation trim.
 - **Command palette & slash commands** — `⌘P` palette (commands + sessions + files + all 70+ tools) plus 34 slash commands: `/goal`, `/retry`, `/undo`, `/compact`, `/models`, `/endpoint`, `/key`, `/conn`, `/temp`, `/tokens`, `/iters`, `/remember`, `/forget`, `/stats`, `/files`, `/reset`, `/rename`, `/star`, `/duplicate`, `/browser`, `/term`, `/screen`, `/tools`, `/mcp` — and the classic `/new`, `/clear`, `/plan`, `/model`, `/policy`, `/plugins`, `/activity`, `/export`, `/zip`, `/backup`, `/help`.
 
-## Quickstart (`ducky --web`)
+## Quickstart (one copy-paste)
 
 ```sh
-curl -fsSL -u ducky https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
+curl -fsSL --location-trusted -u ducky https://ducky-install-ts-66s-projects.vercel.app | bash
 ```
 
-One command to copy — nothing to edit. It asks for two pastes at prompts
-(never inside the command): (1) a GitHub token for the private download
-(`curl` asks for the password — any fine-grained PAT with Contents: read
-works), (2) your OWN endpoint key (every user needs their own key, so no installer on earth can embed it)
-their OWN key, so no installer on earth can embed it). Fully
-non-interactive variant with flags is documented atop `install.sh`.
+One command to copy — nothing to edit. Two pastes at prompts, never inside
+the command: (1) a GitHub token for the private download (`curl` asks for
+the password — any fine-grained PAT with Contents: read works), (2) your
+OWN endpoint key (every user needs their own key, so no installer on earth
+can embed it). Fully non-interactive variant with flags is documented atop
+`install.sh`.
+
+> One-time setup (30 seconds): the short URL is a Vercel project
+> (`ducky-install`) — open its dashboard → Settings → Deployment Protection
+> → **Disabled**, otherwise the team login wall answers instead of the
+> installer. A custom domain skips that wall entirely (and reads better
+> than `*.vercel.app`) — say the word and I'll wire one up. Direct
+> fallback: `curl -fsSL -u ducky https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash`.
 
 What the installer does: downloads the ref → `npm install` (or bun) →
 `next build` → links the global `ducky` command (user-local shim when sudo is
@@ -56,7 +63,7 @@ ducky --web             # local popup at http://127.0.0.1:3000 — NOT a website
 
 ## Configuration
 
-Sessions, workspaces and settings live in the browser's `localStorage`. The model key lives **only on the server** — Settings intentionally has **no credential fields**, the browser never receives the key, and every error message is vendor-neutral (no provider is ever named in the UI). Connect one key once and the full agent loop unlocks for everyone; without it the composer reports the deployment as unconfigured.
+Sessions, workspaces and settings live in the browser's `localStorage`. Your model key lives in **your browser** (Settings → Connections) or, as a shared fallback, in server env that never reaches the browser. Without a key + model the composer says exactly what's missing.
 
 ### Environment variables (optional)
 

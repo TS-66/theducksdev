@@ -2,6 +2,9 @@
 #
 # Ducky AI | Coder — one-line installer.
 #
+#   Shortest form (short URL → this file → full install):
+#     curl -fsSL --location-trusted -u ducky https://ducky-install-ts-66s-projects.vercel.app | bash
+#
 #   Interactive (clone/download first when the repo is private, then run):
 #     export GITHUB_TOKEN=ghp_...
 #     curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
