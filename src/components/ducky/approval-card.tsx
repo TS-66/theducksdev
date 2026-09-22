@@ -7,11 +7,13 @@ import type { ApprovalRequest } from "@/lib/ducky/types";
 interface ApprovalCardProps {
   request: Omit<ApprovalRequest, "resolve">;
   onRespond: (ok: boolean) => void;
+  /** "always allow" escalates the permission mode, then approves */
+  onAlwaysAllow?: () => void;
 }
 
 /** Inline permission-gate card rendered above the composer.
  *  exit_plan_mode gets a dedicated violet plan-review treatment. */
-export function ApprovalCard({ request, onRespond }: ApprovalCardProps) {
+export function ApprovalCard({ request, onRespond, onAlwaysAllow }: ApprovalCardProps) {
   if (request.toolName === "exit_plan_mode") {
     return (
       <div
@@ -68,16 +70,21 @@ export function ApprovalCard({ request, onRespond }: ApprovalCardProps) {
           <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-card p-2 font-mono text-[11px] leading-relaxed">
             {request.argsPreview}
           </pre>
-          <div className="mt-2.5 flex gap-2">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => onRespond(false)}>
-              Reject
+              Deny
             </Button>
+            {onAlwaysAllow && (
+              <Button size="sm" variant="outline" onClick={onAlwaysAllow}>
+                Always allow
+              </Button>
+            )}
             <Button
               size="sm"
               className="bg-amber-500 text-black hover:bg-amber-400"
               onClick={() => onRespond(true)}
             >
-              Approve
+              Allow once
             </Button>
           </div>
         </div>

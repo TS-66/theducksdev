@@ -7,6 +7,7 @@ import {
   Menu,
   Puzzle,
   Settings,
+  SquareTerminal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +22,11 @@ interface HeaderBarProps {
   onMenu: () => void;
   onOpenSettings: (tab?: "behavior" | "about") => void;
   onOpenPlugins: () => void;
+  onToggleTerminal: () => void;
+  terminalOpen: boolean;
 }
 
-export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarProps) {
+export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTerminal, terminalOpen }: HeaderBarProps) {
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const sessions = useDuckyStore((s) => s.sessions);
   const settings = useDuckyStore((s) => s.settings);
@@ -136,6 +139,23 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins }: HeaderBarPr
           <TooltipContent side="bottom">
             {MODEL_DISPLAY} — opens Settings → Models
           </TooltipContent>
+        </Tooltip>
+
+        {/* Terminal */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={terminalOpen ? "Close terminal" : "Open terminal"}
+              aria-pressed={terminalOpen}
+              onClick={onToggleTerminal}
+              className="size-8"
+            >
+              <SquareTerminal className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Terminal — shell over the workspace</TooltipContent>
         </Tooltip>
 
         {/* Plugins */}

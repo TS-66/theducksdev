@@ -102,11 +102,10 @@ export function Hero({
   onUseSample,
   onConnectDisk,
 }: HeroProps) {
-  // hydration-safe: deterministic server render, localized after mount
-  const [greeting, setGreeting] = React.useState("Hello there");
-  React.useEffect(() => {
-    setGreeting(greetingForHour(new Date().getHours()));
-  }, []);
+  // client-only greeting: computed lazily on mount state (no render-phase effect)
+  const [greeting] = React.useState(() =>
+    typeof window === "undefined" ? "Hello there" : greetingForHour(new Date().getHours()),
+  );
 
   const hasFiles = projectFileCount > 0;
 
@@ -222,34 +221,32 @@ export function Hero({
         {children}
       </motion.div>
 
-      {/* dim suggestion list */}
-      <div className="relative z-10 mt-4 w-full max-w-2xl px-4">
-        <ul className="space-y-0.5 text-left">
-          {dimList.map((s) => (
-            <li key={s.text}>
-              <button
-                type="button"
-                onClick={() => {
-                  if ("action" in s && s.action === "new-project") {
-                    onNewProject?.();
-                    return;
-                  }
-                  if ("action" in s && s.action === "connect-disk") {
-                    onConnectDisk?.();
-                    return;
-                  }
-                  if ("prompt" in s && s.prompt) onPick(s.prompt);
-                }}
-                className="group flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <span className="shrink-0 opacity-80">{s.icon}</span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground transition-colors group-hover:text-foreground">
-                  {s.text}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {/* suggestion chips */}
+      <div className="relative z-10 mt-4 flex w-full max-w-2xl flex-wrap items-center justify-center gap-2 px-4">
+        {dimList.map((s) => (
+          <button
+            key={s.text}
+            type="button"
+            onClick={() => {
+              if ("action" in s && s.action === "new-project") {
+                onNewProject?.();
+                return;
+              }
+              if ("action" in s && s.action === "connect-disk") {
+                onConnectDisk?.();
+                return;
+              }
+              if ("prompt" in s && s.prompt) onPick(s.prompt);
+            }}
+            title={s.text}
+            className="group flex max-w-full items-center gap-1.5 rounded-full border bg-card/70 py-1.5 pl-2.5 pr-3 backdrop-blur transition-all hover:-translate-y-px hover:border-[#FDC00A]/40 hover:bg-accent hover:shadow-[0_8px_24px_-12px_rgba(253,192,10,0.4)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <span className="shrink-0 opacity-80">{s.icon}</span>
+            <span className="truncate text-xs text-muted-foreground transition-colors group-hover:text-foreground">
+              {s.text}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* announcement line */}

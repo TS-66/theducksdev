@@ -15,6 +15,7 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **Computer use** — `screen_capture` grabs a user-shared screen frame into `images/` (browser picker first, never silent) and `vision_describe` reads it; `disk_*` tools act on the real folder.
 - **Browser use** — `browser_open` loads pages in the IDE browser panel, `browser_snapshot` reads their text, `browser_tabs`/`browser_close` manage tabs.
 - **Memory + skills** — `memory_save` persists facts across sessions (injected into the system prompt), `note_*` is the session scratchpad, and 8 skill playbooks (`skill_list`/`skill_show`: code-review, debug, refactor, plan, commit, docs, test-gen, web-research) discipline the agent.
+- **Agent-first UI** — one prompt box with `@` context and `/` commands, suggestion chips, model + permission-mode row below the box (Ask before changes / Edit automatically / Plan mode / Read-only), allow-once / always-allow / deny approval cards, a task strip (goal + files + tokens), a bottom terminal over the workspace, and a browser tab for agent-opened pages.
 - **Permission gates** — `auto` / `ask` / `readonly` policies; side-effecting tools raise an inline approval card.
 - **Plan mode** — read-only research phase ending in an `exit_plan_mode` approval.
 - **Subagents** — the `subagent` tool spawns a focused child agent loop with a restricted toolset and returns its report.
@@ -25,9 +26,25 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 ## Quickstart (`ducky --web`)
 
 ```sh
+export GITHUB_TOKEN=ghp_...
+curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh \
+  | bash -s -- --key nvapi-... --no-open
+```
+
+(The repo is private, hence the token header. Prefer it interactive? Download
+`install.sh` first, then run `bash install.sh` — it walks through setup.)
+
+What the installer does: downloads the ref → `npm install` (or bun) →
+`next build` → links the global `ducky` command (user-local shim when sudo is
+unavailable) → `ducky setup` → `ducky --web`. Flags: `--dir`, `--ref`,
+`--port`, `--host`, `--local <checkout>`, `--no-build`, `--no-link`,
+`--no-run`, `--key`, `--model`, `--dry-run`. Or manually:
+
+```sh
 npm install
 npm i -g .              # global `ducky` command (or use node ./bin/ducky.js)
-ducky setup             # paste 1 free provider key (~30 seconds, hidden input)
+ducky setup             # paste 1 free NVIDIA key (hidden input)
 ducky --web             # local popup at http://127.0.0.1:3000 — NOT a website
 ```
 

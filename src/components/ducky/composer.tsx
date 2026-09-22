@@ -11,6 +11,7 @@ import {
   FolderGit2,
   Hand,
   ImagePlus,
+  Map,
   Plus,
   SendHorizontal,
   SlashSquare,
@@ -53,6 +54,79 @@ export const SLASH_COMMANDS = [
   { cmd: "/zip", desc: "Download this session's workspace as a .zip" },
   { cmd: "/backup", desc: "Download all sessions as a JSON backup" },
 ] as const;
+
+/**
+ * ZCode-style row BELOW the prompt box: model pill on the left, permission
+ * mode on the right. One control for the four ways the agent may act:
+ * ask-before-changes, edit-automatically, plan-mode, read-only.
+ */
+export type AgentMode = "ask" | "auto" | "plan" | "readonly";
+
+const MODE_META: Record<AgentMode, { label: string; hint: string }> = {
+  ask: { label: "Ask before changes", hint: "Approve each edit before it runs" },
+  auto: { label: "Edit automatically", hint: "Files change without asking" },
+  plan: { label: "Plan mode", hint: "Research + propose, no writes until approved" },
+  readonly: { label: "Read-only", hint: "The agent can look, never touch" },
+};
+
+function ComposerMetaRow({ sessionId }: { sessionId: string | null }) {
+  const policy = useDuckyStore((s) => s.settings.policy);
+  const planMode = useDuckyStore(
+    (s) => s.sessions.find((x) => x.id === sessionId)?.planMode ?? false,
+  );
+  const mode: AgentMode = planMode
+    ? "plan"
+    : policy === "auto"
+      ? "auto"
+      : policy === "readonly"
+        ? "readonly"
+        : "ask";
+
+  const setMode = (m: AgentMode) => {
+    const st = useDuckyStore.getState();
+    let sid = sessionId;
+    if (m === "plan" && (!sid || !st.sessions.some((s) => s.id === sid))) {
+      sid = st.newSession();
+    }
+    if (sid) st.setPlanMode(sid, m === "plan");
+    if (m !== "plan") {
+      st.updateSettings({ policy: m === "auto" ? "auto" : m === "readonly" ? "readonly" : "ask" });
+    }
+    toast.success(MODE_META[m].label, { description: MODE_META[m].hint });
+  };
+
+  return (
+    <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-1 pt-2">
+      <span
+        aria-label="Active model: Ducky 3.5 Coder, powered by Nemotron 3 Ultra"
+        title="Ducky 3.5 Coder · Nemotron 3 Ultra — the one model"
+        className="flex min-w-0 items-center gap-1.5 truncate rounded-full border border-[#FDC00A]/20 bg-[#FDC00A]/5 px-2.5 py-1 font-mono text-[11px] text-foreground/80"
+      >
+        <Cpu className="size-3 shrink-0 text-[#FDC00A]" aria-hidden />
+        <span className="truncate">
+          {MODEL_DISPLAY} <span className="text-muted-foreground">· Nemotron 3 Ultra</span>
+        </span>
+      </span>
+      <label className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+        <Map className="size-3 text-[#FDC00A]" aria-hidden />
+        <span className="sr-only">Permission mode</span>
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as AgentMode)}
+          aria-label={`Permission mode: ${MODE_META[mode].label}`}
+          title={MODE_META[mode].hint}
+          className="cursor-pointer rounded-full border bg-card px-2 py-1 font-mono text-[11px] text-foreground hover:border-[#FDC00A]/40 focus-visible:outline-none"
+        >
+          {(Object.keys(MODE_META) as AgentMode[]).map((m) => (
+            <option key={m} value={m}>
+              {MODE_META[m].label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
 
 interface ComposerProps {
   value: string;
@@ -356,6 +430,7 @@ export function Composer({
             </div>
           </div>
         </div>
+        <ComposerMetaRow sessionId={activeSessionId} />
       </div>
     );
   }
@@ -524,6 +599,7 @@ export function Composer({
   return (
     <div className="border-t bg-background/60 px-4 py-3">
       {surface}
+      <ComposerMetaRow sessionId={activeSessionId} />
     </div>
   );
 }

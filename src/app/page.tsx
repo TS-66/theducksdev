@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
+import { fmtK } from "@/components/ducky/format";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -28,6 +30,7 @@ import {
   type RailView,
 } from "@/components/ducky/ide-panels";
 import { BrowserPanel } from "@/components/ducky/browser-panel";
+import { TerminalPanel } from "@/components/ducky/terminal-panel";
 import {
   getTabsRevision,
   listTabs,
@@ -59,6 +62,7 @@ export default function DuckyCoderPage() {
   const [activityOpen, setActivityOpen] = React.useState(false);
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = React.useState(false);
+  const [terminalOpen, setTerminalOpen] = React.useState(false);
 
   /* ── IDE shell state ── */
   const [leftOpen, setLeftOpen] = React.useState(true);
@@ -398,6 +402,8 @@ export default function DuckyCoderPage() {
         onMenu={() => setMobileNavOpen(true)}
         onOpenSettings={openSettings}
         onOpenPlugins={() => setPluginsOpen(true)}
+        onToggleTerminal={() => setTerminalOpen((v) => !v)}
+        terminalOpen={terminalOpen}
       />
 
       {/* IDE body row: rail + explorer + center + inspector */}
@@ -458,6 +464,34 @@ export default function DuckyCoderPage() {
 
         {/* center column: tabs + chat/file + composer */}
         <main className="flex min-w-0 flex-1 flex-col bg-background">
+          {/* task strip — goal, scope, cost at a glance */}
+          {!heroState && activeSession && (
+            <div className="flex h-9 shrink-0 items-center gap-2 overflow-hidden border-b bg-muted/10 px-3">
+              <span
+                aria-hidden
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full",
+                  agent.running ? "ducky-pulse-dot bg-amber-400" : "bg-emerald-400",
+                )}
+              />
+              <span className="truncate text-xs font-semibold">{activeSession.title}</span>
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {Object.keys(activeSession.workspace).length} files
+              </span>
+              <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground sm:inline">
+                {fmtK(activeSession.stats.promptTokens + activeSession.stats.completionTokens)} tok ·{" "}
+                {activeSession.stats.toolCalls} tools
+              </span>
+              {activeSession.planMode && (
+                <span className="shrink-0 rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wide text-violet-300">
+                  plan
+                </span>
+              )}
+              <span className="ml-auto hidden shrink-0 font-mono text-[10px] text-muted-foreground/60 md:inline">
+                {agent.running ? "working…" : "idle"}
+              </span>
+            </div>
+          )}
           <IdeTabBar
             tab={effectiveTab}
             onTab={(t) => {
@@ -529,6 +563,13 @@ export default function DuckyCoderPage() {
                         onRespond={(ok) =>
                           ok ? agent.respondApproval(true) : agent.respondApproval(false)
                         }
+                        onAlwaysAllow={() => {
+                          useDuckyStore.getState().updateSettings({ policy: "auto" });
+                          toast.success("Permission mode → Edit automatically", {
+                            description: "Side-effecting tools now run without asking.",
+                          });
+                          agent.respondApproval(true);
+                        }}
                       />
                     )}
                     {askPayload && (
@@ -539,6 +580,15 @@ export default function DuckyCoderPage() {
               </>
             )}
           </div>
+
+          {/* terminal drawer — same mini-bash the agent uses, over this session */}
+          {terminalOpen && activeSession && (
+            <TerminalPanel
+              key={activeSession.id}
+              sessionId={activeSession.id}
+              onClose={() => setTerminalOpen(false)}
+            />
+          )}
 
           {/* docked composer — hidden in hero welcome and in file-tab focus mode */}
           {!heroState && effectiveTab !== "file" && (
