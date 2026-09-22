@@ -54,7 +54,8 @@ function printHelp() {
 
   Usage:
     ducky --web [options]       start the coder web UI and open a browser
-    ducky setup [options]       connect a free cloud key ONCE on this server (never in browser/git)
+    ducky setup [options]       connect YOUR model endpoint (key stays on this server)
+    ducky update                pull latest release + reinstall + rebuild
     ducky --help                show this help
     ducky --version             print version
 
@@ -445,6 +446,44 @@ if (has("--version") || has("-v")) {
 if (ARGS[0] === "setup") {
   runSetup().catch((e) => fail(e instanceof Error ? e.message : String(e)));
   return;
+}
+
+if (ARGS[0] === "update") {
+  // One-command updater: fast-forward the checkout, reinstall, rebuild.
+  // Works on git checkouts (curl installs: re-run the installer instead).
+  const hasGit = (() => {
+    try {
+      const r = spawnSync("git", ["rev-parse", "--git-dir"], { cwd: APP_DIR, stdio: "ignore" });
+      return !r.error && r.status === 0;
+    } catch {
+      return false;
+    }
+  })();
+  if (!hasGit) {
+    fail(`Not a git checkout (${APP_DIR}). Re-run the installer instead:\n  curl -fsSL https://ducky-install.vercel.app | bash`);
+  }
+  console.log(`\n  \x1b[33m▲ ducky update\x1b[0m — pulling latest release…\n`);
+  const pull = spawnSync("git", ["pull", "--ff-only"], { cwd: APP_DIR, stdio: "inherit" });
+  if (pull.status !== 0) fail("git pull failed (local changes? stash or reset, then retry). Nothing else ran.");
+  const pm = (() => {
+    try {
+      const r = spawnSync("bun", ["--version"], { stdio: "ignore" });
+      return !r.error && r.status === 0 ? "bun" : "npm";
+    } catch {
+      return "npm";
+    }
+  })();
+  log("Reinstalling dependencies…");
+  const inst = spawnSync(pm, ["install", ...(pm === "npm" ? ["--no-audit", "--no-fund"] : [])], {
+    cwd: APP_DIR,
+    stdio: "inherit",
+  });
+  if (inst.status !== 0) fail("Dependency install failed — see errors above.");
+  log("Rebuilding…");
+  const build = spawnSync(pm, ["run", "build"], { cwd: APP_DIR, stdio: "inherit" });
+  if (build.status !== 0) fail("Build failed — see errors above.");
+  console.log(`\n  \x1b[32m✓ updated\x1b[0m → restart with: ducky --web\n`);
+  process.exit(0);
 }
 
 const wantsWeb = has("--web") || ARGS.length === 0 || ARGS[0].startsWith("-");

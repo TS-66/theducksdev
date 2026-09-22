@@ -61,6 +61,16 @@ ducky --web             # local popup at http://127.0.0.1:3000 — NOT a website
 
 `ducky --web` binds loopback only: the UI is a popup on your own machine. `ducky setup --check` verifies the key with masked output (values are never printed).
 
+### Updates (notifying every user)
+
+No accounts, no push servers — so every running app checks GitHub Releases on boot and banners loudly when it's behind:
+
+1. Publish a release tagged `vX.Y.Z` on GitHub (notes = changelog).
+2. All older apps show an **update banner** (once per version, dismissible) with a copy button for `ducky update`.
+3. Users run `ducky update` (git pull + reinstall + rebuild) — curl installs just re-run the installer.
+
+Bump `APP_VERSION` in `src/lib/ducky/app-version.ts` together with `package.json` on every release, or the banner never fires.
+
 ## Configuration
 
 Sessions, workspaces and settings live in the browser's `localStorage`. Your model key lives in **your browser** (Settings → Connections) or, as a shared fallback, in server env that never reaches the browser. Without a key + model the composer says exactly what's missing.

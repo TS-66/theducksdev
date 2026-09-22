@@ -584,6 +584,48 @@ await run("registry: every executor has a schema", async () => {
   }
 }
 
+/* ------------------------------ app updates ----------------------------- */
+
+{
+  const ver = await import(`${LIB}/app-version.${EXT}`);
+  await run("updates: semver compare", async () => {
+    assert(ver.isNewerTag("0.3.0", "v0.4.0") === true, "minor bump");
+    assert(ver.isNewerTag("0.3.0", "0.3.0") === false, "equal");
+    assert(ver.isNewerTag("0.4.0", "v0.3.9") === false, "older");
+    assert(ver.isNewerTag("0.3.9", "v0.4.0") === true, "cross");
+    assert(ver.isNewerTag("1.0.0", "v0.9.9") === false, "major guard");
+    assert(ver.APP_VERSION === "0.3.0", `version drift: ${ver.APP_VERSION}`);
+  });
+  await run("updates: release check + dismissal", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({ tag_name: "v9.9.9", name: "Future", html_url: "https://x", body: "notes", published_at: "2026-01-01" }),
+        { status: 200 },
+      );
+    try {
+      const rel = await ver.checkForUpdate("0.3.0");
+      assert(rel && rel.tag === "v9.9.9" && rel.notes === "notes", "should flag");
+      ver.dismissUpdate("v9.9.9");
+      assert((await ver.checkForUpdate("0.3.0")) === null, "dismissal ignored");
+      assert((await ver.checkForUpdate("v9.9.9")) === null, "same version quiet");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+  await run("updates: offline silence", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new Error("offline");
+    };
+    try {
+      assert((await ver.checkForUpdate("0.0.1")) === null, "should stay quiet offline");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+}
+
 /* --------------------------- clipboard (stubbed) -------------------------- */
 
 {

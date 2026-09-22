@@ -4,6 +4,12 @@ import * as React from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { fmtK } from "@/components/ducky/format";
+import {
+  APP_VERSION,
+  checkForUpdate,
+  dismissUpdate,
+  type ReleaseInfo,
+} from "@/lib/ducky/app-version";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -66,6 +72,27 @@ export default function DuckyCoderPage() {
   const [previewPath, setPreviewPath] = React.useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = React.useState(false);
   const [terminalOpen, setTerminalOpen] = React.useState(false);
+  const [update, setUpdate] = React.useState<ReleaseInfo | null>(null);
+
+  /* ── update check: every boot asks GitHub releases; banner once per version ── */
+  React.useEffect(() => {
+    let live = true;
+    const t = setTimeout(() => {
+      checkForUpdate(APP_VERSION).then((rel) => {
+        if (live && rel) {
+          setUpdate(rel);
+          toast.info(`Update available: ${rel.tag}`, {
+            description: "A newer Ducky is out — see the banner up top.",
+            duration: 8000,
+          });
+        }
+      });
+    }, 2500);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, []);
 
   /* ── IDE shell state ── */
   const [leftOpen, setLeftOpen] = React.useState(true);
@@ -614,6 +641,49 @@ export default function DuckyCoderPage() {
         onToggleTerminal={() => setTerminalOpen((v) => !v)}
         terminalOpen={terminalOpen}
       />
+
+      {/* update banner — one per release, dismissed per version */}
+      {update && (
+        <div
+          role="status"
+          aria-label={`Update available: ${update.tag}`}
+          className="ducky-fade-up z-20 flex shrink-0 items-center gap-2 border-b border-[#FDC00A]/30 bg-gradient-to-r from-[#FDC00A]/15 via-[#FDC00A]/8 to-transparent px-3 py-1.5"
+        >
+          <span aria-hidden className="ducky-pulse-dot inline-block size-1.5 shrink-0 rounded-full bg-[#FDC00A]" />
+          <p className="min-w-0 flex-1 truncate text-xs">
+            <span className="font-semibold">Update available: {update.name}</span>
+            <span className="ml-2 hidden text-muted-foreground sm:inline">
+              v{APP_VERSION} → {update.tag} — run `ducky update`
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const cmd = "ducky update";
+              if (navigator.clipboard) {
+                void navigator.clipboard.writeText(cmd).catch(() => undefined);
+              }
+              toast.success("Copied: ducky update", {
+                description: update.url ? `Release notes: ${update.url}` : undefined,
+              });
+            }}
+            className="shrink-0 rounded-full bg-[#FDC00A] px-2.5 py-1 font-mono text-[11px] font-semibold text-black hover:brightness-105"
+          >
+            Copy update command
+          </button>
+          <button
+            type="button"
+            aria-label="Dismiss update"
+            onClick={() => {
+              dismissUpdate(update.tag);
+              setUpdate(null);
+            }}
+            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* IDE body row: rail + explorer + center + inspector */}
       <div className="flex min-h-0 flex-1">
