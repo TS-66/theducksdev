@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Command, Eye, GitBranch, Hand, HardDrive, Plug, TriangleAlert, Wrench, Zap } from "lucide-react";
+import { Command, Eye, GitBranch, Hand, HardDrive, Monitor, Plug, TriangleAlert, Wrench, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,6 +15,7 @@ import {
   reconnectDisk,
   useDiskStore,
 } from "@/lib/ducky/disk";
+import { getPcConfig, pcStatus } from "@/lib/ducky/pc";
 import { type PermissionPolicy } from "@/lib/ducky/types";
 import { clockHM, fmtK, shortId } from "./format";
 
@@ -100,6 +101,58 @@ function DiskChip() {
         </Button>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * This-PC bridge chip: renders only when a bridge is paired. Click probes
+ * liveness (green pulse = answering). The bridge itself is started/stopped
+ * by the human (`ducky bridge`) — this chip never touches the machine.
+ */
+function PcChip() {
+  const [live, setLive] = React.useState<boolean | null>(null);
+  const cfg = getPcConfig();
+  if (!cfg) return null;
+
+  const probe = () => {
+    setLive(null);
+    pcStatus().then(
+      (s) => {
+        setLive(true);
+        toast.success("PC bridge live", { description: `${s.root} · ${s.platform}` });
+      },
+      (e) => {
+        setLive(false);
+        toast.error("PC bridge unreachable", { description: (e as Error).message });
+      },
+    );
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={probe}
+          className="flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-emerald-400 transition-colors hover:bg-emerald-500/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label="Probe the This-PC bridge (click to test)"
+        >
+          <Monitor className="size-3" aria-hidden />
+          <span
+            aria-hidden
+            className={cn(
+              "inline-block size-1.5 rounded-full",
+              live === false ? "bg-red-400" : live ? "bg-emerald-400" : "ducky-pulse-dot bg-emerald-400/70",
+            )}
+          />
+          pc
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-64">
+        This PC is paired (port {cfg.port}). Click to probe — green means the
+        bridge answers. Stop it any time with Ctrl+C in its terminal.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -288,6 +341,7 @@ export function StatusBar({
           </Tooltip>
         )}
         <DiskChip />
+        <PcChip />
       </div>
 
       {/* center */}

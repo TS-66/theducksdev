@@ -56,6 +56,7 @@ function printHelp() {
     ducky --web [options]       start the coder web UI and open a browser
     ducky setup [options]       connect YOUR model endpoint (key stays on this server)
     ducky update                pull latest release + reinstall + rebuild
+    ducky bridge [options]      connect THIS PC (real shell + files, loopback + token)
     ducky --help                show this help
     ducky --version             print version
 
@@ -95,6 +96,13 @@ function printHelp() {
   Database-backed secrets (your own DB writes the file, live rotation, no restart):
     DUCKY_SECRETS_FILE=/run/ducky/secrets.json ducky --web
     file: {"apiKey":"...","model":"...","baseUrl":"https://..."}
+
+  This PC (real shell + files for the UI terminal and pc_* tools):
+    ducky bridge --port 3791 --root ~/projects
+                                binds 127.0.0.1 only, prints a one-time token —
+                                paste it into Settings → Connections → This PC.
+                                Ctrl+C disconnects instantly. Nothing above
+                                --root is ever reachable.
 
   How the key stays hidden:
     • key lives ONLY in server memory/env: OS keychain → shell env → locked file
@@ -446,6 +454,212 @@ if (has("--version") || has("-v")) {
 if (ARGS[0] === "setup") {
   runSetup().catch((e) => fail(e instanceof Error ? e.message : String(e)));
   return;
+}
+
+if (ARGS[0] === "bridge") {
+  // Local PC bridge: exposes THIS computer (shell + files, rooted at --root)
+  // to the browser UI over loopback only, guarded by a one-time token.
+  // The browser can never touch your PC otherwise — this command IS the
+  // explicit consent. Keep this terminal open; Ctrl+C stops everything.
+  runBridge();
+  return;
+}
+
+async function runBridge() {
+  const port = parseInt(valueOf("--port", "3791"), 10) || 3791;
+  const root = path.resolve(valueOf("--root", process.cwd()));
+  const crypto = require("crypto");
+  let token = valueOf("--token", process.env.DUCKY_BRIDGE_TOKEN || "");
+  const fresh = !token;
+  if (fresh) token = crypto.randomBytes(24).toString("hex");
+
+  const MAX_OUT = 64 * 1024;
+  const MAX_READ = 512 * 1024;
+  const MAX_WRITE = 2 * 1024 * 1024;
+
+  const inside = (p) => {
+    const abs = path.resolve(root, p || ".");
+    return abs === root || abs.startsWith(root + path.sep) ? abs : null;
+  };
+
+  const send = (res, code, obj) => {
+    const body = JSON.stringify(obj);
+    res.writeHead(code, {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(body),
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+    res.end(body);
+  };
+
+  const authed = (obj) =>
+    obj && typeof obj.token === "string" && obj.token.length > 0 && obj.token === token;
+
+  const server = require("http").createServer((req, res) => {
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      return res.end();
+    }
+    const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (req.method === "GET" && url.pathname === "/status") {
+      return send(res, 200, { ok: true, bridge: "ducky-pc-bridge", version: PKG.version, root, platform: process.platform, time: Date.now() });
+    }
+    if (req.method !== "POST") return send(res, 405, { ok: false, error: "POST only" });
+    let raw = "";
+    req.on("data", (c) => {
+      raw += c;
+      if (raw.length > MAX_WRITE + 1024) req.destroy();
+    });
+    req.on("end", () => {
+      let body = null;
+      try {
+        body = JSON.parse(raw || "{}");
+      } catch {
+        return send(res, 400, { ok: false, error: "Invalid JSON body." });
+      }
+      if (!authed(body)) return send(res, 401, { ok: false, error: "Bad or missing token." });
+
+      if (url.pathname === "/exec") {
+        const command = String(body.command || "").trim();
+        if (!command) return send(res, 400, { ok: false, error: "Missing command." });
+        const cwd = inside(String(body.cwd || ".")) || root;
+        const timeoutMs = Math.min(120000, Math.max(1000, Number(body.timeoutMs) || 30000));
+        const shell = process.platform === "win32" ? "cmd.exe" : "/bin/sh";
+        const args = process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-c", command];
+        const child = spawn(shell, args, { cwd });
+        let out = "";
+        let err = "";
+        const push = (buf, isErr) => {
+          const s = String(buf).slice(0, Math.max(0, MAX_OUT - (isErr ? err : out).length));
+          if (isErr) err += s;
+          else out += s;
+        };
+        child.stdout.on("data", (c) => push(c, false));
+        child.stderr.on("data", (c) => push(c, true));
+        let done = false;
+        const finish = (code) => {
+          if (done) return;
+          done = true;
+          send(res, 200, { ok: true, exitCode: code ?? -1, stdout: out, stderr: err });
+        };
+        const timer = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {}
+          finish(124);
+        }, timeoutMs);
+        child.on("error", (e) => {
+          clearTimeout(timer);
+          send(res, 200, { ok: true, exitCode: 127, stdout: "", stderr: String((e && e.message) || e) });
+        });
+        child.on("close", (code) => {
+          clearTimeout(timer);
+          finish(code);
+        });
+        return;
+      }
+
+      if (url.pathname === "/ls") {
+        const abs = inside(String(body.path || "."));
+        if (!abs) return send(res, 400, { ok: false, error: "Path escapes the bridge root." });
+        const recursive = body.recursive === true;
+        const out = [];
+        try {
+          const walk = (dir, depth) => {
+            for (const name of fs.readdirSync(dir)) {
+              if (out.length >= 2000) return;
+              const full = path.join(dir, name);
+              let st = null;
+              try {
+                st = fs.statSync(full);
+              } catch {
+                continue;
+              }
+              const rel = path.relative(root, full) || ".";
+              out.push({ path: rel, dir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size });
+              if (recursive && st.isDirectory() && depth < 6) walk(full, depth + 1);
+            }
+          };
+          const st = fs.statSync(abs);
+          if (!st.isDirectory()) return send(res, 400, { ok: false, error: "Not a directory." });
+          walk(abs, 0);
+        } catch (e) {
+          return send(res, 400, { ok: false, error: String((e && e.message) || e) });
+        }
+        return send(res, 200, { ok: true, entries: out });
+      }
+
+      if (url.pathname === "/read") {
+        const abs = inside(String(body.path || ""));
+        if (!abs) return send(res, 400, { ok: false, error: "Path escapes the bridge root." });
+        try {
+          const st = fs.statSync(abs);
+          if (!st.isDirectory()) {
+            const buf = fs.readFileSync(abs);
+            const truncated = buf.length > MAX_READ;
+            return send(res, 200, {
+              ok: true,
+              content: buf.slice(0, MAX_READ).toString("utf8"),
+              bytes: buf.length,
+              truncated,
+            });
+          }
+          return send(res, 400, { ok: false, error: "Is a directory (use /ls)." });
+        } catch (e) {
+          return send(res, 400, { ok: false, error: String((e && e.message) || e) });
+        }
+      }
+
+      if (url.pathname === "/write") {
+        const abs = inside(String(body.path || ""));
+        if (!abs) return send(res, 400, { ok: false, error: "Path escapes the bridge root." });
+        const content = typeof body.content === "string" ? body.content : "";
+        if (Buffer.byteLength(content) > MAX_WRITE) {
+          return send(res, 400, { ok: false, error: "Content exceeds 2 MB." });
+        }
+        try {
+          fs.mkdirSync(path.dirname(abs), { recursive: true });
+          fs.writeFileSync(abs, content);
+          return send(res, 200, { ok: true, bytes: Buffer.byteLength(content) });
+        } catch (e) {
+          return send(res, 400, { ok: false, error: String((e && e.message) || e) });
+        }
+      }
+
+      return send(res, 404, { ok: false, error: "Unknown route. Try /status /exec /ls /read /write." });
+    });
+  });
+
+  server.on("error", (e) => fail(`Bridge failed to bind 127.0.0.1:${port} — ${e.message}`));
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`
+  \x1b[33m▲ ducky bridge\x1b[0m — THIS PC is now connected (loopback only)
+  ─────────────────────────────────────────────
+   url      http://127.0.0.1:${port}  (this machine only — never the web)
+   root     ${root}  (nothing above this folder is reachable)
+   token    ${fresh ? "(fresh, shown ONCE below)" : "(from --token / DUCKY_BRIDGE_TOKEN)"}
+  ─────────────────────────────────────────────
+`);
+    if (fresh) {
+      console.log(`  paste this token into Settings → Connections → This PC:\n\n  ${token}\n`);
+    }
+    console.log(`  In the UI: status bar shows pc: connected · terminal gets a PC mode.\n  Keep this terminal open. Ctrl+C stops the bridge instantly.\n`);
+  });
+  const shutdown = (sig) => {
+    log(`Bridge received ${sig} — disconnecting this PC…`);
+    try {
+      server.close();
+    } catch {}
+    setTimeout(() => process.exit(0), 300).unref();
+  };
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 if (ARGS[0] === "update") {

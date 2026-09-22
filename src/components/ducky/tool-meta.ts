@@ -451,6 +451,36 @@ const REGISTRY: Record<string, ToolMeta> = {
     accent: "border-l-sky-400/70",
     label: "csv",
   },
+  pc_status: {
+    icon: Monitor,
+    tint: "text-emerald-400",
+    accent: "border-l-emerald-400/70",
+    label: "pc",
+  },
+  pc_exec: {
+    icon: SquareTerminal,
+    tint: "text-emerald-400",
+    accent: "border-l-emerald-400/70",
+    label: "pc-shell",
+  },
+  pc_read: {
+    icon: FileText,
+    tint: "text-emerald-400",
+    accent: "border-l-emerald-400/70",
+    label: "pc-read",
+  },
+  pc_write: {
+    icon: FilePlus2,
+    tint: "text-emerald-400",
+    accent: "border-l-emerald-400/70",
+    label: "pc-write",
+  },
+  pc_ls: {
+    icon: FolderSearch,
+    tint: "text-emerald-400",
+    accent: "border-l-emerald-400/70",
+    label: "pc-ls",
+  },
   disk_ls: {
     icon: Monitor,
     tint: "text-emerald-400",

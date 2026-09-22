@@ -296,9 +296,12 @@ export default function DuckyCoderPage() {
         break;
       }
       case "/conn":
-      case "/connect":
+      case "/connect": {
+        openSettings("models");
+        break;
+      }
       case "/mcp": {
-        openSettings("connections");
+        openSettings("mcp");
         break;
       }
       case "/policy": {

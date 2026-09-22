@@ -20,7 +20,7 @@ import { useDuckyStore } from "@/lib/ducky/store";
 
 interface HeaderBarProps {
   onMenu: () => void;
-  onOpenSettings: (tab?: "behavior" | "about") => void;
+  onOpenSettings: (tab?: import("./settings-sheet").SettingsTab) => void;
   onOpenPlugins: () => void;
   onToggleTerminal: () => void;
   terminalOpen: boolean;

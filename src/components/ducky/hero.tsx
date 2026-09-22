@@ -216,13 +216,13 @@ export function Hero({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.16, ease: "easeOut" }}
-        className="relative z-10 mt-7 w-full max-w-2xl px-4"
+        className="relative z-10 mt-7 w-full max-w-3xl px-4"
       >
         {children}
       </motion.div>
 
       {/* suggestion chips */}
-      <div className="relative z-10 mt-4 flex w-full max-w-2xl flex-wrap items-center justify-center gap-2 px-4">
+      <div className="relative z-10 mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-2 px-4">
         {dimList.map((s) => (
           <button
             key={s.text}

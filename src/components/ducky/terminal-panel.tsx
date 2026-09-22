@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { SquareTerminal, X } from "lucide-react";
+import { Monitor, SquareTerminal, X } from "lucide-react";
 import { runShellCommand } from "@/lib/ducky/tools-bash";
 import { useDuckyStore } from "@/lib/ducky/store";
+import { getPcConfig, pcExec } from "@/lib/ducky/pc";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,8 @@ export function TerminalPanel({
     { kind: "sys", text: "ducky shell — virtual workspace. Try: ls, tree, cat README.md, echo hi > note.txt" },
   ]);
   const [cwd, setCwd] = React.useState("");
+  const [mode, setMode] = React.useState<"workspace" | "pc">("workspace");
+  const [pcCwd, setPcCwd] = React.useState(".");
   const [value, setValue] = React.useState("");
   const historyRef = React.useRef<string[]>([]);
   const histIdxRef = React.useRef(-1);
@@ -43,6 +46,20 @@ export function TerminalPanel({
     inputRef.current?.focus();
   }, []);
 
+  /** resolve a `cd` target against a root-relative cwd (tiny, no escapes past root) */
+  const resolvePc = (cur: string, target: string): string => {
+    const t = target.trim();
+    if (!t || t === "/" || t === "~") return ".";
+    const parts = (t.startsWith("/") ? t.slice(1) : `${cur === "." ? "" : `${cur}/`}${t}`).split("/");
+    const stack: string[] = [];
+    for (const p of parts) {
+      if (!p || p === ".") continue;
+      if (p === "..") stack.pop();
+      else stack.push(p);
+    }
+    return stack.length ? stack.join("/") : ".";
+  };
+
   const run = (raw: string) => {
     const cmd = raw.trim();
     if (!cmd) return;
@@ -52,6 +69,41 @@ export function TerminalPanel({
     }
     historyRef.current.push(cmd);
     histIdxRef.current = -1;
+
+    /* ------- REAL PC via the bridge ------- */
+    if (mode === "pc") {
+      if (!getPcConfig()) {
+        setLines((l) => [
+          ...l.slice(-200),
+          { kind: "cmd", text: `pc ❯ ${cmd}` },
+          { kind: "out", text: "PC not connected — run `ducky bridge` on your machine, then paste its token in Settings → Connections → This PC." },
+        ]);
+        return;
+      }
+      const cdMatch = cmd.match(/^cd\s*(.*)$/);
+      if (cdMatch) {
+        const next = resolvePc(pcCwd, cdMatch[1] ?? "");
+        setPcCwd(next);
+        setLines((l) => [...l.slice(-200), { kind: "cmd", text: `pc:${pcCwd} ❯ ${cmd}` }]);
+        return;
+      }
+      const shownCwd = pcCwd;
+      setLines((l) => [...l.slice(-200), { kind: "cmd", text: `pc:${shownCwd} ❯ ${cmd}` }]);
+      void pcExec(cmd, shownCwd)
+        .then((r) => {
+          const body = [r.stdout, r.stderr ? `\n[stderr]\n${r.stderr}` : ""].join("");
+          setLines((l) => [
+            ...l.slice(-200),
+            { kind: "out", text: `[exit ${r.exitCode}]\n${body || "(no output)"}` },
+          ]);
+        })
+        .catch((e: Error) => {
+          setLines((l) => [...l.slice(-200), { kind: "out", text: `pc: ${e.message}` }]);
+        });
+      return;
+    }
+
+    /* ------- virtual workspace (default) ------- */
     const st = useDuckyStore.getState();
     const snapshot = st.readWorkspaceSnapshot(sessionId);
     let res;
@@ -77,8 +129,26 @@ export function TerminalPanel({
         <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           terminal
         </span>
+        <div role="tablist" aria-label="Terminal target" className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5">
+          {(["workspace", "pc"] as const).map((m) => (
+            <button
+              key={m}
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => setMode(m)}
+              title={m === "pc" ? "REAL machine via `ducky bridge`" : "Virtual workspace (safe sandbox)"}
+              className={cn(
+                "flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px]",
+                mode === m ? "bg-white/[0.09] text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {m === "pc" && <Monitor className="size-3" aria-hidden />}
+              {m === "pc" ? "PC" : "sandbox"}
+            </button>
+          ))}
+        </div>
         <span className="truncate font-mono text-[10px] text-muted-foreground/60">
-          {cwd || "~"} · virtual workspace
+          {mode === "pc" ? `${pcCwd} · REAL pc` : `${cwd || "~"} · virtual workspace`}
         </span>
         <button
           type="button"
@@ -112,7 +182,7 @@ export function TerminalPanel({
       </div>
       <div className="flex shrink-0 items-center gap-2 border-t border-white/5 px-3 py-1.5">
         <span aria-hidden className="shrink-0 select-none font-mono text-xs text-emerald-400">
-          {cwd || "~"} ❯
+          {mode === "pc" ? `pc:${pcCwd}` : cwd || "~"} ❯
         </span>
         <Input
           ref={inputRef}

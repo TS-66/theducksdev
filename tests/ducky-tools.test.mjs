@@ -172,10 +172,10 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (72 tools, 27 plugins)", async () => {
+await run("registry: counts (77 tools, 28 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 72, `only ${defs.length} tools`);
-  assert(PLUGINS.length >= 27, `only ${PLUGINS.length} plugins`);
+  assert(defs.length >= 77, `only ${defs.length} tools`);
+  assert(PLUGINS.length >= 28, `only ${PLUGINS.length} plugins`);
 });
 
 await run("registry: every tool has an executor (except loop special-cases)", async () => {
@@ -626,6 +626,97 @@ await run("registry: every executor has a schema", async () => {
   });
 }
 
+/* ------------------------------- this-pc -------------------------------- */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+  const pc = await import(`${LIB}/pc.${EXT}`);
+
+  await run("pc_status without bridge", async () => {
+    pc.clearPcConfig();
+    let msg = "";
+    try {
+      await ex("pc_status")({});
+    } catch (e) {
+      msg = e.message;
+    }
+    assert(msg.includes("ducky bridge"), msg);
+  });
+  await run("pc_exec refuses destruction", async () => {
+    pc.setPcConfig(3791, "t");
+    let msg = "";
+    try {
+      await ex("pc_exec")({ command: "sudo rm -rf /" });
+    } catch (e) {
+      msg = e.message;
+    }
+    assert(msg.includes("refused"), msg);
+  });
+  await run("pc client over stubbed bridge", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      if (String(url).endsWith("/status")) {
+        return new Response(JSON.stringify({ ok: true, root: "/home/u", platform: "linux", version: "0.3.0" }), { status: 200 });
+      }
+      if (String(url).endsWith("/exec")) {
+        assert(body.token === "t", "token forwarded");
+        return new Response(JSON.stringify({ ok: true, exitCode: 0, stdout: "hi-pc", stderr: "" }), { status: 200 });
+      }
+      if (String(url).endsWith("/ls")) {
+        return new Response(JSON.stringify({ ok: true, entries: [{ path: "a.txt", dir: false, size: 3 }] }), { status: 200 });
+      }
+      if (String(url).endsWith("/read")) {
+        return new Response(JSON.stringify({ ok: true, content: "data", bytes: 4, truncated: false }), { status: 200 });
+      }
+      if (String(url).endsWith("/write")) {
+        return new Response(JSON.stringify({ ok: true, bytes: 4 }), { status: 200 });
+      }
+      return new Response("nope", { status: 404 });
+    };
+    try {
+      pc.setPcConfig(3791, "t");
+      const s = await ex("pc_status")({});
+      assert(s.includes("/home/u"), s);
+      const e = await ex("pc_exec")({ command: "echo hi" });
+      assert(e.includes("hi-pc"), e);
+      const l = await ex("pc_ls")({});
+      assert(l.includes("a.txt"), l);
+      const r = await ex("pc_read")({ path: "a.txt" });
+      assert(r.includes("data"), r);
+      const w = await ex("pc_write")({ path: "b.txt", content: "data" });
+      assert(w.includes("4 bytes"), w);
+      // registry + validation
+      assert(pc.getPcConfig()?.port === 3791, "config roundtrip");
+      pc.clearPcConfig();
+      assert(pc.getPcConfig() === null, "unpair");
+    } finally {
+      globalThis.fetch = realFetch;
+      pc.clearPcConfig();
+    }
+  });
+  await run("pc client: unreachable + bad token", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new Error("down");
+    };
+    try {
+      pc.setPcConfig(3791, "t");
+      let msg = "";
+      try {
+        await ex("pc_status")({});
+      } catch (e) {
+        msg = e.message;
+      }
+      assert(msg.includes("unreachable") || msg.includes("badly"), msg);
+    } finally {
+      globalThis.fetch = realFetch;
+      pc.clearPcConfig();
+    }
+  });
+}
+
 /* --------------------------- clipboard (stubbed) -------------------------- */
 
 {
@@ -697,10 +788,11 @@ await run("tools-extra direct: json path + diff", async () => {
   assert(extra.lineDiff("same\n", "same\n").includes("identical"), "identical");
 });
 
-await run("skills module: 16 playbooks", async () => {
-  assert(skills.SKILLS.length === 16, `got ${skills.SKILLS.length}`);
+await run("skills module: 17 playbooks", async () => {
+  assert(skills.SKILLS.length === 17, `got ${skills.SKILLS.length}`);
   assert(skills.getSkill("PLAN")?.name === "plan", "case-insensitive lookup");
   assert(skills.getSkill("mcp-integration")?.name === "mcp-integration", "mcp skill");
+  assert(skills.getSkill("local-pc")?.name === "local-pc", "pc skill");
 });
 
 await run("browser-tabs module: registry", async () => {

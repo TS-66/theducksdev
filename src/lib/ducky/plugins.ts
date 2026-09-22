@@ -46,6 +46,7 @@ import {
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
 import { callMcpTool, listMcpServers, listMcpTools } from './mcp';
+import { pcExec, pcList, pcRead, pcStatus, pcWrite } from './pc';
 import { closeTab, getActiveTab, listTabs, openTab } from './browser-tabs';
 import { captureScreenToWorkspace } from './screen';
 
@@ -290,7 +291,7 @@ export const PLUGINS: PluginManifest[] = [
     name: 'ducky-tool-skills',
     version: '1.0.0',
     description:
-      'Skill playbooks (16): code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis. List them, then pull one into context before starting that kind of work.',
+      'Skill playbooks (17): code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis, local-pc. List them, then pull one into context before starting that kind of work.',
     tools: ['skill_list', 'skill_show'],
     category: 'meta',
     defaultEnabled: true,
@@ -323,6 +324,16 @@ export const PLUGINS: PluginManifest[] = [
       'MCP CONNECTIONS: call tools on user-configured Model Context Protocol servers (Blender bridges, Roblox Studio bridges, browsers, filesystems…). Servers are registered by the human in Settings → Connections → MCP; the agent lists their tools and calls them. Disabled until at least one server exists.',
     tools: ['mcp_servers', 'mcp_list', 'mcp_call'],
     category: 'delegation',
+    defaultEnabled: false,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-pc`,
+    name: 'ducky-tool-pc',
+    version: '1.0.0',
+    description:
+      'THIS PC (real machine): runs only while the human runs `ducky bridge` on their computer — real shell commands and real files rooted at the bridge folder, guarded by a one-time token. This is actual computer use, not the virtual workspace: confirm destructive commands with the human first. Disabled by default — enable it when the bridge is up.',
+    tools: ['pc_status', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls'],
+    category: 'shell',
     defaultEnabled: false,
   },
 ];
@@ -984,7 +995,7 @@ export function buildToolDefinitions(): ToolDefinition[] {
       name: 'skill_list',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-skills`).id,
       description:
-        'List built-in skill playbooks (16: code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis) with one-line descriptions. Call BEFORE starting that kind of work, then skill_show.',
+        'List built-in skill playbooks (17: code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis, local-pc) with one-line descriptions. Call BEFORE starting that kind of work, then skill_show.',
       parameters: obj({}, []),
     },
     {
@@ -1123,6 +1134,61 @@ export function buildToolDefinitions(): ToolDefinition[] {
           delimiter: str('Single-character delimiter. Defaults to ",".'),
         },
         ['path'],
+      ),
+    },
+    {
+      name: 'pc_status',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Check the This-PC bridge: reachable, which folder is rooted, platform. Call first — when it fails, tell the human to run `ducky bridge` and paste the token in Settings → Connections → This PC.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'pc_exec',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Run a REAL shell command on the human PC via the bridge (rooted at its folder). Prefer read-only commands (ls/dir, cat, pwd); destructive ones (rm, del, format, sudo) need explicit human confirmation first. Output capped.',
+      parameters: obj(
+        {
+          command: str('The exact command line to run.'),
+          cwd: str('Working directory relative to the bridge root. Defaults to the root.'),
+          timeout_ms: num('Timeout 1s–120s. Defaults to 30000.'),
+        },
+        ['command'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_read',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Read a REAL text file from the PC through the bridge (paths relative to its root, large files truncated honestly).',
+      parameters: obj({ path: str('File path relative to the bridge root.') }, ['path']),
+    },
+    {
+      name: 'pc_write',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Write a REAL file on the PC through the bridge (parents created). This touches their actual machine: read first, confirm overwrites with the human.',
+      parameters: obj(
+        {
+          path: str('File path relative to the bridge root.'),
+          content: str('Full UTF-8 text content (≤2 MB).'),
+        },
+        ['path', 'content'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_ls',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description: 'List a REAL directory on the PC through the bridge (optionally recursive, capped).',
+      parameters: obj(
+        {
+          path: str('Directory relative to the bridge root. Defaults to the root.'),
+          recursive: bool('Walk the subtree (depth ≤6). Defaults to false.'),
+        },
+        [],
       ),
     },
     {
@@ -2028,6 +2094,90 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
     if (!skill) throw new Error(`skill_show: unknown skill "${name}" (see skill_list)`);
     return `${skill.body}\n\n[ducky: follow this playbook step by step for the current task.]`;
   },
+
+  /* ------------------------------ this-pc --------------------------------- */
+
+  pc_status: () => async () => {
+    try {
+      const s = await pcStatus();
+      return `PC bridge LIVE: root "${s.root}" · ${s.platform} · bridge v${s.version}. Real shell + files available via pc_exec/pc_read/pc_write/pc_ls.`;
+    } catch (e) {
+      throw new Error(`${(e as Error).message}`);
+    }
+  },
+
+  pc_exec:
+    () =>
+    async (args) => {
+      const command = asString(args.command).trim();
+      if (!command) throw new Error('pc_exec: "command" is required');
+      const low = command.toLowerCase();
+      const DANGEROUS = [
+        /\brm\s+-rf\s+(\/|~|\*)/,
+        /:\(\)\s*{\s*:\|:\s*&\s*}\s*;?\s*:/,
+        /\bsudo\s+(rm|mkfs|dd)\b/,
+        /\bformat\s+[a-z]:/i,
+        /\bdel\s+\/[fs]/i,
+        /\bmkfs\b/,
+        /\bdd\s+.*of=\/dev\//,
+      ];
+      if (DANGEROUS.some((re) => re.test(low))) {
+        throw new Error(
+          'pc_exec: refused — that command looks destructive at machine level. Ask the human to confirm explicitly, then they can run it themselves or restate it narrowly.',
+        );
+      }
+      try {
+        const r = await pcExec(command, asString(args.cwd) || '.', asNumber(args.timeout_ms));
+        const head = `[exit code: ${r.exitCode}]`;
+        const body = [r.stdout, r.stderr ? `\n[stderr]\n${r.stderr}` : ''].join('').slice(0, 12000);
+        return `${head}\n${body || '(no output)'}`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_read:
+    () =>
+    async (args) => {
+      const p = asString(args.path).trim();
+      if (!p) throw new Error('pc_read: "path" is required');
+      try {
+        const f = await pcRead(p);
+        const header = f.truncated ? `[pc_read: showing the first 512 KB of ${f.bytes} bytes]\n` : `[pc_read: ${f.bytes} bytes]\n`;
+        return header + formatReadWindow(f.content, 1, 2000);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_write:
+    () =>
+    async (args) => {
+      const p = asString(args.path).trim();
+      if (!p) throw new Error('pc_write: "path" is required');
+      const content = asString(args.content);
+      try {
+        const bytes = await pcWrite(p, content);
+        return `Wrote ${bytes} bytes to ${p} on the PC.`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_ls:
+    () =>
+    async (args) => {
+      try {
+        const entries = await pcList(asString(args.path) || '.', args.recursive === true);
+        if (!entries.length) return 'Directory is empty.';
+        const cap = 200;
+        const lines = entries.slice(0, cap).map((e) => `${e.dir ? '📁' : '📄'} ${e.path}${e.dir ? '' : ` (${e.size} B)`}`);
+        if (entries.length > cap) lines.push(`… +${entries.length - cap} more`);
+        return lines.join('\n');
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
 
   /* ---------------------------------- mcp ---------------------------------- */
 

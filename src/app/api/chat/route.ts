@@ -231,7 +231,15 @@ export async function POST(req: Request): Promise<Response> {
       message = `${message} — the API key was rejected. Check it in Settings → Connections (or AI_API_KEY on the server).`.trim();
     }
     if (status === 404) {
-      message = `${message} — the model id "${model}" was not found. Use Discover in Settings → Connections to list what your endpoint serves.`.trim();
+      // Providers (e.g. NVIDIA) list retired ids in /models that are no
+      // longer servable: "Function '<uuid>': Not found for account '...'".
+      if (/not found for account|function '[^']+': not found/i.test(message)) {
+        message =
+          `The model "${model}" is listed but NOT servable (retired or removed for your account). ` +
+          `Pick a live one: Settings → Connections → Discover, then Test.`.trim();
+      } else {
+        message = `${message} — the model id "${model}" was not found. Use Discover in Settings → Connections to list what your endpoint serves.`.trim();
+      }
     }
     if (status === 429) {
       message = `${message} — rate limited. Wait a moment and retry; lower max iterations or tokens if it persists.`.trim();

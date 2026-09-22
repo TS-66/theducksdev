@@ -2,13 +2,23 @@
 
 import * as React from "react";
 import {
+  ArrowLeft,
+  BarChart3,
+  Boxes,
+  Brain,
   Check,
   Eye,
   EyeOff,
+  GraduationCap,
   Hand,
+  Info,
+  Keyboard,
   KeyRound,
+  Monitor,
   Plug,
   RefreshCw,
+  Settings as SettingsIcon,
+  Terminal,
   Trash2,
   TriangleAlert,
   Zap,
@@ -31,15 +41,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
@@ -51,9 +59,79 @@ import {
   removeMcpServer,
   type McpServer,
 } from "@/lib/ducky/mcp";
+import {
+  clearPcConfig,
+  getPcConfig,
+  pcStatus,
+  setPcConfig,
+} from "@/lib/ducky/pc";
+import { PLUGINS } from "@/lib/ducky/plugins";
+import { SKILLS } from "@/lib/ducky/skills";
+import { SLASH_COMMANDS } from "./composer";
+import {
+  forgetMemory,
+  listMemories,
+  type MemoryEntry,
+} from "@/lib/ducky/memory";
 import type { PermissionPolicy, Settings } from "@/lib/ducky/types";
 
-export type SettingsTab = "behavior" | "connections" | "about";
+export type SettingsTab =
+  | "general"
+  | "models"
+  | "computer"
+  | "plugins"
+  | "mcp"
+  | "skills"
+  | "commands"
+  | "memory"
+  | "shortcuts"
+  | "usage"
+  | "about";
+interface NavItem {
+  id: SettingsTab;
+  label: string;
+  icon: React.ReactNode;
+  group?: string;
+}
+
+const NAV: NavItem[] = [
+  { id: "general", label: "General", icon: <SettingsIcon className="size-4" aria-hidden /> },
+  { id: "models", label: "Models", icon: <KeyRound className="size-4" aria-hidden /> },
+  { id: "computer", label: "Computer Use", icon: <Monitor className="size-4" aria-hidden /> },
+  { id: "plugins", label: "Plugins", icon: <Boxes className="size-4" aria-hidden />, group: "Agent capabilities" },
+  { id: "mcp", label: "MCP Servers", icon: <Plug className="size-4" aria-hidden />, group: "Agent capabilities" },
+  { id: "skills", label: "Skills", icon: <GraduationCap className="size-4" aria-hidden />, group: "Agent capabilities" },
+  { id: "commands", label: "Commands", icon: <Terminal className="size-4" aria-hidden />, group: "Agent capabilities" },
+  { id: "memory", label: "Memory", icon: <Brain className="size-4" aria-hidden />, group: "Agent capabilities" },
+  { id: "shortcuts", label: "Keyboard Shortcuts", icon: <Keyboard className="size-4" aria-hidden /> },
+  { id: "usage", label: "Usage stats", icon: <BarChart3 className="size-4" aria-hidden />, group: "Data and statistics" },
+  { id: "about", label: "About", icon: <Info className="size-4" aria-hidden /> },
+];
+
+const SECTION_META: Record<SettingsTab, { title: string; desc: string }> = {
+  general: { title: "General", desc: "Agent behavior, budgets and house instructions." },
+  models: { title: "Models", desc: "Your model connections — base URL, key and model id, with discovery and live tests." },
+  computer: { title: "Computer Use", desc: "Pair this PC for a real shell and real files, plus screen capture." },
+  plugins: { title: "Plugins", desc: "Everything is a plugin — toggling unloads its tools from the model." },
+  mcp: { title: "MCP Servers", desc: "Outside apps over Model Context Protocol (Blender, Roblox Studio, browsers…)." },
+  skills: { title: "Skills", desc: "Playbooks the agent pulls into context with skill_show." },
+  commands: { title: "Commands", desc: "Slash commands — type / in the composer or press ⌘P." },
+  memory: { title: "Memory", desc: "Durable facts the agent saved across sessions." },
+  shortcuts: { title: "Keyboard Shortcuts", desc: "Every shortcut in one place." },
+  usage: { title: "Usage stats", desc: "Tokens, tools and files across all sessions." },
+  about: { title: "About", desc: "What this app is — and the danger zone." },
+};
+
+const SHORTCUTS: Array<[string, string]> = [
+  ["⌘/Ctrl K", "New task"],
+  ["⌘/Ctrl P", "Command palette"],
+  ["⌘/Ctrl E", "Activity timeline"],
+  ["⌘/Ctrl B", "Toggle sidebar"],
+  ["⌘/Ctrl / or ?", "Shortcut cheat sheet"],
+  ["Enter", "Send message"],
+  ["Shift + Enter", "Newline in composer"],
+  ["↑ / ↓ in terminal", "Command history"],
+];
 
 const FALLBACK_DEFAULTS: Settings = {
   apiKey: "",
@@ -73,8 +151,18 @@ interface SettingsSheetProps {
   initialTab?: SettingsTab;
 }
 
+/** Map legacy tab ids to the new nav (older buttons pass these). */
+function normalizeTab(t: SettingsTab | "behavior" | "connections" | undefined): SettingsTab {
+  if (t === "behavior") return "general";
+  if (t === "connections") return "models";
+  return t ?? "general";
+}
+
 export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetProps) {
-  const [tab, setTab] = React.useState<SettingsTab>(initialTab ?? "behavior");
+  const [tab, setTab] = React.useState<SettingsTab>(() => normalizeTab(initialTab));
+  const [memories, setMemories] = React.useState<MemoryEntry[]>([]);
+  const disabledPlugins = useDuckyStore((s) => s.disabledPlugins);
+  const sessions = useDuckyStore((s) => s.sessions);
   const [draft, setDraft] = React.useState<Settings>(
     useDuckyStore.getState().settings,
   );
@@ -95,12 +183,16 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
   const [mcpServers, setMcpServers] = React.useState<McpServer[]>([]);
   const [mcpName, setMcpName] = React.useState("");
   const [mcpUrl, setMcpUrl] = React.useState("");
+  const [pcPort, setPcPort] = React.useState("3791");
+  const [pcToken, setPcToken] = React.useState("");
+  const [pcState, setPcState] = React.useState<{ live: boolean; text: string } | null>(null);
+  const [pcTesting, setPcTesting] = React.useState(false);
 
   const runTest = async () => {
     setTesting(true);
     setConnTest(null);
     try {
-      setConnTest(await testConnection(draft.baseUrl, draft.apiKey));
+      setConnTest(await testConnection(draft.baseUrl, draft.apiKey, draft.model));
     } finally {
       setTesting(false);
     }
@@ -141,7 +233,12 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
       setConnTest(null);
       setDiscovered([]);
       setMcpServers(listMcpServers());
-      if (initialTab) setTab(initialTab);
+      setMemories(listMemories());
+      const pc = getPcConfig();
+      setPcPort(String(pc?.port ?? 3791));
+      setPcToken(pc?.token ?? "");
+      setPcState(null);
+      if (initialTab) setTab(normalizeTab(initialTab));
     }, 0);
     return () => {
       live = false;
@@ -149,26 +246,93 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
     };
   }, [open, initialTab]);
 
+  const meta = SECTION_META[tab];
+  const statusDot = (on: boolean) => (
+    <span
+      aria-hidden
+      className={cn("ml-auto size-1.5 shrink-0 rounded-full", on ? "bg-emerald-400" : "bg-muted-foreground/30")}
+    />
+  );
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-[420px] max-w-[94vw] flex-col gap-0 sm:max-w-[420px]">
-        <SheetHeader className="border-b">
-          <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>
-            Everything lives in this browser&apos;s localStorage.
-          </SheetDescription>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        aria-label="Settings"
+        className="flex h-[86vh] max-h-[860px] w-[880px] max-w-[94vw] gap-0 overflow-hidden p-0"
+      >
+        <DialogTitle className="sr-only">Settings</DialogTitle>
+        <DialogDescription className="sr-only">
+          General, models, computer use, plugins, MCP, skills, commands, memory, shortcuts, usage and about.
+        </DialogDescription>
+        {/* left nav */}
+        <nav aria-label="Settings sections" className="custom-scrollbar hidden w-60 shrink-0 flex-col gap-px overflow-y-auto border-r bg-muted/20 p-3 sm:flex">
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="mb-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden /> Back to workspace
+          </button>
+          {NAV.map((item) => (
+            <React.Fragment key={item.id}>
+              {item.group && (
+                <p className="px-2 pb-1 pt-3 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60 first:pt-1">
+                  {item.group}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setTab(item.id)}
+                aria-current={tab === item.id ? "true" : undefined}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                  tab === item.id
+                    ? "bg-accent font-medium text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                )}
+              >
+                {item.icon}
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.id === "models" && statusDot(draft.baseUrl.trim() !== "" && draft.apiKey.trim() !== "")}
+                {item.id === "computer" && statusDot(getPcConfig() !== null)}
+                {item.id === "mcp" && statusDot(mcpServers.length > 0)}
+                {item.id === "memory" && statusDot(memories.length > 0)}
+              </button>
+            </React.Fragment>
+          ))}
+          <div className="mt-auto px-2 pt-3 font-mono text-[10px] text-muted-foreground/60">
+            v1.0 · local-first
+          </div>
+        </nav>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as SettingsTab)} className="flex min-h-0 flex-1 flex-col gap-0">
-          <TabsList className="mx-4 mt-3 grid grid-cols-3">
-            <TabsTrigger value="behavior">Behavior</TabsTrigger>
-            <TabsTrigger value="connections">Connections</TabsTrigger>
-            <TabsTrigger value="about">About</TabsTrigger>
-          </TabsList>
-
-          <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {/* right content */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="shrink-0 border-b px-6 pb-4 pt-5">
+            <h2 className="text-xl font-bold tracking-tight">{meta.title}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{meta.desc}</p>
+          </div>
+          <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {/* mobile section picker */}
+            <div className="mb-4 sm:hidden">
+              <div className="flex flex-wrap gap-1.5">
+                {NAV.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 font-mono text-[11px]",
+                      tab === item.id ? "border-[#FDC00A]/50 bg-[#FDC00A]/10" : "text-muted-foreground",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {tab === "general" && (
+              <div className="space-y-6">
             {/* ── Behavior ───────────────────────────────────────────── */}
-            <TabsContent value="behavior" className="mt-0 space-y-6">
               <SliderRow
                 label="Temperature"
                 hint="Randomness of sampling"
@@ -262,10 +426,10 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   className="min-h-24 font-mono text-xs"
                 />
               </section>
-            </TabsContent>
-
-            {/* ── Connections ────────────────────────────────────────── */}
-            <TabsContent value="connections" className="mt-0 space-y-5">
+              </div>
+            )}
+            {tab === "models" && (
+              <div className="space-y-5">
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center gap-2">
                   <KeyRound className="size-4 text-[#FDC00A]" aria-hidden />
@@ -404,7 +568,10 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   </p>
                 )}
               </section>
-
+              </div>
+            )}
+            {tab === "mcp" && (
+              <div className="space-y-5">
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center gap-2">
                   <Plug className="size-4 text-cyan-400" aria-hidden />
@@ -484,10 +651,219 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   </Button>
                 </div>
               </section>
-            </TabsContent>
-
-            {/* ── About ──────────────────────────────────────────────── */}
-            <TabsContent value="about" className="mt-0 space-y-5">
+              </div>
+            )}
+            {tab === "computer" && (
+              <div className="space-y-5">
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <Monitor className="size-4 text-emerald-400" aria-hidden />
+                  <h3 className="text-xs font-semibold">This PC (real machine)</h3>
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Run <code className="font-mono">ducky bridge</code> in a terminal on
+                  your computer — it prints a one-time token. Paste it here and
+                  the terminal gains a <strong>PC mode</strong> (real shell +
+                  files) plus <code className="font-mono">pc_*</code> agent tools.
+                  Ctrl+C in that terminal disconnects instantly.
+                </p>
+                <div className="flex gap-1.5">
+                  <div className="w-20 space-y-1.5">
+                    <Label htmlFor="ducky-pc-port" className="text-xs">
+                      Port
+                    </Label>
+                    <Input
+                      id="ducky-pc-port"
+                      value={pcPort}
+                      onChange={(e) => setPcPort(e.target.value)}
+                      placeholder="3791"
+                      inputMode="numeric"
+                      className="h-8 font-mono text-xs"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="ducky-pc-token" className="text-xs">
+                      Bridge token
+                    </Label>
+                    <Input
+                      id="ducky-pc-token"
+                      type="password"
+                      value={pcToken}
+                      onChange={(e) => setPcToken(e.target.value)}
+                      placeholder="paste the one-time token"
+                      spellCheck={false}
+                      autoComplete="off"
+                      className="h-8 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!pcToken.trim()}
+                    onClick={() => {
+                      const port = Math.max(1, Math.min(65535, parseInt(pcPort, 10) || 3791));
+                      setPcConfig(port, pcToken.trim());
+                      setPcPort(String(port));
+                      useDuckyStore.setState({});
+                      toast.success("PC paired", {
+                        description: `Port ${port} — test it below. Unpair any time.`,
+                      });
+                    }}
+                    className="h-8 flex-1"
+                  >
+                    Pair this PC
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      clearPcConfig();
+                      setPcToken("");
+                      setPcState(null);
+                      useDuckyStore.setState({});
+                      toast.info("PC unpaired");
+                    }}
+                    className="h-8"
+                  >
+                    Unpair
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pcTesting}
+                    onClick={() => {
+                      setPcTesting(true);
+                      setPcState(null);
+                      pcStatus().then(
+                        (s) => {
+                          setPcState({ live: true, text: `LIVE — root "${s.root}" · ${s.platform}` });
+                          useDuckyStore.setState({});
+                        },
+                        (e) => setPcState({ live: false, text: (e as Error).message }),
+                      ).finally(() => setPcTesting(false));
+                    }}
+                    className="h-8 flex-1 gap-1.5"
+                  >
+                    <Zap className="size-3.5" />
+                    {pcTesting ? "Probing…" : "Probe bridge"}
+                  </Button>
+                </div>
+                {pcState && (
+                  <p
+                    className={
+                      pcState.live
+                        ? "rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 font-mono text-[11px] text-emerald-300"
+                        : "rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1.5 font-mono text-[11px] text-red-300"
+                    }
+                  >
+                    {pcState.live ? "✓ " : "✕ "}{pcState.text}
+                  </p>
+                )}
+              </section>
+              <section className="rounded-md border p-3">
+                <h3 className="text-xs font-semibold">Screen capture</h3>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  The other half of computer use: the monitor button in the Explorer
+                  header (or <code className="font-mono">screen_capture</code> /{" "}
+                  <code className="font-mono">/screen</code>) grabs one user-shared
+                  frame into <code className="font-mono">images/</code> for{" "}
+                  <code className="font-mono">vision_describe</code>. The browser
+                  always asks what to share — nothing is captured silently.
+                </p>
+              </section>
+              </div>
+            )}
+            {tab === "plugins" && (
+              <div className="space-y-1.5">
+                {PLUGINS.map((p) => {
+                  const off = disabledPlugins.includes(p.id);
+                  return (
+                    <div key={p.id} className="flex items-start gap-2.5 rounded-md border p-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1.5 font-mono text-xs font-semibold">
+                          <span aria-hidden className={cn("size-1.5 rounded-full", off ? "bg-muted-foreground/40" : "bg-emerald-400")} />
+                          {p.name}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{p.description}</p>
+                        <p className="mt-1 font-mono text-[10px] text-muted-foreground/70">{p.tools.join(" · ")}</p>
+                      </div>
+                      <Switch
+                        checked={!off}
+                        onCheckedChange={() => useDuckyStore.getState().togglePlugin(p.id)}
+                        aria-label={`Toggle ${p.name}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {tab === "skills" && (
+              <div className="space-y-1.5">
+                {SKILLS.map((s) => (
+                  <div key={s.name} className="rounded-md border p-2.5">
+                    <p className="flex items-center gap-1.5 font-mono text-xs font-semibold">
+                      <GraduationCap className="size-3.5 text-[#FDC00A]" aria-hidden />
+                      {s.name}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{s.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tab === "commands" && (
+              <div className="space-y-1">
+                {SLASH_COMMANDS.map((c) => (
+                  <div key={c.cmd} className="flex items-baseline gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40">
+                    <span className="shrink-0 font-mono text-xs font-semibold">{c.cmd}</span>
+                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{c.desc}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tab === "memory" && (
+              <div className="space-y-1.5">
+                {memories.length === 0 && (
+                  <p className="rounded-md border p-3 text-xs text-muted-foreground">
+                    No memories yet — the agent saves them with <code className="font-mono">memory_save</code>, or use <code className="font-mono">/remember</code> in chat.
+                  </p>
+                )}
+                {memories.map((m) => (
+                  <div key={m.id} className="flex items-start gap-2 rounded-md border p-2.5">
+                    <p className="min-w-0 flex-1 break-words text-xs">{m.text}</p>
+                    <button
+                      type="button"
+                      aria-label="Forget this memory"
+                      onClick={() => {
+                        forgetMemory(m.id);
+                        setMemories(listMemories());
+                      }}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tab === "shortcuts" && (
+              <div className="space-y-1">
+                {SHORTCUTS.map(([keys, what]) => (
+                  <div key={keys} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40">
+                    <kbd className="shrink-0 rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                      {keys}
+                    </kbd>
+                    <span className="text-xs text-muted-foreground">{what}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tab === "usage" && (
+              <UsageSection sessions={sessions} />
+            )}
+            {tab === "about" && (
+              <div className="space-y-5">
               <section className="rounded-md border p-3">
                 <div className="flex items-center gap-2">
                   <img
@@ -548,18 +924,76 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   </AlertDialogContent>
                 </AlertDialog>
               </section>
-            </TabsContent>
+              </div>
+            )}
           </div>
-        </Tabs>
 
-        {/* footer */}
-        <div className="border-t p-3">
-          <Button onClick={save} className="w-full gap-2">
-            <Check className="size-4" /> Save settings
-          </Button>
+          {/* footer */}
+          <div className="flex shrink-0 items-center gap-2 border-t px-6 py-3">
+            <p className="hidden font-mono text-[10px] text-muted-foreground sm:block">
+              Model, key and URL above save with the rest
+            </p>
+            <Button onClick={save} className="ml-auto gap-2">
+              <Check className="size-4" /> Save settings
+            </Button>
+          </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Aggregate usage across sessions (reads the live store — always current). */
+function UsageSection({ sessions }: { sessions: import("@/lib/ducky/types").Session[] }) {
+  const totals = sessions.reduce(
+    (acc, s) => ({
+      tools: acc.tools + s.stats.toolCalls,
+      prompt: acc.prompt + s.stats.promptTokens,
+      completion: acc.completion + s.stats.completionTokens,
+      files: acc.files + Object.keys(s.workspace).length,
+      messages: acc.messages + s.messages.length,
+    }),
+    { tools: 0, prompt: 0, completion: 0, files: 0, messages: 0 },
+  );
+  const top = [...sessions]
+    .sort((a, b) => b.stats.promptTokens + b.stats.completionTokens - (a.stats.promptTokens + a.stats.completionTokens))
+    .slice(0, 5);
+  const cards: Array<[string, string]> = [
+    ["Tool calls", String(totals.tools)],
+    ["Prompt tokens", totals.prompt.toLocaleString()],
+    ["Completion tokens", totals.completion.toLocaleString()],
+    ["Messages", String(totals.messages)],
+    ["Workspace files", String(totals.files)],
+    ["Sessions", String(sessions.length)],
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {cards.map(([label, value]) => (
+          <div key={label} className="rounded-md border p-2.5">
+            <p className="truncate font-mono text-sm font-semibold">{value}</p>
+            <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+          </div>
+        ))}
+      </div>
+      {top.length > 0 && (
+        <div className="rounded-md border p-2.5">
+          <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+            Heaviest sessions
+          </p>
+          <ul className="space-y-1">
+            {top.map((s) => (
+              <li key={s.id} className="flex items-center gap-2 text-xs">
+                <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                  {(s.stats.promptTokens + s.stats.completionTokens).toLocaleString()} tok
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 

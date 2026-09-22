@@ -183,6 +183,18 @@ export const SKILLS: Skill[] = [
     ].join("\n"),
   },
   {
+    name: "local-pc",
+    description: "Work on the human's REAL machine via the ducky bridge: pair, verify, act carefully.",
+    body: [
+      "# Skill: local-pc",
+      "1. `pc_status` FIRST — if the bridge is down, tell the human to run `ducky bridge` and paste the token in Settings → Connections → This PC. Never invent paths.",
+      "2. Explore with `pc_ls` / `pc_read` before any write; the bridge root is the whole world — paths above it do not exist for you.",
+      "3. `pc_exec` for read-only commands freely; destructive commands need explicit human confirmation IN CHAT first (the tool itself refuses machine-level destruction).",
+      "4. Prefer the virtual workspace (`write_file`, `bash`) for drafts; use the PC only for things that must live on their machine.",
+      "5. Report exactly where each change landed: workspace path vs PC path.",
+    ].join("\n"),
+  },
+  {
     name: "data-analysis",
     description: "Analyze CSV-ish data in the workspace: preview, clean, summarize.",
     body: [
