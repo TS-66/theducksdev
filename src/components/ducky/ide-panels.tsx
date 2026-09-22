@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { PLUGINS } from "@/lib/ducky/plugins";
-import { MODEL_DISPLAY } from "@/lib/ducky/models";
+import { modelDisplayName } from "@/lib/ducky/models";
 import { fmtK, shortId } from "./format";
 
 /* ─────────────────────────── activity rail ─────────────────────────── */
@@ -256,7 +256,7 @@ export function IdeInspector({
           </div>
           <div className="flex items-center gap-1.5 pt-1 font-mono text-[10px] text-muted-foreground">
             <Cpu className="size-3 text-[#FDC00A]" />
-            <span className="truncate">{MODEL_DISPLAY}</span>
+            <span className="truncate">{modelDisplayName(settings.model)}</span>
             <span className="ml-auto rounded border px-1 uppercase">{settings.policy}</span>
           </div>
         </div>

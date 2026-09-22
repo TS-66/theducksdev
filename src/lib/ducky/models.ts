@@ -1,28 +1,22 @@
 /**
- * Ducky AI | Coder — model registry.
+ * Ducky AI | Coder — model identity.
  *
- * A single user-facing model: **Ducky 3.5 Coder**. Which endpoint serves it
- * is a deployment concern, configured entirely through server environment
- * variables (AI_BASE_URL / AI_API_KEY / AI_MODEL_ID) — nothing here (or
- * anywhere in the client bundle) references the upstream provider.
+ * Bring-your-own-model: there is no bundled model and no hard-coded id.
+ * The user points the app at ANY OpenAI-compatible endpoint (base URL + key
+ * + model id, all editable in Settings → Connections or via server env).
+ * The display name is simply the configured model id.
  */
 
-export const MODEL_ID = "ducky-3.5-coder" as const;
+/** Empty = not configured yet — the UI guides the user to Connections. */
+export const DEFAULT_MODEL = "";
 
-export const MODEL_DISPLAY = "Ducky 3.5 Coder";
-
-export const KNOWN_MODELS = [MODEL_ID] as const;
-
-/** Short marketing blurb shown under the model picker / settings card. */
-export const MODEL_BLURB =
-  "The one model. Tuned end-to-end for agentic coding — tools, diffs and long-horizon tasks.";
-
-/** Default base URL used when the user hasn't overridden it in Settings.
- *  Empty string = defer to the server-configured endpoint (AI_BASE_URL). */
-export const DEFAULT_BASE_URL = "";
-
-/** Map a (possibly legacy) model id to its user-facing display name. */
+/** User-facing name for a model id (or the unconfigured placeholder). */
 export function modelDisplayName(model: string | undefined): string {
-  if (!model) return MODEL_DISPLAY;
-  return MODEL_DISPLAY;
+  const m = (model ?? "").trim();
+  return m || "Custom model";
+}
+
+/** True when a usable model id is configured (client settings or server). */
+export function hasModelId(model: string | undefined): boolean {
+  return (model ?? "").trim().length > 0;
 }

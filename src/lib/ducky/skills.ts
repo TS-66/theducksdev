@@ -104,6 +104,95 @@ export const SKILLS: Skill[] = [
       "4. Say when sources disagree instead of picking one silently. Note the search date.",
     ].join("\n"),
   },
+  {
+    name: "mcp-integration",
+    description: "Connect the agent to outside apps (Blender, Roblox Studio…) via MCP bridges.",
+    body: [
+      "# Skill: mcp-integration",
+      "1. `mcp_servers` first — never assume a bridge is connected; if empty, tell the human the exact URL to add in Settings → Connections → MCP.",
+      "2. `mcp_list` to learn the bridge's real tool names — never invent tool names.",
+      "3. `mcp_call` with small arguments first (list/get/status before create/delete).",
+      "4. Bridges own their state: re-read after every mutation; report bridge errors verbatim.",
+      "5. Examples: a Blender bridge exposes scene/object tools; a Roblox Studio bridge exposes instance/script tools — adapt to what `mcp_list` shows.",
+    ].join("\n"),
+  },
+  {
+    name: "api-design",
+    description: "Design clean APIs: resources, verbs, errors, versioning.",
+    body: [
+      "# Skill: api-design",
+      "1. Name resources as nouns, keep URLs hierarchical; one verb per route.",
+      "2. Use status codes honestly (200/201/400/401/404/409/422/429/5xx) with a stable error shape.",
+      "3. Version from day one (/v1); never break a shipped field — deprecate with sunset dates.",
+      "4. Paginate every list (cursor > offset); document auth, rate limits and idempotency.",
+    ].join("\n"),
+  },
+  {
+    name: "sql",
+    description: "Write safe SQL: read-only first, explicit columns, measured joins.",
+    body: [
+      "# Skill: sql",
+      "1. SELECT with explicit columns — never SELECT * in shipped code.",
+      "2. Reason about joins before writing: which table drives, what fan-out does each join add?",
+      "3. Parameterize everything; no string-built queries, ever.",
+      "4. Check the plan on big tables (EXPLAIN); add the index that the slow join needs.",
+    ].join("\n"),
+  },
+  {
+    name: "regex",
+    description: "Craft correct regular expressions: build up, test edges, mind catastrophic backtracking.",
+    body: [
+      "# Skill: regex",
+      "1. Build the pattern in pieces; test each against 3 matching + 3 non-matching strings (use `calc`? no — reason it through or test via `bash` grep).",
+      "2. Prefer explicit classes over `.` and lazy over greedy when spans are involved.",
+      "3. Avoid nested quantifiers (`(a+)+`) — rewrite or bound repetitions.",
+      "4. For file edits use `regex_edit` with $1 groups; verify with `diff_files` after.",
+    ].join("\n"),
+  },
+  {
+    name: "git",
+    description: "Git hygiene: small commits, honest messages, clean history.",
+    body: [
+      "# Skill: git",
+      "1. One logical change per commit; stage hunks, not files, when scopes mix.",
+      "2. Message: `<type>: <imperative ≤72ch>` + WHY body. Types: feat/fix/refactor/docs/test/chore.",
+      "3. Never commit secrets, keys, env files or build output — verify the file list first.",
+      "4. Pull with rebase on personal branches; never force-push shared history.",
+    ].join("\n"),
+  },
+  {
+    name: "perf",
+    description: "Performance work that holds up: measure first, fix the bottleneck, prove it.",
+    body: [
+      "# Skill: perf",
+      "1. Measure before touching anything; record the baseline number in a note.",
+      "2. Fix the actual bottleneck (profile, don't guess) — one change at a time.",
+      "3. Re-measure identically; report before/after with the method, not just vibes.",
+      "4. Watch for regressions nearby (`grep` for sibling call sites of the changed code).",
+    ].join("\n"),
+  },
+  {
+    name: "security-review",
+    description: "Security pass: injection, auth, secrets, dependencies.",
+    body: [
+      "# Skill: security-review",
+      "1. Trace every external input (args, files, network, clipboard) to its sink.",
+      "2. Check: injection (commands/SQL/HTML), auth gaps, secrets in code or logs, unsafe eval/deserialization.",
+      "3. Rate findings: exploitable-now / latent / hardening. Lead with the first bucket.",
+      "4. Every finding gets file + line + a concrete fix — never vague warnings.",
+    ].join("\n"),
+  },
+  {
+    name: "data-analysis",
+    description: "Analyze CSV-ish data in the workspace: preview, clean, summarize.",
+    body: [
+      "# Skill: data-analysis",
+      "1. `preview_csv` first — confirm headers, delimiters and ragged rows before any math.",
+      "2. Clean with `dedupe_lines`/`sort_lines`; count with `count_words`; compute with `calc` (exact, never estimated).",
+      "3. State the grain (what one row means) and the filters applied, up front.",
+      "4. Report: top findings as numbers with units, method in one line, caveats honestly.",
+    ].join("\n"),
+  },
 ];
 
 export function getSkill(name: string): Skill | undefined {

@@ -20,10 +20,11 @@ import {
 } from '@/lib/ducky/agent-loop';
 import { PLUGINS, resolveEnabledPluginIds } from '@/lib/ducky/plugins';
 import { renderMemoriesForPrompt } from '@/lib/ducky/memory';
+import { renderMcpForPrompt } from '@/lib/ducky/mcp';
 import { SKILLS } from '@/lib/ducky/skills';
 import { renderTree } from '@/lib/ducky/tools-vfs';
 import { useDiskStore, type DiskStatus } from '@/lib/ducky/disk';
-import { isServerLive } from '@/lib/ducky/server-caps';
+import { isModelIdSet, isServerLive } from '@/lib/ducky/server-caps';
 import type { AskUserQuestion } from '@/lib/ducky/plugins';
 import type {
   ApprovalRequest,
@@ -106,6 +107,7 @@ function buildSystemPrompt(opts: {
   planDraft?: string;
   systemPromptExtra: string;
   memoryBlock: string;
+  mcpBlock: string;
   disk: { status: DiskStatus; rootName: string };
 }): string {
   const now = new Date();
@@ -141,6 +143,9 @@ function buildSystemPrompt(opts: {
     '',
     '# Skill playbooks (call skill_show to load one before that kind of work)',
     SKILLS.map((s) => `- ${s.name}: ${s.description}`).join('\n'),
+    '',
+    '# MCP connections (outside apps — call mcp_list before mcp_call)',
+    opts.mcpBlock.trim() ? opts.mcpBlock : '(none connected — the human adds them in Settings → Connections → MCP)',
   ];
 
   if (opts.disk.status === 'connected') {
@@ -257,6 +262,7 @@ export function useDuckyAgent() {
       planDraft: session.planDraft,
       systemPromptExtra: settings.systemPromptExtra,
       memoryBlock: renderMemoriesForPrompt(10),
+      mcpBlock: renderMcpForPrompt(),
       disk: {
         status: useDiskStore.getState().status,
         rootName: useDiskStore.getState().rootName,
@@ -458,21 +464,26 @@ export function useDuckyAgent() {
       }
     };
 
-    // Live path only: the deployment must provide server-side credentials.
-    if (settings.apiKey.trim() === '' && !isServerLive()) {
+    // BYOK guard: the user needs their own connection (or a live server
+    // fallback) AND a model id before anything is sent.
+    const missing: string[] = [];
+    if (settings.apiKey.trim() === '' && !isServerLive()) missing.push('API key');
+    if (settings.baseUrl.trim() === '' && !isServerLive()) missing.push('base URL');
+    if (settings.model.trim() === '' && !isModelIdSet()) missing.push('model');
+    if (missing.length > 0) {
       useDuckyStore.getState().addMessage(sid, {
         id: uid(),
         role: 'assistant',
         content:
-          '**Model endpoint not configured on this deployment.**\n\n' +
-          'The live agent needs a server-side OpenAI-compatible endpoint:\n\n' +
-          '- Set `AI_BASE_URL`, `AI_API_KEY` **and `AI_MODEL_ID`** as environment variables of your deployment — then **redeploy** (env changes never apply to existing deployments).\n' +
-          '- `AI_BASE_URL` must include the version segment (e.g. `https://api.openai.com/v1`) — the proxy appends `/chat/completions`.\n' +
-          '- `AI_MODEL_ID` must be a model your endpoint actually serves (e.g. `gpt-4o-mini`).\n\n' +
-          'No key ever reaches the browser — `/api/chat` proxies your endpoint server-side.',
+          `**Connection incomplete — missing ${missing.join(', ')}.**\n\n` +
+          'Open Settings → Connections and add your OpenAI-compatible endpoint:\n\n' +
+          '- **Base URL** (e.g. `https://api.example.com/v1`)\n' +
+          '- **API key** (yours — stored only in this browser)\n' +
+          '- **Model** (use Discover to list what your endpoint serves, then Test)\n\n' +
+          'Or set `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL_ID` as server env vars once for everyone.',
         reasoning: '',
         status: 'error',
-        error: 'Model endpoint not configured (missing AI_BASE_URL / AI_API_KEY server env).',
+        error: `Connection incomplete (missing ${missing.join(', ')}).`,
         meta: { model: settings.model },
         createdAt: Date.now(),
       });

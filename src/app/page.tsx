@@ -40,7 +40,10 @@ import { useDuckyAgent } from "@/hooks/use-ducky-agent";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { setServerLive, setModelIdSet, setProvider } from "@/lib/ducky/server-caps";
 import { connectDisk, reconnectDisk, restoreDiskOnBoot, useDiskStore } from "@/lib/ducky/disk";
-import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
+import { modelDisplayName } from "@/lib/ducky/models";
+import { discoverModels } from "@/lib/ducky/connection";
+import { forgetMemory, saveMemory } from "@/lib/ducky/memory";
+import { openTab } from "@/lib/ducky/browser-tabs";
 import type { PermissionPolicy } from "@/lib/ducky/types";
 
 const KNOWN_POLICIES = ["readonly", "ask", "auto"] as const;
@@ -70,6 +73,26 @@ export default function DuckyCoderPage() {
   const [centerTab, setCenterTab] = React.useState<CenterTab>("chat");
 
   const agent = useDuckyAgent();
+  // Stable fn reference: the agent object identity changes per render, but
+  // send/stop/responders are stable useCallbacks — destructure once so every
+  // callback below keeps its memoization.
+  const { send: agentSend } = agent;
+
+  /* ── stable UI helpers (declared before the command pipeline) ── */
+  const openSettings = React.useCallback((tab?: SettingsTab) => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }, []);
+
+  /* ── IDE file preview plumbing ── */
+  const handlePreviewFile = React.useCallback((p: string) => {
+    setPreviewPath(p);
+    setCenterTab("file");
+  }, []);
+  const handleCloseFile = React.useCallback(() => {
+    setPreviewPath(null);
+    setCenterTab("chat");
+  }, []);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? null;
@@ -173,6 +196,8 @@ export default function DuckyCoderPage() {
     const parts = raw.trim().split(/\s+/);
     const name = parts[0];
     const arg = parts[1];
+    const rest = parts.slice(1).join(" ");
+    const session = sid ? (st.sessions.find((s) => s.id === sid) ?? null) : null;
 
     switch (name) {
       case "/new": {
@@ -195,13 +220,58 @@ export default function DuckyCoderPage() {
         break;
       }
       case "/model": {
-        if (arg !== MODEL_ID) {
-          return toast.error("Unknown model", {
-            description: `Ducky AI currently ships a single model: ${MODEL_DISPLAY} (/model ${MODEL_ID}).`,
+        if (!rest) {
+          return toast.info(`Current model: ${modelDisplayName(st.settings.model)}`, {
+            description: "Usage: /model <id> — any id your endpoint serves.",
           });
         }
-        st.updateSettings({ model: arg });
-        toast.success(`Model switched to ${MODEL_DISPLAY}`);
+        st.updateSettings({ model: rest });
+        toast.success(`Model switched to ${modelDisplayName(rest)}`);
+        break;
+      }
+      case "/models": {
+        const { baseUrl, apiKey } = st.settings;
+        if (!baseUrl.trim() || !apiKey.trim()) {
+          return toast.info("Set base URL + API key first", {
+            description: "Settings → Connections, then /models to discover.",
+          });
+        }
+        toast.info("Discovering models…");
+        discoverModels(baseUrl, apiKey).then(
+          (models) => {
+            if (!models.length) return toast.info("Reachable, but no models listed.");
+            toast.success(`${models.length} model(s) found`, {
+              description: `${models.slice(0, 5).map((m) => m.id).join(", ")}${
+                models.length > 5 ? ` +${models.length - 5} more` : ""
+              } — /model <id> to switch.`,
+              duration: 8000,
+            });
+          },
+          (e) => toast.error("Discovery failed", { description: (e as Error).message }),
+        );
+        break;
+      }
+      case "/endpoint": {
+        if (!arg) return toast.info("Usage: /endpoint <base-url>");
+        st.updateSettings({ baseUrl: arg.replace(/\/+$/, "") });
+        toast.success("Endpoint updated", { description: "Test it in Settings → Connections." });
+        break;
+      }
+      case "/key": {
+        if (!arg) {
+          const has = st.settings.apiKey.trim() !== "";
+          return toast.info(has ? "API key is set (hidden)." : "No API key set.", {
+            description: "Usage: /key <key> — stored in this browser only, never echoed.",
+          });
+        }
+        st.updateSettings({ apiKey: arg.trim() });
+        toast.success("API key saved", { description: "This browser only — value never shown." });
+        break;
+      }
+      case "/conn":
+      case "/connect":
+      case "/mcp": {
+        openSettings("connections");
         break;
       }
       case "/policy": {
@@ -213,6 +283,159 @@ export default function DuckyCoderPage() {
         }
         st.updateSettings({ policy: p });
         toast.success(`Permission policy → ${p}`);
+        break;
+      }
+      case "/temp": {
+        const t = Number(arg);
+        if (!Number.isFinite(t) || t < 0 || t > 2) return toast.info("Usage: /temp <0–2>");
+        st.updateSettings({ temperature: Math.round(t * 10) / 10 });
+        toast.success(`Temperature → ${Math.round(t * 10) / 10}`);
+        break;
+      }
+      case "/tokens": {
+        const t = Number(arg);
+        if (!Number.isFinite(t) || t < 512 || t > 32768) return toast.info("Usage: /tokens <512–32768>");
+        st.updateSettings({ maxTokens: Math.round(t) });
+        toast.success(`Max tokens → ${Math.round(t)}`);
+        break;
+      }
+      case "/iters": {
+        const t = Number(arg);
+        if (!Number.isFinite(t) || t < 1 || t > 30) return toast.info("Usage: /iters <1–30>");
+        st.updateSettings({ maxToolIterations: Math.round(t) });
+        toast.success(`Max tool iterations → ${Math.round(t)}`);
+        break;
+      }
+      case "/goal": {
+        if (!sid || !session) return toast.info("Select a session first");
+        if (!rest) {
+          const g = session.todos.length
+            ? `${session.todos.filter((t) => t.status !== "completed").length} open todo(s)`
+            : "no goal set";
+          return toast.info(`Goal: ${session.title} — ${g}`, {
+            description: "Usage: /goal <text> to set it.",
+          });
+        }
+        st.renameSession(sid, rest.slice(0, 80));
+        toast.success("Goal set", { description: `${rest.slice(0, 120)} — /remember it to keep it across sessions.` });
+        break;
+      }
+      case "/remember": {
+        if (!rest) return toast.info("Usage: /remember <fact>");
+        try {
+          const e = saveMemory(rest.slice(0, 500));
+          toast.success("Remembered", { description: `id ${e.id.slice(0, 8)} — /forget to drop it.` });
+        } catch (e) {
+          toast.error("Memory full", { description: (e as Error).message });
+        }
+        break;
+      }
+      case "/forget": {
+        if (!arg) return toast.info("Usage: /forget <id-prefix> (see memory_list)");
+        if (forgetMemory(arg)) toast.success("Forgotten");
+        else toast.error("No memory starts with that id");
+        break;
+      }
+      case "/stats": {
+        if (!sid || !session) return toast.info("Select a session first");
+        toast.info(`Session: ${session.title}`, {
+          description: `${session.stats.promptTokens + session.stats.completionTokens} tokens · ${session.stats.toolCalls} tools · ${session.messages.length} messages · ${Object.keys(session.workspace).length} files.`,
+        });
+        break;
+      }
+      case "/files": {
+        if (!sid || !session) return toast.info("Select a session first");
+        const files = Object.keys(session.workspace).sort();
+        if (!files.length) return toast.info("Workspace is empty");
+        toast.info(`${files.length} file(s)`, {
+          description: files.slice(0, 12).join(", ") + (files.length > 12 ? ` +${files.length - 12} more` : ""),
+        });
+        break;
+      }
+      case "/retry": {
+        if (!sid || !session) return toast.info("Select a session first");
+        const lastUser = [...session.messages].reverse().find((m) => m.role === "user");
+        if (!lastUser) return toast.info("Nothing to retry yet");
+        void agentSend(lastUser.content);
+        break;
+      }
+      case "/undo": {
+        if (!sid || !session) return toast.info("Select a session first");
+        const idx = session.messages.map((m) => m.role).lastIndexOf("user");
+        if (idx === -1) return toast.info("Nothing to undo");
+        st.truncateSessionFrom(sid, session.messages.slice(0, idx));
+        toast.success("Undone", { description: "Last exchange removed." });
+        break;
+      }
+      case "/compact": {
+        if (!sid || !session) return toast.info("Select a session first");
+        const keep = Math.max(2, Math.min(100, Number(arg) || 20));
+        const userIdx = session.messages.map((m, i) => (m.role === "user" ? i : -1)).filter((i) => i >= 0);
+        if (userIdx.length <= keep) return toast.info("Nothing to compact");
+        const cut = userIdx[userIdx.length - keep];
+        st.truncateSessionFrom(sid, session.messages.slice(cut));
+        toast.success("Compacted", { description: `Kept the last ${keep} exchange(s).` });
+        break;
+      }
+      case "/rename": {
+        if (!sid) return toast.info("Select a session first");
+        if (!rest) return toast.info("Usage: /rename <title>");
+        st.renameSession(sid, rest.slice(0, 80));
+        toast.success("Renamed");
+        break;
+      }
+      case "/star": {
+        if (!sid || !session) return toast.info("Select a session first");
+        if (!session.starred) st.toggleStar(sid);
+        toast.success("Starred");
+        break;
+      }
+      case "/duplicate": {
+        if (!sid) return toast.info("Select a session first");
+        const id = st.duplicateSession(sid);
+        if (id) toast.success("Session duplicated");
+        break;
+      }
+      case "/reset": {
+        if (!sid || !session) return toast.info("Select a session first");
+        st.resetWorkspace(sid);
+        toast.success("Workspace reset", { description: "Restored to starting files." });
+        break;
+      }
+      case "/browser": {
+        if (!rest || !/^https?:\/\//i.test(rest)) return toast.info("Usage: /browser <https-url>");
+        try {
+          openTab(rest);
+          setCenterTab("browser");
+        } catch (e) {
+          toast.error("Cannot open tab", { description: (e as Error).message });
+        }
+        break;
+      }
+      case "/term": {
+        setTerminalOpen((v) => !v);
+        break;
+      }
+      case "/screen": {
+        if (!sid) return toast.info("Select a session first");
+        void import("@/lib/ducky/screen").then(({ captureScreenToWorkspace }) => {
+          toast.info("Pick a screen to share…");
+          captureScreenToWorkspace(sid, (path, content) =>
+            useDuckyStore.getState().writeFile(sid, path, content),
+          ).then(
+            (msg) => {
+              toast.success("Screen captured", { description: msg });
+              const m = msg.match(/→ (\S+)/);
+              if (m) handlePreviewFile(m[1]);
+            },
+            (e) => toast.error("Capture cancelled", { description: (e as Error).message }),
+          );
+        });
+        break;
+      }
+      case "/tools": {
+        setPaletteOpen(true);
+        toast.info("Tools live in the palette", { description: "Type a tool name to see usage." });
         break;
       }
       case "/plugins": {
@@ -271,7 +494,7 @@ export default function DuckyCoderPage() {
       default:
         toast.error(`Unknown command “${name}”`);
     }
-  }, []);
+  }, [agentSend, handlePreviewFile, openSettings]);
 
   const doSend = React.useCallback(
     async (text: string) => {
@@ -281,9 +504,9 @@ export default function DuckyCoderPage() {
         executeCommand(t);
         return;
       }
-      await agent.send(t);
+      await agentSend(t);
     },
-    [agent, executeCommand],
+    [agentSend, executeCommand],
   );
 
   /** composer path: clear input, dispatch */
@@ -314,11 +537,6 @@ export default function DuckyCoderPage() {
     [doSend],
   );
 
-  const openSettings = React.useCallback((tab?: SettingsTab) => {
-    setSettingsTab(tab);
-    setSettingsOpen(true);
-  }, []);
-
   /** one-click sample project — the greeting-service repo, only when asked for */
   const useSampleProject = React.useCallback(() => {
     const st = useDuckyStore.getState();
@@ -339,15 +557,6 @@ export default function DuckyCoderPage() {
     });
   }, []);
 
-  /* ── IDE file preview plumbing ── */
-  const handlePreviewFile = React.useCallback((p: string) => {
-    setPreviewPath(p);
-    setCenterTab("file");
-  }, []);
-  const handleCloseFile = React.useCallback(() => {
-    setPreviewPath(null);
-    setCenterTab("chat");
-  }, []);
   const handleRail = React.useCallback((v: RailView) => {
     if (v === "explorer" || v === "search") setLeftOpen(true);
     if (v === "source") setActivityOpen(true);

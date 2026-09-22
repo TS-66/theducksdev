@@ -36,7 +36,7 @@ export function isModelIdSet(): boolean {
   return modelIdSet;
 }
 
-/** Server provider label ("nvidia") — display only, never a secret. */
+/** Shared-server key presence mirror — display only, never a secret. */
 export function setProvider(p: string | null): void {
   provider = p;
   useDuckyStore.setState({ provider: p });

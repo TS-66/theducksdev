@@ -58,18 +58,16 @@ function printHelp() {
     ducky --help                show this help
     ducky --version             print version
 
-  Setup (server-only key — no one ever sees it):
-    ducky setup                     guided setup: paste 1 free NVIDIA key.
-                                build.nvidia.com → sign in → model
-                                "nemotron-3-ultra-550b-a55b" → "Get API Key"
-                                (free credits, no card → key starts nvapi-...).
-                                Powers Nemotron 3 Ultra: frontier reasoning +
-                                agentic coding, tool calling, streaming thinking.
+  Setup (connect YOUR model — any OpenAI-compatible endpoint):
+    ducky setup                     guided: base URL + API key + model id,
+                                live-tested against the endpoint before saving.
                                 Key goes to your OS keychain first (macOS Keychain /
                                 Linux Secret Service — nothing on disk, nothing in git);
                                 locked .env.local file only as fallback.
-                                Browsers only ever see "nvidia · key hidden".
-    ducky setup --key nvapi-...     non-interactive variant (CI / SSH).
+                                (Server fallback only — every user can also add
+                                their OWN key in Settings → Connections.)
+    ducky setup --base-url https://... --key ... [--model ...]
+                                non-interactive variant (CI / SSH).
     ducky setup --check         verify server key WITHOUT printing it (masked output only).
                                 Add --file <path> to use a different env file (default: .env.local).
 
@@ -85,7 +83,7 @@ function printHelp() {
 
   Install (global):
     npm i -g ./theducksdev        # or: npm i -g ducky-ai-coder
-    ducky setup                   # one time, on the server (~30 seconds)
+    ducky setup                   # connect your model endpoint once
     ducky --web
 
   Local (no install):
@@ -95,7 +93,7 @@ function printHelp() {
 
   Database-backed secrets (your own DB writes the file, live rotation, no restart):
     DUCKY_SECRETS_FILE=/run/ducky/secrets.json ducky --web
-    file: {"apiKey":"nvapi-...","model":"nvidia/nemotron-3-ultra-550b-a55b"}
+    file: {"apiKey":"...","model":"...","baseUrl":"https://..."}
 
   How the key stays hidden:
     • key lives ONLY in server memory/env: OS keychain → shell env → locked file
@@ -267,18 +265,63 @@ function promptHidden(q) {
   return promptText(q);
 }
 
+/** Live-test a base URL + key against the provider's /models endpoint. */
+function probeEndpoint(baseUrl, apiKey) {
+  const clean = String(baseUrl || "").trim().replace(/\/+$/, "").replace(/\/chat\/completions$/i, "");
+  const urls = [`${clean}/models`];
+  if (!/\/v\d+[a-z]*$/i.test(clean)) urls.push(`${clean}/v1/models`);
+  return new Promise((resolve) => {
+    let pending = urls.length;
+    let best = { ok: false, models: 0, message: "unreachable" };
+    const done = (r) => {
+      if (r.ok && r.models >= best.models) best = r;
+      else if (!best.ok && best.message === "unreachable") best = r;
+      if (--pending === 0) resolve(best);
+    };
+    for (const u of urls) {
+      const lib = u.startsWith("https") ? require("https") : require("http");
+      try {
+        const req = lib.get(
+          u,
+          { headers: { Authorization: `Bearer ${apiKey}` } },
+          (res) => {
+            let body = "";
+            res.on("data", (c) => {
+              body += c;
+              if (body.length > 200000) req.destroy();
+            });
+            res.on("end", () => {
+              if (res.statusCode === 404) return done({ ok: false, models: 0, message: "not an OpenAI-compatible /models path" });
+              if (res.statusCode !== 200) {
+                return done({ ok: false, models: 0, message: `HTTP ${res.statusCode} — key rejected or bad URL` });
+              }
+              try {
+                const data = JSON.parse(body);
+                const n = Array.isArray(data.data) ? data.data.length : 0;
+                done({ ok: true, models: n, message: `${n} model(s) listed` });
+              } catch {
+                done({ ok: false, models: 0, message: "reachable but response was not JSON" });
+              }
+            });
+          },
+        );
+        req.on("error", (e) => done({ ok: false, models: 0, message: `unreachable (${e.message})` }));
+        req.setTimeout(12000, () => {
+          req.destroy();
+          done({ ok: false, models: 0, message: "timed out after 12s" });
+        });
+      } catch (e) {
+        done({ ok: false, models: 0, message: String((e && e.message) || e) });
+      }
+    }
+  });
+}
+
 async function runSetup() {
-  const provider = (valueOf("--provider", "nvidia") || "nvidia").toLowerCase();
   // NOTE: flag is --file (not --env-file): Node 20.6+ natively pre-parses
   // --env-file anywhere on the command line and would swallow ours.
   const envFile = valueOf("--file", path.join(APP_DIR, ".env.local"));
   const checkOnly = has("--check");
-
-  const readKey = () => {
-    if (process.env.AI_API_KEY && !has("--key")) return null; // env already provides it
-    return null;
-  };
-  void readKey;
 
   if (checkOnly) {
     // Never print the key value — masked metadata only.
@@ -294,15 +337,12 @@ async function runSetup() {
       key = String(fromFile.get("AI_API_KEY")).trim();
       source = envFile + " (mode " + ((fs.statSync(envFile).mode & 0o777).toString(8) || "?") + ")";
     }
-    const rawProv = (process.env.AI_PROVIDER || fromFile.get("AI_PROVIDER") || "").trim();
-    const prov = !rawProv ? "(not set)" : rawProv.toLowerCase() === "nvidia" ? "nvidia" : "server";
-    const model = (process.env.AI_MODEL_ID || fromFile.get("AI_MODEL_ID") || "").trim() || "(preset default)";
-    const base = (process.env.AI_BASE_URL || fromFile.get("AI_BASE_URL") || "").trim() || (prov && prov !== "(not set)" ? "(preset default)" : "(not set)");
+    const model = (process.env.AI_MODEL_ID || fromFile.get("AI_MODEL_ID") || "").trim() || "(not set)";
+    const base = (process.env.AI_BASE_URL || fromFile.get("AI_BASE_URL") || "").trim() || "(not set)";
     console.log(`
   \x1b[33m▲ ducky setup --check\x1b[0m  (values masked — key is never printed)
   ─────────────────────────────────────────────
    env file   ${envFile} ${fs.existsSync(envFile) ? "(exists)" : "(missing)"}
-   provider   ${prov}
    base url   ${base}
    model      ${model}
    key        ${maskKey(key)}
@@ -313,14 +353,10 @@ async function runSetup() {
     process.exit(key ? 0 : 1);
   }
 
-  if (provider !== "nvidia" && provider !== "custom") {
-    fail(`Unknown provider: ${provider}. There is exactly one provider: --provider nvidia (or --provider custom for your own endpoint).`);
-  }
-
   console.log(`
-  \x1b[33m▲ ducky setup\x1b[0m — server-only key connect
+  \x1b[33m▲ ducky setup\x1b[0m — connect YOUR model endpoint (any OpenAI-compatible API)
   Order of hiding: OS keychain first (nothing on disk) → locked file fallback.
-  Browsers will only ever see "key hidden".
+  The connection is live-tested before anything is saved.
 `);
 
   let key = valueOf("--key", "");
@@ -328,40 +364,44 @@ async function runSetup() {
   let baseUrl = valueOf("--base-url", "");
 
   // Non-interactive (CI/SSH pipes): never block on prompts. The key must
-  // come via --key; anything optional falls back to the preset default.
+  // come via --key; the base URL via --base-url.
   const tty = Boolean(process.stdin.isTTY);
   const askText = async (q) => {
     if (!tty) return "";
     return promptText(q);
   };
 
-  if (provider === "nvidia") {
-    console.log(`  1. Open build.nvidia.com  →  sign in  →  open "nemotron-3-ultra-550b-a55b"  →  "Get API Key"`);
-    console.log(`  2. Paste the key below (input hidden). Free credits, no card.\n`);
-    if (!key) {
-      if (!tty) fail("No API key: re-run with --key nvapi-... (non-interactive shells can't prompt). Nothing was written.");
-      key = await promptHidden("  NVIDIA API key (nvapi-...): ");
-    }
-    if (!key) fail("No key entered. Aborting — nothing was written.");
-    if (!key.startsWith("nvapi-")) {
-      console.warn("  \x1b[33m[ducky]\x1b[0m  warning: NVIDIA keys usually start with 'nvapi-'. Continuing anyway…");
-    }
-    if (!model) {
-      model = await askText("  Model [nvidia/nemotron-3-ultra-550b-a55b, Enter for default]: ");
-    }
+  if (!baseUrl) {
+    baseUrl = await askText("  Base URL (https://your-endpoint/v1): ");
+    if (!baseUrl && !tty) fail("No base URL: re-run with --base-url https://... (non-interactive shells can't prompt). Nothing was written.");
+  }
+  if (!baseUrl) fail("No base URL entered. Aborting — nothing was written.");
+  if (!key) {
+    if (!tty) fail("No API key: re-run with --key ... (non-interactive shells can't prompt). Nothing was written.");
+    key = await promptHidden("  API key (hidden input): ");
+  }
+  if (!key) fail("No key entered. Aborting — nothing was written.");
+  if (!model) {
+    model = await askText("  Model id (Enter to pick after the live test): ");
+  }
+
+  // Live-test BEFORE saving: the endpoint must answer /models with this key.
+  console.log(`  testing connection…`);
+  const probe = await probeEndpoint(baseUrl, key);
+  if (probe.ok) {
+    console.log(`  \x1b[32m✓ live\x1b[0m — ${probe.message}.`);
   } else {
-    // generic path (also used by legacy provider ids — never named in output)
-    if (!key) {
-      if (!tty) fail("No API key: re-run with --key ... (non-interactive shells can't prompt). Nothing was written.");
-      key = await promptHidden("  API key (hidden input): ");
+    console.log(`  \x1b[33m! not verified\x1b[0m — ${probe.message}.`);
+    if (tty) {
+      const again = await promptText("  Save anyway? [y/N]: ");
+      if (!/^(y|yes)$/i.test(again.trim())) fail("Aborted — nothing was written. Fix the URL/key and retry.");
+    } else {
+      warn("saving unverified (non-interactive) — verify with: ducky setup --check");
     }
-    if (!key) fail("No key entered. Aborting — nothing was written.");
-    if (!baseUrl) baseUrl = await askText("  Base URL (Enter for preset default): ");
-    if (!model) model = await askText("  Model id (Enter for preset default): ");
   }
 
   // Non-secrets always go to the env file (safe to keep, gitignored anyway).
-  const entries = { AI_PROVIDER: provider };
+  const entries = {};
   if (model) entries.AI_MODEL_ID = model;
   if (baseUrl) entries.AI_BASE_URL = baseUrl;
   writeEnvFile(envFile, entries);
@@ -381,14 +421,14 @@ async function runSetup() {
 
   console.log(`
   \x1b[32m✓ saved\x1b[0m — never commit it or paste it in chat
-    provider   ${provider === "nvidia" ? "nvidia" : "server"}
-    model      ${model || "(preset default)"}
+    base url   ${baseUrl}
+    model      ${model || "(pick in Settings → Connections → Discover)"}
     key        ${maskKey(key)}
     stored in  ${storedIn}
   Next:
     1. Restart the server:  ducky --web   (local popup only, key stays on this machine)
     2. Verify masked:       ducky setup --check
-    3. Users just open the URL — no key field exists in the UI.
+    3. Users add their OWN key + model in Settings → Connections — or share this one via server env.
 `);
   process.exit(0);
 }
@@ -571,17 +611,11 @@ function waitForReady(url, timeoutMs = 60000) {
     }
   }
 
-  // Provider label only — key value is never read or printed here.
-  // Legacy ids are never named in output; only the default preset is shown.
-  let providerLabel = (childEnv.AI_PROVIDER || "").trim().toLowerCase();
-  if (!providerLabel) {
-    try {
-      const raw = fs.readFileSync(path.join(APP_DIR, ".env.local"), "utf8");
-      const m = raw.match(/^\s*AI_PROVIDER\s*=\s*(.+)\s*$/m);
-      if (m) providerLabel = m[1].trim().toLowerCase();
-    } catch { /* no env file — setup not run yet */ }
-  }
-  if (providerLabel && providerLabel !== "nvidia") providerLabel = "server";
+  // Key-source label only — key value is never read or printed here.
+  // Server env and keychain both count as "server key"; per-user browser
+  // keys are reported by the UI itself.
+  const hasServerKey = Boolean((childEnv.AI_API_KEY || "").trim());
+  const keyLabel = hasServerKey ? `server key (${keySource})` : "not configured — run: ducky setup";
 
   console.log(`
   \x1b[33m▲ ducky ai | coder\x1b[0m  v${PKG.version}  ·  ${DEV ? "dev" : "web"}  ·  LOCAL ONLY${loopback ? "" : " (EXPOSED — see warning above)"}
@@ -589,7 +623,7 @@ function waitForReady(url, timeoutMs = 60000) {
    app      ${APP_DIR}
    url      \x1b[36m${url}\x1b[0m  ← local popup on this machine, NOT a website
    mode     ${DEV ? "next dev (hot reload)" : "next start (production)"}
-   model    ${providerLabel ? providerLabel + " · key hidden on server (" + keySource + ")" : "not configured — run: ducky setup"}
+   model    ${keyLabel}
    browser  ${NO_OPEN ? "manual (--no-open)" : "auto-open"}
   ─────────────────────────────────────────────
 `);

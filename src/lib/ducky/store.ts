@@ -21,7 +21,7 @@ import type {
   StoredState,
   TodoItem,
 } from './types';
-import { MODEL_ID } from './models';
+import { DEFAULT_MODEL } from './models';
 import { PLUGINS } from './plugins';
 import { SEED_WORKSPACE } from './workspace-seed';
 import { normalizePath } from './tools-vfs';
@@ -62,7 +62,7 @@ const newSessionObj = (project: Project | null) => ({
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   baseUrl: '', // empty = use the server-configured endpoint (AI_BASE_URL env)
-  model: MODEL_ID,
+  model: DEFAULT_MODEL,
   temperature: 1,
   maxTokens: 8192,
   policy: 'auto',
@@ -214,7 +214,7 @@ export type DshStore = StoredState &
     serverLive: boolean;
     /** deployment configured AI_MODEL_ID (upstream model id) */
     modelIdSet: boolean;
-    /** server provider label from /api/config ("nvidia") — never a key/URL */
+    /** shared-server key presence from /api/config — never a key/URL */
     provider: string | null;
   };
 
@@ -645,9 +645,10 @@ export const useDuckyStore = create<DshStore>()(
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<StoredState>;
         const settings = { ...DEFAULT_SETTINGS, ...(p.settings ?? {}) };
-        // Rebrand migration: any unknown/legacy model id snaps to the single
-        // shipped model — Ducky 3.5 Coder.
-        if (settings.model !== MODEL_ID) settings.model = MODEL_ID;
+        // BYOK migration: keep whatever model id the user configured (legacy
+        // "ducky-3.5-coder" placeholders become unconfigured instead of fake).
+        if (settings.model === 'ducky-3.5-coder') settings.model = DEFAULT_MODEL;
+        if (typeof settings.model !== 'string') settings.model = DEFAULT_MODEL;
         // Drop stale plugin ids that no longer exist in the registry.
         const knownIds = new Set(PLUGINS.map((pl) => pl.id));
         const projects = Array.isArray(p.projects)

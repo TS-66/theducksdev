@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { MODEL_DISPLAY } from "@/lib/ducky/models";
+import { modelDisplayName } from "@/lib/ducky/models";
 import { useDuckyStore } from "@/lib/ducky/store";
 
 interface HeaderBarProps {
@@ -130,14 +130,14 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
               size="sm"
               onClick={() => onOpenSettings("about")}
               className="gap-1.5 px-2 font-mono text-xs text-muted-foreground"
-              aria-label={`Model ${MODEL_DISPLAY}. Open settings.`}
+              aria-label={`Model ${modelDisplayName(settings.model)}. Open settings.`}
             >
               <Cpu className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
-              <span className="hidden max-w-36 truncate sm:inline">{MODEL_DISPLAY}</span>
+              <span className="hidden max-w-36 truncate sm:inline">{modelDisplayName(settings.model)}</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            {MODEL_DISPLAY} — opens Settings → Models
+            {modelDisplayName(settings.model)} — opens Settings → Connections
           </TooltipContent>
         </Tooltip>
 

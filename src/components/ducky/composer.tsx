@@ -35,7 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { MODEL_DISPLAY, MODEL_ID } from "@/lib/ducky/models";
+import { modelDisplayName } from "@/lib/ducky/models";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { fileToPastedImage } from "@/lib/ducky/images";
 import { ProjectPickerRow } from "@/components/ducky/project-picker";
@@ -44,11 +44,35 @@ import type { PermissionPolicy } from "@/lib/ducky/types";
 export const SLASH_COMMANDS = [
   { cmd: "/help", desc: "Open the cheat sheet (shortcuts + commands)" },
   { cmd: "/new", desc: "Start a fresh session" },
+  { cmd: "/goal <text>", desc: "Set this session's goal (also its title)" },
+  { cmd: "/retry", desc: "Resend the last message" },
+  { cmd: "/undo", desc: "Remove the last exchange" },
+  { cmd: "/compact <n>", desc: "Keep only the last n exchanges (default 20)" },
   { cmd: "/clear", desc: "Clear messages of this session" },
   { cmd: "/plan", desc: "Toggle plan mode" },
-  { cmd: "/model <m>", desc: `Switch model — only ${MODEL_ID} ships today` },
+  { cmd: "/model <m>", desc: "Switch model — any id your endpoint serves" },
+  { cmd: "/models", desc: "Discover models your endpoint serves" },
+  { cmd: "/endpoint <url>", desc: "Set the API base URL" },
+  { cmd: "/key <key>", desc: "Save your API key (this browser only, never echoed)" },
+  { cmd: "/conn", desc: "Open Settings → Connections (keys, models, MCP)" },
   { cmd: "/policy <p>", desc: "Permission policy — readonly | ask | auto" },
+  { cmd: "/temp <n>", desc: "Sampling temperature 0–2" },
+  { cmd: "/tokens <n>", desc: "Max response tokens 512–32768" },
+  { cmd: "/iters <n>", desc: "Max tool rounds per turn 1–30" },
+  { cmd: "/remember <fact>", desc: "Save to cross-session memory" },
+  { cmd: "/forget <id>", desc: "Forget a memory by id prefix" },
+  { cmd: "/stats", desc: "Show session counters" },
+  { cmd: "/files", desc: "List workspace files" },
+  { cmd: "/reset", desc: "Reset workspace to starting files" },
+  { cmd: "/rename <t>", desc: "Rename this session" },
+  { cmd: "/star", desc: "Star this session" },
+  { cmd: "/duplicate", desc: "Clone this session" },
+  { cmd: "/browser <url>", desc: "Open a page in the browser tab" },
+  { cmd: "/term", desc: "Toggle the terminal drawer" },
+  { cmd: "/screen", desc: "Capture the screen into images/" },
+  { cmd: "/tools", desc: "Browse the 70+ agent tools" },
   { cmd: "/plugins", desc: "Open the plugin manager" },
+  { cmd: "/mcp", desc: "Manage MCP servers (Blender, Roblox…)" },
   { cmd: "/activity", desc: "Open the activity timeline (⌘E)" },
   { cmd: "/export", desc: "Download the session as a Markdown transcript" },
   { cmd: "/zip", desc: "Download this session's workspace as a .zip" },
@@ -71,6 +95,7 @@ const MODE_META: Record<AgentMode, { label: string; hint: string }> = {
 
 function ComposerMetaRow({ sessionId }: { sessionId: string | null }) {
   const policy = useDuckyStore((s) => s.settings.policy);
+  const model = useDuckyStore((s) => s.settings.model);
   const planMode = useDuckyStore(
     (s) => s.sessions.find((x) => x.id === sessionId)?.planMode ?? false,
   );
@@ -98,14 +123,12 @@ function ComposerMetaRow({ sessionId }: { sessionId: string | null }) {
   return (
     <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-1 pt-2">
       <span
-        aria-label="Active model: Ducky 3.5 Coder, powered by Nemotron 3 Ultra"
-        title="Ducky 3.5 Coder · Nemotron 3 Ultra — the one model"
+        aria-label={`Active model: ${modelDisplayName(model)}`}
+        title="Your model (Settings → Connections)"
         className="flex min-w-0 items-center gap-1.5 truncate rounded-full border border-[#FDC00A]/20 bg-[#FDC00A]/5 px-2.5 py-1 font-mono text-[11px] text-foreground/80"
       >
         <Cpu className="size-3 shrink-0 text-[#FDC00A]" aria-hidden />
-        <span className="truncate">
-          {MODEL_DISPLAY} <span className="text-muted-foreground">· Nemotron 3 Ultra</span>
-        </span>
+        <span className="truncate">{modelDisplayName(model)}</span>
       </span>
       <label className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
         <Map className="size-3 text-[#FDC00A]" aria-hidden />
@@ -179,6 +202,7 @@ export function Composer({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const policy = useDuckyStore((s) => s.settings.policy);
+  const model = useDuckyStore((s) => s.settings.model);
   const disabledSurface = !hasSession;
   const hero = variant === "hero";
 
@@ -365,10 +389,10 @@ export function Composer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label={`Active model: ${MODEL_DISPLAY}`}
+                    aria-label={`Active model: ${modelDisplayName(model)}`}
                     className="h-8 gap-1 rounded-full px-2.5 font-mono text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <span className="max-w-28 truncate sm:max-w-40">{MODEL_DISPLAY}</span>
+                    <span className="max-w-28 truncate sm:max-w-40">{modelDisplayName(model)}</span>
                     <ChevronDown className="size-3" aria-hidden />
                   </Button>
                 </PopoverTrigger>
@@ -379,9 +403,9 @@ export function Composer({
                   >
                     <Cpu className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-xs font-semibold">{MODEL_DISPLAY}</span>
+                      <span className="block font-mono text-xs font-semibold">{modelDisplayName(model)}</span>
                       <span className="block text-[10px] text-muted-foreground">
-                        the one model — tuned for agentic coding
+                        your model — set it in Settings → Connections
                       </span>
                     </span>
                     <Check className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
@@ -451,18 +475,18 @@ export function Composer({
       />
       {/* top chip row */}
       <div className="flex items-center gap-1 px-2 pt-1.5">
-        {/* single-model chip — the one and only Ducky 3.5 Coder */}
+        {/* model chip — your configured model */}
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              aria-label={`Active model: ${MODEL_DISPLAY}`}
+              aria-label={`Active model: ${modelDisplayName(model)}`}
               className="flex h-7 cursor-default items-center gap-1.5 rounded-md bg-muted/50 px-2 font-mono text-[11px] text-foreground/80"
             >
-              <Cpu className="size-3.5 text-[#FDC00A]" aria-hidden /> {MODEL_DISPLAY}
+              <Cpu className="size-3.5 text-[#FDC00A]" aria-hidden /> {modelDisplayName(model)}
             </span>
           </TooltipTrigger>
           <TooltipContent side="top">
-            {MODEL_DISPLAY} — the one model, tuned for agentic coding
+            {modelDisplayName(model)} — set it in Settings → Connections
           </TooltipContent>
         </Tooltip>
 

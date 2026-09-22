@@ -172,10 +172,10 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (69 tools, 26 plugins)", async () => {
+await run("registry: counts (72 tools, 27 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 69, `only ${defs.length} tools`);
-  assert(PLUGINS.length >= 26, `only ${PLUGINS.length} plugins`);
+  assert(defs.length >= 72, `only ${defs.length} tools`);
+  assert(PLUGINS.length >= 27, `only ${PLUGINS.length} plugins`);
 });
 
 await run("registry: every tool has an executor (except loop special-cases)", async () => {
@@ -502,6 +502,88 @@ await run("registry: every executor has a schema", async () => {
   });
 }
 
+/* --------------------------- mcp + connection --------------------------- */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+
+  await run("mcp_servers empty guidance", async () => {
+    const out = await ex("mcp_servers")({});
+    assert(out.includes("No MCP servers"), out);
+  });
+  await run("mcp_list empty guidance", async () => {
+    const out = await ex("mcp_list")({});
+    assert(out.includes("No MCP servers"), out);
+  });
+  await run("mcp_call validation", async () => {
+    await expectThrow(() => ex("mcp_call")({ server: "", tool: "x" }), "missing fields");
+    await expectThrow(() => ex("mcp_call")({ server: "ghost", tool: "x", args: {} }), "unknown server");
+    await expectThrow(() => ex("mcp_call")({ server: "s", tool: "t", args: [1] }), "args shape");
+  });
+
+  // stub fetch: one fake MCP bridge over Streamable HTTP
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    assert(String(url).includes("fake-bridge"), `unexpected url ${url}`);
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    const payload =
+      body.method === "tools/list"
+        ? { jsonrpc: "2.0", id: body.id, result: { tools: [{ name: "ping", description: "pong tool" }] } }
+        : { jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "pong!" }] } };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const mcp = await import(`${LIB}/mcp.${EXT}`);
+    mcp.addMcpServer("fake", "http://fake-bridge/mcp");
+    await run("mcp bridge list/call over stubbed HTTP", async () => {
+      const servers = await ex("mcp_servers")({});
+      assert(servers.includes("fake"), servers);
+      const list = await ex("mcp_list")({});
+      assert(list.includes("fake / ping"), list);
+      const out = await ex("mcp_call")({ server: "FAKE", tool: "ping", args: {} });
+      assert(out.includes("pong!"), out);
+    });
+    await run("mcp module: registry + SSE parse", async () => {
+      assert(mcp.listMcpServers().some((s) => s.name === "fake"), "registry");
+      const sse = 'event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"tools":[]}}\n\ndata: [DONE]\n';
+      assert(Array.isArray(mcp.parseRpcPayload(sse).result.tools), "sse parse");
+      let threw = false;
+      try {
+        mcp.addMcpServer("bad", "not-a-url");
+      } catch {
+        threw = true;
+      }
+      assert(threw, "bad url accepted");
+      assert(mcp.removeMcpServer("zzz") === false, "bad remove");
+      assert(mcp.removeMcpServer(mcp.listMcpServers()[0].id.slice(0, 6)) === true, "remove");
+    });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
+  // connection.ts over stubbed /api/models proxy
+  const realFetch2 = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ models: [{ id: "a" }, { id: "b" }] }), { status: 200 });
+  try {
+    const conn = await import(`${LIB}/connection.${EXT}`);
+    await run("connection: discover + test report", async () => {
+      const models = await conn.discoverModels("https://x/v1", "k");
+      assert(models.length === 2 && models[0].id === "a", "discover");
+      const rep = await conn.testConnection("https://x/v1", "k");
+      assert(rep.ok && rep.models === 2 && rep.latencyMs >= 0, JSON.stringify(rep));
+      const bad = await conn.testConnection("", "");
+      assert(!bad.ok, "empty should fail");
+    });
+  } finally {
+    globalThis.fetch = realFetch2;
+  }
+}
+
 /* --------------------------- clipboard (stubbed) -------------------------- */
 
 {
@@ -573,9 +655,10 @@ await run("tools-extra direct: json path + diff", async () => {
   assert(extra.lineDiff("same\n", "same\n").includes("identical"), "identical");
 });
 
-await run("skills module: 8 playbooks", async () => {
-  assert(skills.SKILLS.length === 8, `got ${skills.SKILLS.length}`);
+await run("skills module: 16 playbooks", async () => {
+  assert(skills.SKILLS.length === 16, `got ${skills.SKILLS.length}`);
   assert(skills.getSkill("PLAN")?.name === "plan", "case-insensitive lookup");
+  assert(skills.getSkill("mcp-integration")?.name === "mcp-integration", "mcp skill");
 });
 
 await run("browser-tabs module: registry", async () => {

@@ -17,10 +17,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://ducky-ai-coder.local"),
   title: "Ducky AI | Coder",
   description:
-    "Ducky AI | Coder — a browser-native coding agent console. Plugin-based tools, a virtual workspace filesystem, permission gates and the Ducky 3.5 Coder model.",
+    "Ducky AI | Coder — a browser-native coding agent console. Bring your own model: plugin-based tools, a virtual workspace filesystem and permission gates over any OpenAI-compatible endpoint.",
   keywords: [
     "Ducky AI",
-    "Ducky 3.5 Coder",
     "coding agent",
     "agent harness",
     "AI agent",
@@ -30,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Ducky AI | Coder",
     description:
-      "A browser-native coding agent console running Ducky 3.5 Coder.",
+      "A browser-native coding agent console for your own AI model.",
     images: ["/ducky-logo.png"],
   },
 };

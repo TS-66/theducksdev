@@ -45,6 +45,7 @@ import {
   sortLines,
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
+import { callMcpTool, listMcpServers, listMcpTools } from './mcp';
 import { closeTab, getActiveTab, listTabs, openTab } from './browser-tabs';
 import { captureScreenToWorkspace } from './screen';
 
@@ -289,7 +290,7 @@ export const PLUGINS: PluginManifest[] = [
     name: 'ducky-tool-skills',
     version: '1.0.0',
     description:
-      'Skill playbooks: code-review, debug, refactor, plan, commit, docs, test-gen, web-research. List them, then pull one into context before starting that kind of work.',
+      'Skill playbooks (16): code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis. List them, then pull one into context before starting that kind of work.',
     tools: ['skill_list', 'skill_show'],
     category: 'meta',
     defaultEnabled: true,
@@ -313,6 +314,16 @@ export const PLUGINS: PluginManifest[] = [
     tools: ['session_list', 'session_new', 'session_rename', 'session_switch'],
     category: 'meta',
     defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-mcp`,
+    name: 'ducky-tool-mcp',
+    version: '1.0.0',
+    description:
+      'MCP CONNECTIONS: call tools on user-configured Model Context Protocol servers (Blender bridges, Roblox Studio bridges, browsers, filesystems…). Servers are registered by the human in Settings → Connections → MCP; the agent lists their tools and calls them. Disabled until at least one server exists.',
+    tools: ['mcp_servers', 'mcp_list', 'mcp_call'],
+    category: 'delegation',
+    defaultEnabled: false,
   },
 ];
 
@@ -973,7 +984,7 @@ export function buildToolDefinitions(): ToolDefinition[] {
       name: 'skill_list',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-skills`).id,
       description:
-        'List built-in skill playbooks (code-review, debug, refactor, plan, commit, docs, test-gen, web-research) with one-line descriptions. Call BEFORE starting that kind of work, then skill_show.',
+        'List built-in skill playbooks (16: code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis) with one-line descriptions. Call BEFORE starting that kind of work, then skill_show.',
       parameters: obj({}, []),
     },
     {
@@ -1113,6 +1124,39 @@ export function buildToolDefinitions(): ToolDefinition[] {
         },
         ['path'],
       ),
+    },
+    {
+      name: 'mcp_servers',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-mcp`).id,
+      description:
+        'List configured MCP servers (name + URL). Empty means the human has not connected anything yet — tell them to open Settings → Connections → MCP.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'mcp_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-mcp`).id,
+      description:
+        'List tools exposed by ALL configured MCP servers (Blender scenes, Roblox instances, browser actions…). Call this before mcp_call; unreachable servers are reported, not fatal.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'mcp_call',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-mcp`).id,
+      description:
+        'Call one MCP tool: pick server + tool from mcp_list and pass its arguments object. Results return as text (capped). Retries and auth live with the bridge itself.',
+      parameters: obj(
+        {
+          server: str('Server name from mcp_list (case-insensitive).'),
+          tool: str('Tool name from mcp_list.'),
+          args: {
+            type: 'object',
+            description: 'Arguments object for the tool (see its schema via mcp_list context or ask the human).',
+            additionalProperties: true,
+          },
+        },
+        ['server', 'tool'],
+      ),
+      sideEffects: true,
     },
     {
       name: 'ask_user_question',
@@ -1984,6 +2028,49 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
     if (!skill) throw new Error(`skill_show: unknown skill "${name}" (see skill_list)`);
     return `${skill.body}\n\n[ducky: follow this playbook step by step for the current task.]`;
   },
+
+  /* ---------------------------------- mcp ---------------------------------- */
+
+  mcp_servers:
+    () =>
+    async () => {
+      const servers = listMcpServers();
+      if (!servers.length) {
+        return 'No MCP servers connected. The human connects them in Settings → Connections → MCP (e.g. a Blender or Roblox Studio bridge URL).';
+      }
+      return servers.map((s) => `${s.name} — ${s.url} (id ${s.id.slice(0, 8)})`).join('\n');
+    },
+
+  mcp_list:
+    () =>
+    async () => {
+      const servers = listMcpServers();
+      if (!servers.length) {
+        return 'No MCP servers connected (see mcp_servers).';
+      }
+      const { tools, errors } = await listMcpTools();
+      const lines = tools.map((t) => `${t.server} / ${t.name} — ${t.description.slice(0, 160)}`);
+      for (const e of errors) lines.push(`[unreachable] ${e}`);
+      if (!lines.length) return 'Servers answered but exposed no tools.';
+      return lines.join('\n');
+    },
+
+  mcp_call:
+    () =>
+    async (args) => {
+      const server = asString(args.server).trim();
+      const tool = asString(args.tool).trim();
+      if (!server || !tool) throw new Error('mcp_call: "server" and "tool" are required (see mcp_list)');
+      const rawArgs = args.args ?? {};
+      if (rawArgs === null || typeof rawArgs !== 'object' || Array.isArray(rawArgs)) {
+        throw new Error('mcp_call: "args" must be an object');
+      }
+      try {
+        return await callMcpTool(server, tool, rawArgs as Record<string, unknown>);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
 
   /* -------------------------------- config --------------------------------- */
 

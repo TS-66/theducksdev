@@ -141,7 +141,7 @@ export function StatusBar({
   const disabledPlugins = useDuckyStore((s) => s.disabledPlugins);
   const serverLive = useDuckyStore((s) => s.serverLive);
   const modelIdSet = useDuckyStore((s) => s.modelIdSet);
-  const provider = useDuckyStore((s) => s.provider);
+  const hasOwnKey = useDuckyStore((s) => s.settings.apiKey.trim() !== "" && s.settings.baseUrl.trim() !== "");
 
   const [now, setNow] = React.useState<string>("");
   React.useEffect(() => {
@@ -244,31 +244,32 @@ export function StatusBar({
             </TooltipContent>
           </Tooltip>
         )}
-        {!serverLive && (
+        {!hasOwnKey && !serverLive && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-400">
-                <TriangleAlert className="size-3" aria-hidden /> no model
+                <TriangleAlert className="size-3" aria-hidden /> no connection
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              No server key configured. On the server run
-              `ducky setup` (one free key, ~30 seconds, stays on
-              the server) — then restart. Never paste keys in the browser.
+              No model connection. Open Settings → Connections and add your
+              base URL + API key + model — or set AI_BASE_URL / AI_API_KEY on
+              the server once for everyone.
             </TooltipContent>
           </Tooltip>
         )}
-        {serverLive && (
+        {(hasOwnKey || serverLive) && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
                 <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-400" />
-                {provider ?? "server"} · key hidden
+                {hasOwnKey ? "your key" : "server key"}
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              Model key lives only in server env (`AI_API_KEY`) — it never
-              reaches the browser, devtools, or git. Users just chat.
+              {hasOwnKey
+                ? "Chatting with your own key (Settings → Connections, this browser only)."
+                : "Chatting with the shared server key (AI_* env — never reaches the browser)."}
             </TooltipContent>
           </Tooltip>
         )}
@@ -280,9 +281,9 @@ export function StatusBar({
               </span>
             </TooltipTrigger>
             <TooltipContent side="top">
-              AI_MODEL_ID is not set on the server, so requests ask your endpoint for the
-              literal id &quot;ducky-3.5-coder&quot; — real providers will reject it. Set
-              AI_MODEL_ID to the upstream model your endpoint serves (e.g. gpt-4o-mini).
+              Neither your Settings → Connections nor the server names a model.
+              Add one (Discover lists what your endpoint serves) or set
+              AI_MODEL_ID on the server.
             </TooltipContent>
           </Tooltip>
         )}

@@ -12,14 +12,14 @@
 #   a password prompt — paste a fine-grained PAT with "Contents: read"):
 #     curl -fsSL -u ducky https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
 #   Then answer two prompts: (1) GitHub token [asked by curl], (2) your free
-#   NVIDIA key [asked by the installer — every user needs their OWN key from
-#   build.nvidia.com, so no curl on earth can embed it].
+#   API key [asked by the installer — every user needs their OWN key from
+#   their endpoint, so no curl on earth can embed it].
 #
 #   Fully non-interactive (pipe-friendly — pass everything as flags):
 #     export GITHUB_TOKEN=ghp_...
 #     curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
 #       https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh \
-#       | bash -s -- --key nvapi-... --no-open
+#       | bash -s -- --base-url https://... --key ... --no-open
 #
 # What it does: fetches the app (private-repo aware) → installs deps →
 # builds → links the global `ducky` command → runs `ducky setup` (+ `--web`).
@@ -38,6 +38,7 @@ DO_LINK=1
 LOCAL_DIR=""
 SETUP_KEY=""
 SETUP_MODEL=""
+SETUP_BASE_URL=""
 DRY_RUN=0
 
 say()  { printf '\033[33m[ducky-install]\033[0m %s\n' "$*"; }
@@ -57,7 +58,8 @@ Usage: install.sh [options]
   --no-run           stop after install (don't run setup/web UI)
   --no-build         skip `next build` (run `ducky --web --dev` instead)
   --no-link          don't create the global `ducky` command
-  --key <nvapi-...>  NVIDIA key for non-interactive `ducky setup`
+  --key <...>        API key for non-interactive `ducky setup`
+  --base-url <url>   base URL for non-interactive `ducky setup`
   --model <id>       model id for non-interactive setup (default preset)
   --dry-run          print what would happen, change nothing
   -h, --help         this help
@@ -79,6 +81,7 @@ while [ $# -gt 0 ]; do
     --no-link) DO_LINK=0; shift ;;
     --key) SETUP_KEY="${2:?}"; shift 2 ;;
     --model) SETUP_MODEL="${2:?}"; shift 2 ;;
+    --base-url) SETUP_BASE_URL="${2:?}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail "unknown flag: $1 (see --help)" ;;
@@ -180,7 +183,7 @@ fi
 if [ ! -t 0 ] && [ -z "$SETUP_KEY" ]; then
   # Piped (curl | bash): stdin is the script, so ask on the real terminal.
   if [ -r /dev/tty ] && [ -w /dev/tty ]; then
-    printf '  NVIDIA API key (nvapi-..., hidden — Enter to skip setup): ' > /dev/tty
+    printf '  API key (hidden — Enter to skip setup): ' > /dev/tty
     if read -rs TTY_KEY < /dev/tty; then
       printf '\n' > /dev/tty
       SETUP_KEY="$TTY_KEY"
@@ -189,17 +192,17 @@ if [ ! -t 0 ] && [ -z "$SETUP_KEY" ]; then
 fi
 if [ -z "$SETUP_KEY" ] && [ ! -t 0 ]; then
   warn "no key given — skipping interactive setup."
-  warn "re-run: ducky setup   (or reinstall with --key nvapi-...)"
+  warn "re-run: ducky setup   (or reinstall with --base-url ... --key ...)"
 else
   say "running setup (key stays on this machine)"
   if [ -n "$SETUP_KEY" ]; then
     if [ -n "$SETUP_MODEL" ]; then
-      run node "$DEST/bin/ducky.js" setup --provider nvidia --key "$SETUP_KEY" --model "$SETUP_MODEL"
+      run node "$DEST/bin/ducky.js" setup --base-url "$SETUP_BASE_URL" --key "$SETUP_KEY" --model "$SETUP_MODEL"
     else
-      run node "$DEST/bin/ducky.js" setup --provider nvidia --key "$SETUP_KEY"
+      run node "$DEST/bin/ducky.js" setup --base-url "$SETUP_BASE_URL" --key "$SETUP_KEY"
     fi
   else
-    run node "$DEST/bin/ducky.js" setup --provider nvidia
+    run node "$DEST/bin/ducky.js" setup
   fi
 fi
 
