@@ -110,10 +110,19 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
     setDiscovering(true);
     try {
       const models = await discoverModels(draft.baseUrl, draft.apiKey);
-      setDiscovered(models.map((m) => m.id).slice(0, 100));
-      toast.success(`Found ${models.length} model(s)`, {
-        description: models.length ? "Pick one below — it fills the model field." : undefined,
-      });
+      const ids = models.map((m) => m.id).slice(0, 100);
+      setDiscovered(ids);
+      if (ids.length > 0 && !draft.model.trim()) {
+        patch({ model: ids[0] });
+        toast.success(`Found ${models.length} model(s) — using ${ids[0]}`, {
+          description: "Tap another chip below to switch.",
+          duration: 6000,
+        });
+      } else {
+        toast.success(`Found ${models.length} model(s)`, {
+          description: ids.length ? "Pick one below — it fills the model field." : undefined,
+        });
+      }
     } catch (e) {
       toast.error("Discovery failed", { description: (e as Error).message });
     } finally {
@@ -267,6 +276,32 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   only in <em>this browser</em>; never sent anywhere except your
                   endpoint through the chat proxy.
                 </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      patch({ baseUrl: "https://integrate.api.nvidia.com/v1" });
+                      toast.success("NVIDIA endpoint filled", {
+                        description: "Paste your key, then Discover → pick a model → Test.",
+                      });
+                    }}
+                    className="rounded-full border border-[#FDC00A]/30 bg-[#FDC00A]/5 px-2.5 py-1 font-mono text-[11px] hover:border-[#FDC00A]/60 hover:text-foreground"
+                  >
+                    ⚡ Use NVIDIA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      patch({ baseUrl: "", apiKey: "", model: "" });
+                      setDiscovered([]);
+                      setConnTest(null);
+                      toast.info("Connection cleared");
+                    }}
+                    className="rounded-full border px-2.5 py-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ducky-base-url" className="text-xs">
                     Base URL

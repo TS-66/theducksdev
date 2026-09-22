@@ -79,23 +79,23 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.12 0.005 260);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.165 0.008 260);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.16 0.008 260);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.86 0.155 95);
   --primary-foreground: oklch(0.18 0.02 95);
-  --secondary: oklch(0.269 0 0);
+  --secondary: oklch(0.22 0.01 260);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: oklch(0.22 0.01 260);
+  --muted-foreground: oklch(0.68 0.01 260);
+  --accent: oklch(0.24 0.015 260);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.72 0.13 90);
   --chart-1: oklch(0.86 0.155 95);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -307,4 +307,93 @@
 :where(button, a, input, textarea):focus-visible {
   outline: 2px solid color-mix(in oklab, #fdc00a 65%, transparent);
   outline-offset: 1px;
+}
+
+/* ─────────────────── Midnight Glass v2 (new UI design) ───────────────── */
+
+.ducky-headline {
+  background: linear-gradient(180deg, oklch(0.99 0 0) 30%, oklch(0.72 0.02 260) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.03em;
+}
+
+.ducky-glass {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 88%, white 2%), color-mix(in oklab, var(--card) 94%, transparent));
+  border: 1px solid color-mix(in oklab, white 9%, transparent);
+  box-shadow:
+    0 1px 0 0 color-mix(in oklab, white 6%, transparent) inset,
+    0 24px 64px -32px rgb(0 0 0 / 0.7);
+  backdrop-filter: blur(14px);
+}
+
+.ducky-send {
+  background: linear-gradient(180deg, #ffd53d, #f5b800);
+  color: #1a1400;
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.45) inset,
+    0 8px 24px -8px rgb(253 192 10 / 0.55);
+  transition: transform 120ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+.ducky-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.5) inset,
+    0 10px 32px -8px rgb(253 192 10 / 0.7);
+}
+.ducky-send:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.ducky-send:disabled {
+  opacity: 0.45;
+}
+
+@keyframes ducky-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ducky-fade-up {
+  animation: ducky-fade-up 0.32s ease-out both;
+}
+
+@keyframes ducky-float-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -18px, 0) scale(1.06);
+  }
+}
+.ducky-orb {
+  animation: ducky-float-slow 9s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes ducky-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.ducky-glow-breathe {
+  animation: ducky-glow-breathe 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ducky-fade-up,
+  .ducky-orb,
+  .ducky-glow-breathe {
+    animation: none;
+  }
 }

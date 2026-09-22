@@ -111,10 +111,10 @@ export function IdeTabBar({
           aria-selected={tab === "chat"}
           onClick={() => onTab("chat")}
           className={cn(
-            "flex h-8 items-center gap-2 rounded-t-md border-b-2 px-3 font-mono text-xs transition-colors",
+            "flex h-8 items-center gap-2 rounded-lg px-3 font-mono text-xs transition-all",
             tab === "chat"
-              ? "border-[#FDC00A] bg-background text-foreground shadow-[0_-8px_20px_-12px_rgba(253,192,10,0.35)]"
-              : "border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+              ? "bg-white/[0.07] text-foreground shadow-sm ring-1 ring-white/10"
+              : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
           )}
         >
           <MessagesSquare className="size-3.5" />
@@ -131,10 +131,10 @@ export function IdeTabBar({
             aria-selected={tab === "browser"}
             onClick={() => onTab("browser")}
             className={cn(
-              "flex h-8 items-center gap-2 rounded-t-md border-b-2 px-3 font-mono text-xs transition-colors",
+              "flex h-8 items-center gap-2 rounded-lg px-3 font-mono text-xs transition-all",
               tab === "browser"
-                ? "border-cyan-400 bg-background text-foreground"
-                : "border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                ? "bg-white/[0.07] text-foreground shadow-sm ring-1 ring-white/10"
+                : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
             )}
           >
             <Globe className="size-3.5 text-cyan-400" />
@@ -150,10 +150,10 @@ export function IdeTabBar({
             aria-selected={tab === "file"}
             onClick={() => onTab("file")}
             className={cn(
-              "group flex h-8 items-center gap-2 rounded-t-md border-b-2 px-3 font-mono text-xs transition-colors",
+              "group flex h-8 items-center gap-2 rounded-lg px-3 font-mono text-xs transition-all",
               tab === "file"
-                ? "border-[#FDC00A] bg-background text-foreground"
-                : "border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                ? "bg-white/[0.07] text-foreground shadow-sm ring-1 ring-white/10"
+                : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
             )}
           >
             <FileCode2 className="size-3.5 text-[#FDC00A]" />

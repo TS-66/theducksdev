@@ -28,6 +28,7 @@ function prettyJson(raw: string): string {
 
 export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
   const [open, setOpen] = React.useState(false);
+  const [dismissed, setDismissed] = React.useState(false);
   const state: ToolRunState = result
     ? result.status === "error"
       ? "err"
@@ -54,38 +55,50 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
     () => (isEdit ? parseEditArgs(call.function.arguments) : null),
     [isEdit, call.function.arguments],
   );
-  // Auto-open edit cards so the diff is immediately visible.
-  React.useEffect(() => {
-    if (editArgs && state === "ok") setOpen(true);
-  }, [editArgs != null, state]);
+  // Auto-open edit cards so the diff is immediately visible (derived, not
+  // an effect: dismissal is recorded in the toggle handler below).
+  const autoOpen = editArgs != null && state === "ok" && !dismissed;
 
   const outputTone =
     result?.status === "error" ? "text-destructive bg-destructive/5" : "text-foreground/90";
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="min-w-0">
+    <Collapsible
+      open={open || autoOpen}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) setDismissed(true);
+      }}
+      className="min-w-0"
+    >
       <div
         className={cn(
-          "overflow-hidden rounded-md border text-xs transition-shadow",
+          "overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.02] text-xs transition-all",
           state === "running" && cn("border-l-2 shadow-sm", meta.accent),
         )}
       >
         <CollapsibleTrigger
           aria-expanded={open}
-          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
+          <span
+            aria-hidden
+            className={cn("flex size-6 shrink-0 items-center justify-center rounded-md bg-white/[0.04]", state === "running" && "ducky-glow-breathe")}
+            data-state={state}
+          >
+            <Icon
+              aria-hidden
+              className={cn(
+                "size-3.5",
+                meta.tint,
+                state === "running" && "ducky-spin-slow",
+              )}
+            />
+          </span>
           <span
             aria-hidden
             className={cn("size-1.5 shrink-0 rounded-full", dot)}
             data-state={state}
-          />
-          <Icon
-            aria-hidden
-            className={cn(
-              "size-3.5 shrink-0",
-              meta.tint,
-              state === "running" && "ducky-spin-slow",
-            )}
           />
           <span className="shrink-0 font-mono font-semibold">{name}</span>
           <span className="hidden rounded bg-muted/70 px-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground sm:inline">

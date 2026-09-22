@@ -168,30 +168,30 @@ export function Hero({
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="relative flex min-h-full min-w-0 flex-col items-center justify-center overflow-hidden py-8 text-center"
     >
-      {/* giant faint pixel-duck watermark — zcode-style backdrop */}
+      {/* ambient orbs + faint mark */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-6 size-72 -translate-x-1/2 rounded-full bg-[#FDC00A]/10 blur-[100px] md:size-96" />
-        <div className="absolute left-1/4 top-40 size-48 rounded-full bg-violet-500/10 blur-[80px]" />
-        <div className="absolute right-1/4 top-32 size-48 rounded-full bg-cyan-500/10 blur-[80px]" />
+        <div className="ducky-orb absolute left-1/2 top-2 size-72 -translate-x-1/2 rounded-full bg-[#FDC00A]/[0.13] blur-[110px] md:size-[28rem]" />
+        <div className="ducky-orb absolute left-[12%] top-44 size-56 rounded-full bg-violet-500/[0.13] blur-[90px] [animation-delay:-3s]" />
+        <div className="ducky-orb absolute right-[10%] top-36 size-56 rounded-full bg-cyan-500/[0.12] blur-[90px] [animation-delay:-6s]" />
       </div>
       <img
         src="/ducky-mark.png"
         alt=""
         aria-hidden
         draggable={false}
-        className="pointer-events-none absolute -top-10 left-1/2 size-72 -translate-x-1/2 select-none opacity-[0.05] md:size-96"
+        className="pointer-events-none absolute -top-8 left-1/2 size-60 -translate-x-1/2 select-none opacity-[0.06] md:size-80"
       />
 
-      {/* greeting */}
-      <h1 className="relative mt-14 bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-3xl font-bold tracking-tight text-transparent md:mt-20 md:text-5xl">
-        {greeting}
-      </h1>
-      <p className="relative mt-1 font-mono text-[11px] uppercase tracking-[0.2em] text-[#FDC00A]/80">
-        ducky ai · coder ide
+      {/* eyebrow + headline */}
+      <p className="ducky-fade-up relative mt-12 font-mono text-[11px] uppercase tracking-[0.28em] text-[#FDC00A]/90 md:mt-16">
+        {greeting} · ducky ai
       </p>
+      <h1 className="ducky-headline ducky-fade-up relative mt-2 max-w-2xl text-4xl font-bold leading-[1.05] md:text-6xl [animation-delay:80ms]">
+        What are we building today?
+      </h1>
 
       {/* project context line — quiet, honest about the empty slate */}
-      <p className="relative z-10 mt-2 text-xs text-muted-foreground">
+      <p className="ducky-fade-up relative z-10 mt-3 text-xs text-muted-foreground [animation-delay:140ms]">
         {projectName ? (
           hasFiles ? (
             <>
@@ -213,10 +213,10 @@ export function Hero({
 
       {/* centered composer slot */}
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.08, ease: "easeOut" }}
-        className="relative z-10 mt-9 w-full max-w-2xl px-4"
+        transition={{ duration: 0.4, delay: 0.16, ease: "easeOut" }}
+        className="relative z-10 mt-7 w-full max-w-2xl px-4"
       >
         {children}
       </motion.div>
@@ -239,7 +239,7 @@ export function Hero({
               if ("prompt" in s && s.prompt) onPick(s.prompt);
             }}
             title={s.text}
-            className="group flex max-w-full items-center gap-1.5 rounded-full border bg-card/70 py-1.5 pl-2.5 pr-3 backdrop-blur transition-all hover:-translate-y-px hover:border-[#FDC00A]/40 hover:bg-accent hover:shadow-[0_8px_24px_-12px_rgba(253,192,10,0.4)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="group flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] py-1.5 pl-2.5 pr-3 backdrop-blur transition-all hover:-translate-y-px hover:border-[#FDC00A]/50 hover:bg-[#FDC00A]/[0.07] hover:shadow-[0_8px_24px_-12px_rgba(253,192,10,0.5)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <span className="shrink-0 opacity-80">{s.icon}</span>
             <span className="truncate text-xs text-muted-foreground transition-colors group-hover:text-foreground">
@@ -276,9 +276,9 @@ export function Hero({
               if (c.prompt) onPick(c.prompt, c.planMode ? { planMode: true } : undefined);
             }}
             className={cn(
-              "group rounded-xl border bg-card/70 p-3.5 text-left shadow-sm backdrop-blur transition-all duration-200",
-              "hover:-translate-y-0.5 hover:border-[#FDC00A]/40 hover:bg-accent hover:shadow-[0_12px_32px_-12px_rgba(253,192,10,0.35)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              c.violetTint && "border-violet-500/25 hover:border-violet-400/50",
+              "ducky-glass group rounded-2xl p-4 text-left transition-all duration-200",
+              "hover:-translate-y-1 hover:shadow-[0_20px_48px_-16px_rgba(253,192,10,0.35)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              c.violetTint && "hover:shadow-[0_20px_48px_-16px_rgba(139,92,246,0.4)]",
             )}
           >
             <span className="flex items-center gap-1.5">

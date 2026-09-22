@@ -82,7 +82,7 @@ export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea ref={rootRef} className="min-h-0 flex-1">
-        <div className="ducky-grid-bg mx-auto max-w-3xl space-y-5 px-4 py-6 md:px-8">
+        <div className="ducky-grid-bg mx-auto max-w-2xl space-y-6 px-4 py-8 md:px-6">
           {visible.map((m) => (
             <MessageItem
               key={m.id}

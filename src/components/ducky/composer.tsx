@@ -276,7 +276,7 @@ export function Composer({
   };
 
   const focusGlow = cn(
-    "focus-within:border-[#FDC00A]/60 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.12),0_16px_40px_-16px_rgba(253,192,10,0.35)]",
+    "focus-within:border-[#FDC00A]/50 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.14),0_24px_64px_-24px_rgba(253,192,10,0.45)]",
   );
 
   const fileInput = (
@@ -301,7 +301,7 @@ export function Composer({
       <div className="w-full">
         <div
           className={cn(
-            "group/composer relative rounded-2xl border bg-card shadow-[0_12px_40px_-16px_rgba(0,0,0,0.6)] transition-all duration-200",
+            "ducky-glass group/composer relative rounded-[26px] transition-all duration-200",
             focusGlow,
           )}
         >
@@ -323,7 +323,7 @@ export function Composer({
             onPaste={onPaste}
             placeholder="Ask Ducky anything, @ to add context, / for commands"
             aria-label="Ask Ducky"
-            className="min-h-[72px] max-h-[240px] resize-none border-0 bg-transparent px-4 pb-2 pt-3.5 focus-visible:ring-0"
+            className="min-h-[72px] max-h-[240px] resize-none border-0 bg-transparent px-5 pb-2 pt-4 text-[15px] leading-relaxed placeholder:text-muted-foreground/60 focus-visible:ring-0"
           />
 
           {fileInput}
@@ -439,12 +439,12 @@ export function Composer({
                         disabled={!canSend}
                         onClick={trySend}
                         className={cn(
-                          "size-9 rounded-full",
-                          canSend ? "bg-primary text-primary-foreground hover:bg-primary/90" : "",
+                          "size-10 rounded-full",
+                          canSend ? "ducky-send" : "bg-muted text-muted-foreground",
                           locked && "cursor-not-allowed",
                         )}
                       >
-                        <ArrowUp className="size-4.5" />
+                        <ArrowUp className="size-4.5" strokeWidth={2.5} />
                       </Button>
                     </span>
                   </TooltipTrigger>
@@ -463,7 +463,7 @@ export function Composer({
   const surface = (
     <div
       className={cn(
-        "group/composer relative mx-auto w-full max-w-3xl rounded-xl border bg-card shadow-sm transition-all duration-200",
+        "ducky-glass group/composer relative mx-auto w-full max-w-3xl rounded-[22px] transition-all duration-200",
         focusGlow,
         disabledSurface && "opacity-70",
       )}
@@ -599,8 +599,8 @@ export function Composer({
                   disabled={!canSend}
                   onClick={trySend}
                   className={cn(
-                    "size-9",
-                    canSend ? "bg-primary text-primary-foreground" : "",
+                    "size-9 rounded-full",
+                    canSend ? "ducky-send" : "bg-muted text-muted-foreground",
                     locked && "cursor-not-allowed",
                   )}
                 >
