@@ -242,7 +242,7 @@ export function StatusBar({
 
   return (
     <footer
-      className="z-20 flex h-7 shrink-0 items-center justify-between gap-4 border-t bg-muted/40 px-3 font-mono text-[11px] text-muted-foreground"
+      className="z-20 flex h-6 shrink-0 items-center justify-between gap-4 border-t border-white/[0.06] bg-black/40 px-3 font-mono text-[10px] text-muted-foreground"
       role="status"
       aria-label="Status bar"
     >
@@ -405,7 +405,7 @@ export function StatusBar({
         <span aria-label="Current time">{now || "--:--"}</span>
         <span
           aria-hidden
-          className="select-none font-semibold text-[#FDC00A]/70"
+          className="select-none font-semibold text-[#FF7A1A]/70"
           title="Ducky AI | Coder"
         >
           ▲ ducky

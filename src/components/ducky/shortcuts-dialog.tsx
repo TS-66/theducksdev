@@ -40,7 +40,7 @@ export function ShortcutsDialog({
       <DialogContent className="custom-scrollbar max-h-[85dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <SquareTerminal className="size-4 text-[#FDC00A]" aria-hidden /> ducky cheat sheet
+            <SquareTerminal className="size-4 text-[#FF7A1A]" aria-hidden /> ducky cheat sheet
           </DialogTitle>
           <DialogDescription>
             Keyboard bindings and slash commands — the harness way.
@@ -48,7 +48,7 @@ export function ShortcutsDialog({
         </DialogHeader>
         {/* ── keyboard ────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2">
-          <Keyboard className="size-3.5 text-[#FDC00A]" aria-hidden />
+          <Keyboard className="size-3.5 text-[#FF7A1A]" aria-hidden />
           <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             keyboard
           </h3>
@@ -80,7 +80,7 @@ export function ShortcutsDialog({
 
         {/* ── slash commands ─────────────────────────────────────────────── */}
         <div className="mt-3 flex items-center gap-2 border-t pt-3">
-          <Slash className="size-3.5 text-[#FDC00A]" aria-hidden />
+          <Slash className="size-3.5 text-[#FF7A1A]" aria-hidden />
           <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             slash commands
           </h3>
@@ -92,7 +92,7 @@ export function ShortcutsDialog({
               key={c.cmd}
               className="group flex items-center justify-between gap-3 rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-muted/50"
             >
-              <code className="shrink-0 rounded border border-[#FDC00A]/25 bg-[#FDC00A]/[0.07] px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-[#8fa2ff] transition-colors group-hover:border-[#FDC00A]/45">
+              <code className="shrink-0 rounded border border-[#FF7A1A]/25 bg-[#FF7A1A]/[0.07] px-1.5 py-0.5 font-mono text-[10.5px] font-semibold text-[#8fa2ff] transition-colors group-hover:border-[#FF7A1A]/45">
                 {c.cmd}
               </code>
               <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">

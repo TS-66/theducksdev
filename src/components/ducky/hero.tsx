@@ -43,7 +43,7 @@ interface HeroCard {
 
 const CARDS_WITH_FILES: HeroCard[] = [
   {
-    icon: <FilePenLine className="size-3.5 text-[#FDC00A]" aria-hidden />,
+    icon: <FilePenLine className="size-3.5 text-[#FF7A1A]" aria-hidden />,
     title: "Live edit + diff",
     desc: "Ask for a change and watch the diff land.",
     prompt: "Change the default greeting to Howdy",
@@ -66,13 +66,13 @@ const CARDS_WITH_FILES: HeroCard[] = [
 
 const CARDS_EMPTY: HeroCard[] = [
   {
-    icon: <FolderPlus className="size-3.5 text-[#FDC00A]" aria-hidden />,
+    icon: <FolderPlus className="size-3.5 text-[#FF7A1A]" aria-hidden />,
     title: "Bring your own project",
     desc: "Import a folder from disk — your files, your structure, sandboxed.",
     action: "new-project",
   },
   {
-    icon: <FilePenLine className="size-3.5 text-[#FDC00A]" aria-hidden />,
+    icon: <FilePenLine className="size-3.5 text-[#FF7A1A]" aria-hidden />,
     title: "Start from the sample repo",
     desc: "greeting-service: 7 TypeScript files with tests, ready to edit.",
     action: "use-sample",
@@ -135,7 +135,7 @@ export function Hero({
       ] as const)
     : ([
         {
-          icon: <FolderPlus className="size-4 text-[#FDC00A]" aria-hidden />,
+          icon: <FolderPlus className="size-4 text-[#FF7A1A]" aria-hidden />,
           text: "Create a project — empty, sample repo, or import your own folder",
           action: "new-project" as const,
         },
@@ -170,7 +170,7 @@ export function Hero({
     >
       {/* ambient orbs + faint mark */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="ducky-orb absolute left-1/2 top-2 size-72 -translate-x-1/2 rounded-full bg-[#FDC00A]/[0.13] blur-[110px] md:size-[28rem]" />
+        <div className="ducky-orb absolute left-1/2 top-2 size-72 -translate-x-1/2 rounded-full bg-[#FF7A1A]/[0.13] blur-[110px] md:size-[28rem]" />
         <div className="ducky-orb absolute left-[12%] top-44 size-56 rounded-full bg-violet-500/[0.13] blur-[90px] [animation-delay:-3s]" />
         <div className="ducky-orb absolute right-[10%] top-36 size-56 rounded-full bg-cyan-500/[0.12] blur-[90px] [animation-delay:-6s]" />
       </div>
@@ -183,10 +183,10 @@ export function Hero({
       />
 
       {/* eyebrow + headline */}
-      <p className="ducky-fade-up relative mt-12 font-mono text-[11px] uppercase tracking-[0.28em] text-[#FDC00A]/90 md:mt-16">
+      <p className="ducky-fade-up relative mt-12 font-mono text-[11px] uppercase tracking-[0.28em] text-[#FF7A1A]/90 md:mt-16">
         {greeting} · ducky ai
       </p>
-      <h1 className="ducky-headline ducky-fade-up relative mt-2 max-w-2xl text-4xl font-bold leading-[1.05] md:text-6xl [animation-delay:80ms]">
+      <h1 className="ducky-headline ducky-fade-up relative mt-3 max-w-3xl text-[2.6rem] font-bold leading-[1.02] md:text-7xl [animation-delay:80ms]">
         What are we building today?
       </h1>
 
@@ -196,13 +196,13 @@ export function Hero({
           hasFiles ? (
             <>
               working in{" "}
-              <span className="font-mono text-[#FDC00A]">{projectName}</span> · {projectFileCount}{" "}
+              <span className="font-mono text-[#FF7A1A]">{projectName}</span> · {projectFileCount}{" "}
               {projectFileCount === 1 ? "file" : "files"} seeded into new tasks
             </>
           ) : (
             <>
               working in{" "}
-              <span className="font-mono text-[#FDC00A]">{projectName}</span> · empty workspace —
+              <span className="font-mono text-[#FF7A1A]">{projectName}</span> · empty workspace —
               new tasks start blank
             </>
           )
@@ -239,7 +239,7 @@ export function Hero({
               if ("prompt" in s && s.prompt) onPick(s.prompt);
             }}
             title={s.text}
-            className="group flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] py-1.5 pl-2.5 pr-3 backdrop-blur transition-all hover:-translate-y-px hover:border-[#FDC00A]/50 hover:bg-[#FDC00A]/[0.07] hover:shadow-[0_8px_24px_-12px_rgba(253,192,10,0.5)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="group flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] py-1.5 pl-2.5 pr-3 backdrop-blur transition-all hover:-translate-y-px hover:border-[#FF7A1A]/50 hover:bg-[#FF7A1A]/[0.07] hover:shadow-[0_8px_24px_-12px_rgba(253,192,10,0.5)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <span className="shrink-0 opacity-80">{s.icon}</span>
             <span className="truncate text-xs text-muted-foreground transition-colors group-hover:text-foreground">
@@ -251,7 +251,7 @@ export function Hero({
 
       {/* announcement line */}
       <div className="relative z-10 mt-6 flex max-w-xl items-start gap-2 px-6 text-left">
-        <Megaphone className="mt-0.5 size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+        <Megaphone className="mt-0.5 size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
         <p className="text-xs leading-relaxed text-muted-foreground">
           New for explorers: paste an image straight into chat and ask
           &ldquo;describe the image&rdquo; — vision analysis runs free while in beta.

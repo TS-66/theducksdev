@@ -126,20 +126,20 @@ function ComposerMetaRow({ sessionId }: { sessionId: string | null }) {
       <span
         aria-label={`Active model: ${modelDisplayName(model)}`}
         title="Your model (Settings → Connections)"
-        className="flex min-w-0 items-center gap-1.5 truncate rounded-full border border-[#FDC00A]/20 bg-[#FDC00A]/5 px-2.5 py-1 font-mono text-[11px] text-foreground/80"
+        className="flex min-w-0 items-center gap-1.5 truncate rounded-full border border-[#FF7A1A]/20 bg-[#FF7A1A]/5 px-2.5 py-1 font-mono text-[11px] text-foreground/80"
       >
-        <Cpu className="size-3 shrink-0 text-[#FDC00A]" aria-hidden />
+        <Cpu className="size-3 shrink-0 text-[#FF7A1A]" aria-hidden />
         <span className="truncate">{modelDisplayName(model)}</span>
       </span>
       <label className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-        <Map className="size-3 text-[#FDC00A]" aria-hidden />
+        <Map className="size-3 text-[#FF7A1A]" aria-hidden />
         <span className="sr-only">Permission mode</span>
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as AgentMode)}
           aria-label={`Permission mode: ${MODE_META[mode].label}`}
           title={MODE_META[mode].hint}
-          className="cursor-pointer rounded-full border bg-card px-2 py-1 font-mono text-[11px] text-foreground hover:border-[#FDC00A]/40 focus-visible:outline-none"
+          className="cursor-pointer rounded-full border bg-card px-2 py-1 font-mono text-[11px] text-foreground hover:border-[#FF7A1A]/40 focus-visible:outline-none"
         >
           {(Object.keys(MODE_META) as AgentMode[]).map((m) => (
             <option key={m} value={m}>
@@ -277,7 +277,7 @@ export function Composer({
   };
 
   const focusGlow = cn(
-    "focus-within:border-[#FDC00A]/50 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.14),0_24px_64px_-24px_rgba(253,192,10,0.45)]",
+    "focus-within:border-[#FF7A1A]/50 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.14),0_24px_64px_-24px_rgba(253,192,10,0.45)]",
   );
 
   const fileInput = (
@@ -309,7 +309,7 @@ export function Composer({
           {/* focus glow hairline (top edge) */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#FDC00A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
+            className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A1A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
           />
 
           {/* workspace row — real project picker (list / create / rename / delete) */}
@@ -377,7 +377,7 @@ export function Composer({
                   >
                     <span className={POLICY_META[p].className}>{POLICY_META[p].icon}</span>
                     <span className="flex-1">{POLICY_META[p].label}</span>
-                    {policy === p && <Check className="size-3.5 text-[#FDC00A]" aria-hidden />}
+                    {policy === p && <Check className="size-3.5 text-[#FF7A1A]" aria-hidden />}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -402,14 +402,14 @@ export function Composer({
                     type="button"
                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <Cpu className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+                    <Cpu className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block font-mono text-xs font-semibold">{modelDisplayName(model)}</span>
                       <span className="block text-[10px] text-muted-foreground">
                         your model — set it in Settings → Connections
                       </span>
                     </span>
-                    <Check className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+                    <Check className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
                   </button>
                 </PopoverContent>
               </Popover>
@@ -472,7 +472,7 @@ export function Composer({
       {/* focus glow hairline (top edge) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#FDC00A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
+        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A1A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
       />
       {/* top chip row */}
       <div className="flex items-center gap-1 px-2 pt-1.5">
@@ -483,7 +483,7 @@ export function Composer({
               aria-label={`Active model: ${modelDisplayName(model)}`}
               className="flex h-7 cursor-default items-center gap-1.5 rounded-md bg-muted/50 px-2 font-mono text-[11px] text-foreground/80"
             >
-              <Cpu className="size-3.5 text-[#FDC00A]" aria-hidden /> {modelDisplayName(model)}
+              <Cpu className="size-3.5 text-[#FF7A1A]" aria-hidden /> {modelDisplayName(model)}
             </span>
           </TooltipTrigger>
           <TooltipContent side="top">

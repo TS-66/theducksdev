@@ -63,7 +63,7 @@ export function MarketplacePanel({
           Browse, search, install and remove agent plugins.
         </DialogDescription>
         <div className="flex shrink-0 items-center gap-2 border-b px-5 pb-3 pt-4">
-          <Store className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+          <Store className="size-4 shrink-0 text-[#FF7A1A]" aria-hidden />
           <h2 className="truncate text-lg font-bold tracking-tight">Marketplace</h2>
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
             {enabledCount}/{PLUGINS.length} installed
@@ -91,7 +91,7 @@ export function MarketplacePanel({
               className={cn(
                 "rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors",
                 cat === c
-                  ? "border-[#FDC00A]/50 bg-[#FDC00A]/10 text-foreground"
+                  ? "border-[#FF7A1A]/50 bg-[#FF7A1A]/10 text-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

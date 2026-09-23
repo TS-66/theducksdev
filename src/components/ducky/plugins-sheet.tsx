@@ -74,7 +74,7 @@ export function PluginsSheet({ open, onOpenChange }: PluginsSheetProps) {
       <div className="space-y-5">
         <section className="space-y-1">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <Puzzle className="size-4 text-[#FDC00A]" aria-hidden /> Plugins
+            <Puzzle className="size-4 text-[#FF7A1A]" aria-hidden /> Plugins
           </h2>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             Everything is a plugin. Each package below contributes tools to the model&apos;s
@@ -133,7 +133,7 @@ function PluginCard({
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate font-mono text-[13px] font-semibold text-[#FDC00A] dark:text-[#7b90ff]">
+            <span className="truncate font-mono text-[13px] font-semibold text-[#FF7A1A] dark:text-[#7b90ff]">
               {plugin.name}
             </span>
             <Badge variant="secondary" className="px-1 py-0 font-mono text-[9px] text-muted-foreground">

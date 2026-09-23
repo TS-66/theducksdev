@@ -619,7 +619,7 @@ export default function DuckyCoderPage() {
           alt="Ducky AI logo"
           className="size-14 rounded-xl border bg-black ducky-pulse-dot"
         />
-        <span aria-hidden className="font-mono text-lg font-bold text-[#FDC00A]">
+        <span aria-hidden className="font-mono text-lg font-bold text-[#FF7A1A]">
           ducky ai | coder
         </span>
         <div className="w-48 space-y-2">
@@ -656,9 +656,9 @@ export default function DuckyCoderPage() {
         <div
           role="status"
           aria-label={`Update available: ${update.tag}`}
-          className="ducky-fade-up z-20 flex shrink-0 items-center gap-2 border-b border-[#FDC00A]/30 bg-gradient-to-r from-[#FDC00A]/15 via-[#FDC00A]/8 to-transparent px-3 py-1.5"
+          className="ducky-fade-up z-20 flex shrink-0 items-center gap-2 border-b border-[#FF7A1A]/30 bg-gradient-to-r from-[#FF7A1A]/15 via-[#FF7A1A]/8 to-transparent px-3 py-1.5"
         >
-          <span aria-hidden className="ducky-pulse-dot inline-block size-1.5 shrink-0 rounded-full bg-[#FDC00A]" />
+          <span aria-hidden className="ducky-pulse-dot inline-block size-1.5 shrink-0 rounded-full bg-[#FF7A1A]" />
           <p className="min-w-0 flex-1 truncate text-xs">
             <span className="font-semibold">Update available: {update.name}</span>
             <span className="ml-2 hidden text-muted-foreground sm:inline">
@@ -676,7 +676,7 @@ export default function DuckyCoderPage() {
                 description: update.url ? `Release notes: ${update.url}` : undefined,
               });
             }}
-            className="shrink-0 rounded-full bg-[#FDC00A] px-2.5 py-1 font-mono text-[11px] font-semibold text-black hover:brightness-105"
+            className="shrink-0 rounded-full bg-[#FF7A1A] px-2.5 py-1 font-mono text-[11px] font-semibold text-black hover:brightness-105"
           >
             Copy update command
           </button>
@@ -708,7 +708,7 @@ export default function DuckyCoderPage() {
 
         {/* desktop explorer */}
         {leftOpen && (
-          <aside className="hidden w-[300px] shrink-0 flex-col border-r border-white/[0.06] bg-black/20 lg:flex">
+          <aside className="hidden w-[320px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0d10] lg:flex">
             <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
               <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Explorer

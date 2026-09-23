@@ -98,7 +98,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
       >
         <div className="ducky-glass min-w-0 flex-1 rounded-2xl px-4 py-3">
           <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed">
-            <span aria-hidden className="mr-2 select-none font-mono text-[#FDC00A]">
+            <span aria-hidden className="mr-2 select-none font-mono text-[#FF7A1A]">
               ❯
             </span>
             {m.content}
@@ -127,7 +127,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
       className="group/msg space-y-1"
     >
       <div className="flex items-start justify-between gap-3">
-        <span aria-hidden className="select-none font-mono text-sm leading-6 text-[#FDC00A]">
+        <span aria-hidden className="select-none font-mono text-sm leading-6 text-[#FF7A1A]">
           ✦
         </span>
         <div className="flex items-center gap-1.5">
@@ -218,7 +218,7 @@ function UsageChip({ message: m }: { message: ChatMessage }) {
           className="flex cursor-help items-center gap-0.5 rounded border border-border/60 bg-muted/40 px-1 py-px font-mono text-[9px] text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
           aria-label={`Model ${meta.model ?? "unknown"}, ${total} tokens`}
         >
-          <Zap className={cn("size-2.5", total > 0 ? "text-[#FDC00A]" : "text-muted-foreground")} aria-hidden />
+          <Zap className={cn("size-2.5", total > 0 ? "text-[#FF7A1A]" : "text-muted-foreground")} aria-hidden />
           {total > 0 ? fmtK(total) : modelDisplayName(meta.model)}
         </span>
       </TooltipTrigger>

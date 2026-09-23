@@ -1424,7 +1424,7 @@ export function buildToolDefinitions(): ToolDefinition[] {
       name: 'color_convert',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-color`).id,
       description: 'Convert a hex color (#rgb or #rrggbb) to rgb() and hsl() strings.',
-      parameters: obj({ hex: str('Hex color, e.g. "#fdc00a".') }, ['hex']),
+      parameters: obj({ hex: str('Hex color, e.g. "#ff7a1a".') }, ['hex']),
     },
     {
       name: 'color_contrast',

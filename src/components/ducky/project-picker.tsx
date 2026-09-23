@@ -100,7 +100,7 @@ export function ProjectPickerRow({ onNewProject }: { onNewProject: () => void })
             aria-label="Select project"
             className="flex w-full items-center gap-2 rounded-t-2xl border-b px-4 py-2.5 text-left text-[13px] text-foreground/90 transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <FolderGit2 className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+            <FolderGit2 className="size-4 shrink-0 text-[#FF7A1A]" aria-hidden />
             <span className={cn("truncate", !active && "italic text-muted-foreground")}>
               {active ? active.name : "No project — start from an empty workspace"}
             </span>
@@ -153,7 +153,7 @@ export function ProjectPickerRow({ onNewProject }: { onNewProject: () => void })
                       <FolderTree
                         className={cn(
                           "size-3.5 shrink-0",
-                          isActive ? "text-[#FDC00A]" : "text-muted-foreground",
+                          isActive ? "text-[#FF7A1A]" : "text-muted-foreground",
                         )}
                         aria-hidden
                       />
@@ -162,7 +162,7 @@ export function ProjectPickerRow({ onNewProject }: { onNewProject: () => void })
                         {n}
                       </span>
                       {isActive && (
-                        <Check className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+                        <Check className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
                       )}
                     </button>
                     <DropdownMenu>
@@ -208,7 +208,7 @@ export function ProjectPickerRow({ onNewProject }: { onNewProject: () => void })
               }}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <FolderPlus className="size-3.5 text-[#FDC00A]" aria-hidden />
+              <FolderPlus className="size-3.5 text-[#FF7A1A]" aria-hidden />
               New project…
             </button>
             <p className="px-2 pb-0.5 pt-1 text-[10px] leading-relaxed text-muted-foreground/70">
@@ -543,7 +543,7 @@ export function NewProjectDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FolderPlus className="size-4 text-[#FDC00A]" aria-hidden /> New project
+            <FolderPlus className="size-4 text-[#FF7A1A]" aria-hidden /> New project
           </DialogTitle>
           <DialogDescription>
             A project is the starting workspace for your tasks. Bring your own files, use the
@@ -680,7 +680,7 @@ export function NewProjectDialog({
                 htmlFor="starter-empty"
                 className={cn(
                   "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
-                  starter === "empty" ? "border-[#FDC00A]/50 bg-[#FDC00A]/5" : "hover:bg-accent/40",
+                  starter === "empty" ? "border-[#FF7A1A]/50 bg-[#FF7A1A]/5" : "hover:bg-accent/40",
                 )}
               >
                 <RadioGroupItem id="starter-empty" value="empty" className="mt-0.5" />
@@ -695,7 +695,7 @@ export function NewProjectDialog({
                 htmlFor="starter-sample"
                 className={cn(
                   "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
-                  starter === "sample" ? "border-[#FDC00A]/50 bg-[#FDC00A]/5" : "hover:bg-accent/40",
+                  starter === "sample" ? "border-[#FF7A1A]/50 bg-[#FF7A1A]/5" : "hover:bg-accent/40",
                 )}
               >
                 <RadioGroupItem id="starter-sample" value="sample" className="mt-0.5" />

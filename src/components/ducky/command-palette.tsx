@@ -141,13 +141,13 @@ export function CommandPalette({
       onOpenChange={onOpenChange}
       title="Ducky command palette"
       description="Jump to sessions, open workspace files or run slash commands."
-      className="w-[min(560px,92vw)] max-w-none gap-0 overflow-hidden rounded-xl border-border/70 shadow-2xl shadow-black/40"
+      className="w-[min(620px,92vw)] max-w-none gap-0 overflow-hidden rounded-2xl border-white/10 bg-[#131316] shadow-2xl shadow-black/60"
       showCloseButton={false}
     >
-      <div aria-hidden className="h-px w-full bg-gradient-to-r from-transparent via-[#FDC00A]/60 to-transparent" />
+      <div aria-hidden className="h-px w-full bg-gradient-to-r from-transparent via-[#FF7A1A]/60 to-transparent" />
       <CommandInput
-        placeholder="Type a command, session or file…"
-        className="font-mono text-[13px]"
+        placeholder="Type a command, session, file or tool…"
+        className="py-4 font-mono text-[14px]"
         aria-label="Command palette search"
       />
       <CommandList className="custom-scrollbar max-h-[min(420px,56dvh)]">
@@ -178,7 +178,7 @@ export function CommandPalette({
               onToggleActivity();
             }}
           >
-            <Activity className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+            <Activity className="size-4 shrink-0 text-[#FF7A1A]" aria-hidden />
             <span>Toggle activity timeline</span>
             <CommandShortcut>⌘E</CommandShortcut>
           </CommandItem>
@@ -233,7 +233,7 @@ export function CommandPalette({
                 });
               }}
             >
-              <Wrench className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+              <Wrench className="size-4 shrink-0 text-[#FF7A1A]" aria-hidden />
               <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold">
                 {t.name}
                 <span className="ml-2 hidden truncate font-sans text-xs font-normal text-muted-foreground sm:inline">
@@ -267,7 +267,7 @@ export function CommandPalette({
                   )}
                   <span className="min-w-0 flex-1 truncate">{s.title}</span>
                   {s.id === activeSessionId && (
-                    <span className="font-mono text-[10px] uppercase tracking-wide text-[#FDC00A]">
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-[#FF7A1A]">
                       current
                     </span>
                   )}

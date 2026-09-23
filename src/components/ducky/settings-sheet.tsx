@@ -335,7 +335,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                     onClick={() => setTab(item.id)}
                     className={cn(
                       "rounded-full border px-2.5 py-1 font-mono text-[11px]",
-                      tab === item.id ? "border-[#FDC00A]/50 bg-[#FDC00A]/10" : "text-muted-foreground",
+                      tab === item.id ? "border-[#FF7A1A]/50 bg-[#FF7A1A]/10" : "text-muted-foreground",
                     )}
                   >
                     {item.label}
@@ -443,9 +443,37 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
             )}
             {tab === "models" && (
               <div className="space-y-5">
+              <button
+                type="button"
+                onClick={runTest}
+                disabled={testing || !draft.baseUrl.trim() || !draft.apiKey.trim()}
+                title="Click to test this connection"
+                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-left transition-colors hover:border-white/[0.14]"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-2 shrink-0 rounded-full",
+                    draft.baseUrl.trim() && draft.apiKey.trim() && draft.model.trim()
+                      ? "bg-emerald-400"
+                      : "bg-muted-foreground/40",
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-xs font-semibold">
+                    {modelDisplayName(draft.model)}
+                  </span>
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    {draft.baseUrl.trim() || "no endpoint yet — fill the form below"}
+                  </span>
+                </span>
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                  {testing ? "testing…" : "test →"}
+                </span>
+              </button>
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center gap-2">
-                  <KeyRound className="size-4 text-[#FDC00A]" aria-hidden />
+                  <KeyRound className="size-4 text-[#FF7A1A]" aria-hidden />
                   <h3 className="text-xs font-semibold">Your model connection</h3>
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
@@ -462,7 +490,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                         description: "Paste your key, then Discover → pick a model → Test.",
                       });
                     }}
-                    className="rounded-full border border-[#FDC00A]/30 bg-[#FDC00A]/5 px-2.5 py-1 font-mono text-[11px] hover:border-[#FDC00A]/60 hover:text-foreground"
+                    className="rounded-full border border-[#FF7A1A]/30 bg-[#FF7A1A]/5 px-2.5 py-1 font-mono text-[11px] hover:border-[#FF7A1A]/60 hover:text-foreground"
                   >
                     ⚡ Use NVIDIA
                   </button>
@@ -539,7 +567,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                           type="button"
                           onClick={() => patch({ model: m })}
                           title={m}
-                          className="max-w-44 truncate rounded-full border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-[#FDC00A]/50 hover:text-foreground"
+                          className="max-w-44 truncate rounded-full border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-[#FF7A1A]/50 hover:text-foreground"
                         >
                           {m}
                         </button>
@@ -619,7 +647,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs font-medium">
                               {p.name}
-                              {active && <span className="ml-1.5 text-[10px] text-[#FDC00A]">active</span>}
+                              {active && <span className="ml-1.5 text-[10px] text-[#FF7A1A]">active</span>}
                             </span>
                             <span className="block truncate font-mono text-[10px] text-muted-foreground">
                               {p.model || "(no model)"} · {maskKeyHint(p.apiKey)}
@@ -938,7 +966,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                 {SKILLS.map((s) => (
                   <div key={s.name} className="rounded-md border p-2.5">
                     <p className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-                      <GraduationCap className="size-3.5 text-[#FDC00A]" aria-hidden />
+                      <GraduationCap className="size-3.5 text-[#FF7A1A]" aria-hidden />
                       {s.name}
                     </p>
                     <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{s.description}</p>
@@ -1003,7 +1031,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   <img
                     src="/ducky-mark.png"
                     alt="Ducky AI logo"
-                    className="size-8 rounded-md border border-[#FDC00A]/25 bg-black"
+                    className="size-8 rounded-md border border-[#FF7A1A]/25 bg-black"
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold leading-tight">Ducky AI | Coder</p>
@@ -1237,7 +1265,7 @@ function PolicyOption({
       <RadioGroupItem id={`policy-${value}`} value={value} className="mt-0.5" />
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-          <span className="text-[#FDC00A]">{icon}</span>
+          <span className="text-[#FF7A1A]">{icon}</span>
           {title}
         </span>
         <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{desc}</span>

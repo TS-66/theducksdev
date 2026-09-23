@@ -260,6 +260,9 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
       <div className="mx-3 mb-1 h-px bg-white/[0.06]" aria-hidden />
 
       {/* Search + Sessions */}
+      <p className="px-4 pb-1 pt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground/50">
+        Sessions
+      </p>
       {sessions.length > 0 && (
         <div className="px-2 pb-1">
           <div className="relative">

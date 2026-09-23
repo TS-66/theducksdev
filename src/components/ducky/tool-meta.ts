@@ -385,14 +385,14 @@ const REGISTRY: Record<string, ToolMeta> = {
   },
   skill_list: {
     icon: GraduationCap,
-    tint: "text-[#FDC00A]",
-    accent: "border-l-[#FDC00A]/70",
+    tint: "text-[#FF7A1A]",
+    accent: "border-l-[#FF7A1A]/70",
     label: "skills",
   },
   skill_show: {
     icon: BookOpen,
-    tint: "text-[#FDC00A]",
-    accent: "border-l-[#FDC00A]/70",
+    tint: "text-[#FF7A1A]",
+    accent: "border-l-[#FF7A1A]/70",
     label: "skill",
   },
   get_config: {
@@ -535,8 +535,8 @@ const REGISTRY: Record<string, ToolMeta> = {
   },
   pc_announce: {
     icon: Crosshair,
-    tint: "text-[#FDC00A]",
-    accent: "border-l-[#FDC00A]/70",
+    tint: "text-[#FF7A1A]",
+    accent: "border-l-[#FF7A1A]/70",
     label: "here",
   },
   url_parse: {

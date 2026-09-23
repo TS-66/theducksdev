@@ -50,7 +50,7 @@ export function FilePreviewDialog({ path, content, onOpenChange }: FilePreviewDi
                 {image ? (
                   <ImageIcon className="size-4 shrink-0 text-pink-400" aria-hidden />
                 ) : (
-                  <FileCode2 className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+                  <FileCode2 className="size-4 shrink-0 text-[#FF7A1A]" aria-hidden />
                 )}
                 <span className="truncate font-mono font-normal">{path}</span>
               </DialogTitle>

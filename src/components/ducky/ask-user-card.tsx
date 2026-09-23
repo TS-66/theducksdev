@@ -62,7 +62,7 @@ export function AskUserCard({ pendingAsk, respondAsk }: AskUserCardProps) {
   return (
     <div className="mx-auto w-full max-w-3xl rounded-lg border bg-card px-4 py-3 shadow-sm md:px-8">
       <div className="flex items-center gap-2">
-        <HelpCircle className="size-4 shrink-0 text-[#FDC00A]" aria-hidden />
+        <HelpCircle className="size-4 shrink-0 text-[#FF7A1A]" aria-hidden />
         <h3 className="text-sm font-semibold">ducky needs your input</h3>
       </div>
 

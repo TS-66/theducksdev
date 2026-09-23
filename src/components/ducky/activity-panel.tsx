@@ -249,12 +249,12 @@ function LedgerBrowser({
               className={cn(
                 "rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 selected
-                  ? "border-[#FDC00A]/60 bg-[#FDC00A]/15 text-[#9dabff]"
+                  ? "border-[#FF7A1A]/60 bg-[#FF7A1A]/15 text-[#9dabff]"
                   : "border-border/60 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground",
               )}
             >
               {f.label}
-              <span className={cn("ml-1", selected ? "text-[#FDC00A]" : "text-muted-foreground/60")}>
+              <span className={cn("ml-1", selected ? "text-[#FF7A1A]" : "text-muted-foreground/60")}>
                 {counts[f.id]}
               </span>
             </button>
@@ -854,7 +854,7 @@ function NodeGlyph({ entry: e, running }: { entry: TimelineEntry; running: boole
   if (e.kind === "user")
     return <span className="font-mono text-[11px] font-bold text-sky-400">❯</span>;
   if (e.kind === "assistant")
-    return <span className="font-mono text-[12px] text-[#FDC00A]">✦</span>;
+    return <span className="font-mono text-[12px] text-[#FF7A1A]">✦</span>;
   if (e.kind === "plan")
     return <ClipboardCheck className="size-3 text-teal-400" aria-hidden />;
   if (e.kind === "todo")

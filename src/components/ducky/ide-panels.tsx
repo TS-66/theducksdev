@@ -162,7 +162,7 @@ export function IdeTabBar({
                 : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
             )}
           >
-            <FileCode2 className="size-3.5 text-[#FDC00A]" />
+            <FileCode2 className="size-3.5 text-[#FF7A1A]" />
             <span className="max-w-48 truncate">{fileName.split("/").pop()}</span>
             <span
               role="button"
@@ -210,9 +210,9 @@ function AiPointerReadout() {
   }
   const ago = Math.max(0, Math.round((Date.now() - pointer.at) / 1000));
   return (
-    <div className="space-y-1.5 rounded-lg border border-[#FDC00A]/25 bg-[#FDC00A]/[0.06] p-2.5">
+    <div className="space-y-1.5 rounded-lg border border-[#FF7A1A]/25 bg-[#FF7A1A]/[0.06] p-2.5">
       <div className="flex items-center gap-2">
-        <span aria-hidden className="ducky-pulse-dot inline-block size-2 rounded-full bg-[#FDC00A]" />
+        <span aria-hidden className="ducky-pulse-dot inline-block size-2 rounded-full bg-[#FF7A1A]" />
         <span className="font-mono text-xs font-semibold capitalize">{pointer.action}</span>
         <span className="ml-auto font-mono text-[10px] text-muted-foreground">
           {ago < 5 ? "just now" : `${ago}s ago`}
@@ -291,7 +291,7 @@ export function IdeInspector({
             </div>
           </div>
           <div className="flex items-center gap-1.5 pt-1 font-mono text-[10px] text-muted-foreground">
-            <Cpu className="size-3 text-[#FDC00A]" />
+            <Cpu className="size-3 text-[#FF7A1A]" />
             <span className="truncate">{modelDisplayName(settings.model)}</span>
             <span className="ml-auto rounded border px-1 uppercase">{settings.policy}</span>
           </div>
@@ -396,7 +396,7 @@ export function IdeFilePreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b bg-muted/20 px-3">
-        <FileCode2 className="size-3.5 text-[#FDC00A]" />
+        <FileCode2 className="size-3.5 text-[#FF7A1A]" />
         <span className="truncate font-mono text-xs">{path}</span>
         <span className="font-mono text-[10px] text-muted-foreground">{lines.length} lines · {(content.length / 1024).toFixed(1)} KB</span>
         <div className="ml-auto flex items-center gap-1">

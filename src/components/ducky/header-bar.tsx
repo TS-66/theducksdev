@@ -45,7 +45,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
       : (activeProject?.name ?? "no project"));
 
   return (
-    <header className="z-20 flex h-11 shrink-0 items-center gap-1.5 border-b border-white/[0.06] bg-black/30 px-3 backdrop-blur-xl">
+    <header className="z-20 flex h-11 shrink-0 items-center gap-1.5 border-b border-white/[0.05] bg-transparent px-4">
       {/* Left */}
       <Button
         size="icon"
@@ -62,7 +62,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
         <img
           src="/ducky-mark.png"
           alt="Ducky AI logo"
-          className="size-6 shrink-0 rounded-md border border-[#FDC00A]/30 bg-black shadow-[0_0_12px_-2px_rgba(253,192,10,0.5)]"
+          className="size-6 shrink-0 rounded-md border border-[#FF7A1A]/30 bg-black shadow-[0_0_12px_-2px_rgba(253,192,10,0.5)]"
         />
         <span className="whitespace-nowrap font-bold leading-none tracking-tight">
           Ducky AI{" "}
@@ -72,7 +72,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
         </span>
         <Badge
           variant="outline"
-          className="hidden border-[#FDC00A]/25 bg-[#FDC00A]/5 px-1.5 py-0 font-mono text-[10px] text-[#FDC00A] sm:inline-flex"
+          className="hidden border-[#FF7A1A]/25 bg-[#FF7A1A]/5 px-1.5 py-0 font-mono text-[10px] text-[#FF7A1A] sm:inline-flex"
         >
           v1.0 · ide
         </Badge>
@@ -118,7 +118,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
           className="gap-1.5 px-2 font-normal"
           aria-label="Toggle plan mode"
         >
-          <Map className="size-3.5 text-[#FDC00A]" aria-hidden />
+          <Map className="size-3.5 text-[#FF7A1A]" aria-hidden />
           <span className="hidden sm:inline">Plan</span>
         </Toggle>
 
@@ -132,7 +132,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
               className="gap-1.5 px-2 font-mono text-xs text-muted-foreground"
               aria-label={`Model ${modelDisplayName(settings.model)}. Open settings.`}
             >
-              <Cpu className="size-3.5 shrink-0 text-[#FDC00A]" aria-hidden />
+              <Cpu className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
               <span className="hidden max-w-36 truncate sm:inline">{modelDisplayName(settings.model)}</span>
             </Button>
           </TooltipTrigger>

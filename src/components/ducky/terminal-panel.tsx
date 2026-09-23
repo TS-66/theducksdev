@@ -171,7 +171,7 @@ export function TerminalPanel({
             key={i}
             className={cn(
               "whitespace-pre-wrap break-words",
-              l.kind === "cmd" && "font-semibold text-[#FDC00A]",
+              l.kind === "cmd" && "font-semibold text-[#FF7A1A]",
               l.kind === "sys" && "text-muted-foreground/70",
               l.kind === "out" && "text-foreground/85",
             )}
