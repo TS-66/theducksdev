@@ -8,6 +8,7 @@ import type { ChatMessage } from "@/lib/ducky/types";
 import { cn } from "@/lib/utils";
 import { Hero } from "./hero";
 import { MessageItem } from "./message-item";
+import { TrajectoryExpansionProvider } from "./trajectory-expansion";
 import {
   TranscriptFindBar,
   scrollToTranscriptRow,
@@ -139,6 +140,7 @@ export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: 
         />
       )}
       <ScrollArea ref={rootRef} className="min-h-0 flex-1">
+        <TrajectoryExpansionProvider>
         <div className="mx-auto max-w-[46rem] space-y-4 px-4 py-8 md:px-6">
           {visible.map((m, i) => {
             const matched = matchIds.has(m.id);
@@ -163,6 +165,7 @@ export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: 
           })}
           <div aria-hidden className="h-1" />
         </div>
+        </TrajectoryExpansionProvider>
       </ScrollArea>
       {showJump && (
         <button

@@ -10,6 +10,7 @@ import { formatTrajectoryDuration } from "@/lib/ducky/zcode-vendor/trajectory-fo
 import { summarizeArgs, truncate } from "./format";
 import { getToolMeta } from "./tool-meta";
 import { DiffView, parseEditArgs } from "./diff-view";
+import { useTrajectoryOpen } from "./trajectory-expansion";
 
 export type ToolRunState = "running" | "ok" | "err" | "pending";
 
@@ -29,8 +30,8 @@ function prettyJson(raw: string): string {
 }
 
 export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
-  const [open, setOpen] = React.useState(false);
-  const [dismissed, setDismissed] = React.useState(false);
+  // ZCode expansion registry: persisted toggle wins; edits default open.
+  const [open, setOpen] = useTrajectoryOpen("tool-call", call.id, call.function.name === "edit_file");
   const state: ToolRunState = result
     ? result.status === "error"
       ? "err"
@@ -56,20 +57,15 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
     () => (isEdit ? parseEditArgs(call.function.arguments) : null),
     [isEdit, call.function.arguments],
   );
-  // Auto-open edit cards so the diff is immediately visible (derived, not
-  // an effect: dismissal is recorded in the toggle handler below).
-  const autoOpen = editArgs != null && state === "ok" && !dismissed;
+  // (Edits default open via the expansion registry fallback above.)
 
   const outputTone =
     result?.status === "error" ? "text-destructive bg-destructive/5" : "text-foreground/90";
 
   return (
     <Collapsible
-      open={open || autoOpen}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (!v) setDismissed(true);
-      }}
+      open={open}
+      onOpenChange={setOpen}
       className="min-w-0 overflow-hidden rounded-lg border border-white/[0.08]"
     >
       <div

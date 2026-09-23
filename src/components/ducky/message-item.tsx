@@ -27,6 +27,7 @@ import { modelDisplayName } from "@/lib/ducky/models";
 import { fmtK } from "./format";
 import { MarkdownBody } from "./markdown-body";
 import { ToolCallCard } from "./tool-call-card";
+import { useTrajectoryOpen } from "./trajectory-expansion";
 
 /* ─────────────────────────────── MessageItem ─────────────────────────────── */
 
@@ -37,16 +38,9 @@ function Stamp({ t }: { t: number }) {
   );
 }
 
-/** Reasoning ("thinking") ghost card — dashed border, italic body. */
-function ReasoningCard({ text, streaming }: { text: string; streaming: boolean }) {
-  const wasStreaming = React.useRef(streaming);
-  const [open, setOpen] = React.useState(streaming);
-  // default open while streaming, collapse once done; user can still toggle
-  React.useEffect(() => {
-    if (wasStreaming.current && !streaming) setOpen(false);
-    if (streaming && !wasStreaming.current) setOpen(true);
-    wasStreaming.current = streaming;
-  }, [streaming]);
+/** Reasoning ("thinking") row — ZCode default-open + persisted toggle. */
+function ReasoningCard({ messageId, text, streaming }: { messageId: string; text: string; streaming: boolean }) {
+  const [open, setOpen] = useTrajectoryOpen("reasoning", `reasoning:${messageId}`, true);
 
   return (
     <Collapsible
@@ -199,7 +193,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning, index = 0
 
       <div className="mt-1.5 space-y-2">
         {Boolean(m.reasoning?.trim()) && m.reasoning && (
-          <ReasoningCard text={m.reasoning} streaming={m.status === "streaming"} />
+          <ReasoningCard messageId={m.id} text={m.reasoning} streaming={m.status === "streaming"} />
         )}
 
         {(m.content.length > 0 || m.status === "streaming") && (

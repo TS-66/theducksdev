@@ -39,7 +39,13 @@ each carrying its Apache-2.0 attribution inline:
   classes consumed by the transcript (`message-item.tsx`, `tool-call-card.tsx`);
 - `src/lib/ducky/zcode-vendor/trajectory-format.ts`
   (upstream `packages/ui/src/ModelTrajectoryFormat.ts`) — duration/clock
-  formatters consumed by `tool-call-card.tsx`.
+  formatters consumed by `tool-call-card.tsx`;
+- `src/lib/ducky/zcode-vendor/trajectory-expansion.ts`
+  (upstream `packages/ui/src/ModelTrajectoryExpansion.ts`, only the
+  monorepo-alias import adapted to a relative path) — expansion defaults +
+  override registry consumed by `trajectory-expansion.tsx` (provider with
+  localStorage persistence), `message-item.tsx` (reasoning rows) and
+  `tool-call-card.tsx` (tool rows).
 
 No other ZCode source files are vendored here; all other implementations
 are original.
