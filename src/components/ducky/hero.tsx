@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
+import { useDuckyStore } from "@/lib/ducky/store";
 import {
   FolderPlus,
   HardDrive,
@@ -108,6 +109,17 @@ export function Hero({
   );
 
   const hasFiles = projectFileCount > 0;
+
+  /** recent non-empty tasks to jump back into */
+  const sessions = useDuckyStore((s) => s.sessions);
+  const recent = React.useMemo(
+    () =>
+      sessions
+        .filter((x) => x.messages.length > 0)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 3),
+    [sessions],
+  );
 
   /* dim one-line suggestions — adapt to whether the project has files */
   const dimList = hasFiles
@@ -257,6 +269,33 @@ export function Hero({
           &ldquo;describe the image&rdquo; — vision analysis runs free while in beta.
         </p>
       </div>
+
+      {/* jump back in */}
+      {recent.length > 0 && (
+        <div className="relative z-10 mt-6 w-full max-w-3xl px-4">
+          <p className="mb-2 flex items-center gap-1.5 px-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+            <History className="size-3" aria-hidden /> Jump back in
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {recent.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => useDuckyStore.getState().selectSession(s.id)}
+                className="group rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-left transition-all hover:-translate-y-px hover:border-white/[0.15] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <span className="block truncate text-[13px] font-medium group-hover:text-foreground">
+                  {s.title}
+                </span>
+                <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                  {s.messages.filter((m) => m.role === "user" || m.role === "assistant").length} messages
+                  {s.projectName ? ` · ${s.projectName}` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* bottom feature cards */}
       <div className="relative z-10 mt-3 grid w-full max-w-3xl grid-cols-1 gap-2 px-4 sm:grid-cols-3">

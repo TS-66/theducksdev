@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Command, Menu, Puzzle, Settings, SquareTerminal } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { fmtK } from "@/components/ducky/format";
@@ -19,7 +20,6 @@ import { AskUserCard } from "@/components/ducky/ask-user-card";
 import { ChatStream } from "@/components/ducky/chat-stream";
 import { Composer } from "@/components/ducky/composer";
 import { CommandPalette } from "@/components/ducky/command-palette";
-import { HeaderBar } from "@/components/ducky/header-bar";
 import { NewProjectDialog } from "@/components/ducky/project-picker";
 import { MarketplacePanel } from "@/components/ducky/marketplace-panel";
 import { PluginsSheet } from "@/components/ducky/plugins-sheet";
@@ -29,12 +29,10 @@ import { ShortcutsDialog } from "@/components/ducky/shortcuts-dialog";
 import { StatusBar } from "@/components/ducky/status-bar";
 import { TodoCard } from "@/components/ducky/message-item";
 import {
-  IdeActivityRail,
   IdeFilePreview,
   IdeInspector,
   IdeTabBar,
   type CenterTab,
-  type RailView,
 } from "@/components/ducky/ide-panels";
 import { BrowserPanel } from "@/components/ducky/browser-panel";
 import { TerminalPanel } from "@/components/ducky/terminal-panel";
@@ -54,6 +52,34 @@ import { openTab } from "@/lib/ducky/browser-tabs";
 import type { PermissionPolicy } from "@/lib/ducky/types";
 
 const KNOWN_POLICIES = ["readonly", "ask", "auto"] as const;
+
+function SideFootButton({
+  label,
+  onClick,
+  active,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "rounded-lg p-2 text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        active && "bg-white/[0.07] text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function DuckyCoderPage() {
   const hydrated = useDuckyStore((s) => s.hydrated);
@@ -593,12 +619,6 @@ export default function DuckyCoderPage() {
     });
   }, []);
 
-  const handleRail = React.useCallback((v: RailView) => {
-    if (v === "explorer" || v === "search") setLeftOpen(true);
-    if (v === "source") setActivityOpen(true);
-    if (v === "plugins") setPluginsOpen(true);
-  }, []);
-
   // Derived tabs (no setState-in-effect): file needs a preview path,
   // browser needs at least one open tab — otherwise we render chat.
   const browserRev = React.useSyncExternalStore(subscribeTabs, getTabsRevision, getTabsRevision);
@@ -643,13 +663,27 @@ export default function DuckyCoderPage() {
 
   return (
     <div className="ducky-ide-shell flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
-      <HeaderBar
-        onMenu={() => setMobileNavOpen(true)}
-        onOpenSettings={openSettings}
-        onOpenPlugins={() => setPluginsOpen(true)}
-        onToggleTerminal={() => setTerminalOpen((v) => !v)}
-        terminalOpen={terminalOpen}
-      />
+      {/* mobile mini bar (desktop uses the sidebar for everything) */}
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 lg:hidden">
+        <button
+          type="button"
+          aria-label="Open navigation"
+          onClick={() => setMobileNavOpen(true)}
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          <Menu className="size-4" aria-hidden />
+        </button>
+        <img src="/ducky-mark.png" alt="" aria-hidden className="size-5 rounded border border-white/10 bg-black" />
+        <span className="text-sm font-bold tracking-tight">Ducky AI</span>
+        <button
+          type="button"
+          aria-label="Toggle terminal"
+          onClick={() => setTerminalOpen((v) => !v)}
+          className="ml-auto rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          <SquareTerminal className="size-4" aria-hidden />
+        </button>
+      </div>
 
       {/* update banner — one per release, dismissed per version */}
       {update && (
@@ -694,22 +728,41 @@ export default function DuckyCoderPage() {
         </div>
       )}
 
-      {/* IDE body row: rail + explorer + center + inspector */}
+      {/* App body row: sidebar + center + inspector */}
       <div className="flex min-h-0 flex-1">
-        <IdeActivityRail
-          leftOpen={leftOpen}
-          onToggleLeft={() => setLeftOpen((v) => !v)}
-          onRail={handleRail}
-          onOpenPlugins={() => setPluginsOpen(true)}
-          onOpenSettings={() => openSettings()}
-          onOpenPalette={() => setPaletteOpen(true)}
-          onOpenActivity={() => setActivityOpen(true)}
-        />
-
-        {/* desktop explorer */}
+        {/* desktop sidebar */}
         {leftOpen && (
           <aside className="hidden w-[320px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0d10] lg:flex">
-            <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
+            {/* identity */}
+            <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
+              <img
+                src="/ducky-mark.png"
+                alt="Ducky AI logo"
+                className="size-7 rounded-lg border border-white/10 bg-black shadow-[0_0_16px_-4px_rgba(255,122,26,0.6)]"
+              />
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="truncate text-[14px] font-bold tracking-tight">Ducky AI</p>
+                <p className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "inline-block size-1.5 rounded-full",
+                      agent.running ? "ducky-pulse-dot bg-amber-400" : "bg-emerald-400",
+                    )}
+                  />
+                  {agent.running ? "working" : "ready"}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Hide sidebar (⌘B)"
+                onClick={() => setLeftOpen(false)}
+                className="rounded-md p-1.5 font-mono text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/[0.06] px-3">
               <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Explorer
               </span>
@@ -733,6 +786,22 @@ export default function DuckyCoderPage() {
                 onOpenPlugins={() => setPluginsOpen(true)}
                 onOpenMarketplace={() => setMarketOpen(true)}
               />
+            </div>
+            {/* sidebar footer tools */}
+            <div className="flex shrink-0 items-center gap-1 border-t border-white/[0.06] px-3 py-2">
+              <SideFootButton label={terminalOpen ? "Close terminal" : "Open terminal"} onClick={() => setTerminalOpen((v) => !v)} active={terminalOpen}>
+                <SquareTerminal className="size-4" aria-hidden />
+              </SideFootButton>
+              <SideFootButton label="Command palette (⌘P)" onClick={() => setPaletteOpen(true)}>
+                <Command className="size-4" aria-hidden />
+              </SideFootButton>
+              <SideFootButton label="Plugins" onClick={() => setPluginsOpen(true)}>
+                <Puzzle className="size-4" aria-hidden />
+              </SideFootButton>
+              <SideFootButton label="Settings" onClick={() => openSettings()}>
+                <Settings className="size-4" aria-hidden />
+              </SideFootButton>
+              <span className="ml-auto font-mono text-[10px] text-muted-foreground/50">v{APP_VERSION}</span>
             </div>
           </aside>
         )}
