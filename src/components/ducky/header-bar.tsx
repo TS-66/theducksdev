@@ -45,7 +45,7 @@ export function HeaderBar({ onMenu, onOpenSettings, onOpenPlugins, onToggleTermi
       : (activeProject?.name ?? "no project"));
 
   return (
-    <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b bg-background/85 px-3 shadow-[0_1px_0_rgba(253,192,10,0.08)] backdrop-blur-xl">
+    <header className="z-20 flex h-11 shrink-0 items-center gap-1.5 border-b border-white/[0.06] bg-black/30 px-3 backdrop-blur-xl">
       {/* Left */}
       <Button
         size="icon"

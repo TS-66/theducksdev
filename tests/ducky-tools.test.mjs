@@ -172,9 +172,9 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (83 tools, 28 plugins)", async () => {
+await run("registry: counts (84 tools, 28 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 83, `only ${defs.length} tools`);
+  assert(defs.length >= 84, `only ${defs.length} tools`);
   assert(PLUGINS.length >= 28, `only ${PLUGINS.length} plugins`);
 });
 
@@ -336,6 +336,33 @@ await run("registry: every executor has a schema", async () => {
     await expectThrow(() => ex("browser_snapshot")({}), "no tabs");
     await expectThrow(() => ex("browser_close")({ tab_id: "zzz" }), "unknown tab");
   });
+  await run("browser_open outside modes", async () => {
+    // real-browser mode without a DOM fails gracefully
+    await expectThrow(() => ex("browser_open")({ url: "https://example.com", outside: true }), "no DOM");
+  });
+  // real-browser mode with a stubbed window
+  {
+    const hadWindow = typeof globalThis.window !== "undefined";
+    const prev = globalThis.window;
+    let opened = null;
+    let blocked = false;
+    globalThis.window = {
+      open: (url) => {
+        opened = String(url);
+        return blocked ? null : {};
+      },
+    };
+    try {
+      const okMsg = await ex("browser_open")({ url: "https://example.com/real", outside: true });
+      assert(opened === "https://example.com/real" && okMsg.includes("REAL browser"), okMsg);
+      blocked = true;
+      const blockedMsg = await ex("browser_open")({ url: "https://example.com/blocked", outside: true });
+      assert(blockedMsg.includes("BLOCKED"), blockedMsg);
+    } finally {
+      if (hadWindow) globalThis.window = prev;
+      else delete globalThis.window;
+    }
+  }
   btabs.__resetTabs();
 }
 
@@ -734,6 +761,38 @@ await run("registry: every executor has a schema", async () => {
     } finally {
       globalThis.fetch = realFetch;
       pc.clearPcConfig();
+    }
+  });
+  await run("pc announce + pointer registry", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      if (String(url).endsWith("/wiggle")) {
+        return new Response(JSON.stringify({ ok: true, message: "Announced at 5,6." }), { status: 200 });
+      }
+      if (String(url).endsWith("/move") || String(url).endsWith("/click")) {
+        return new Response(JSON.stringify({ ok: true, message: "did it" }), { status: 200 });
+      }
+      return new Response("nope", { status: 404 });
+    };
+    try {
+      const pc = await import(`${LIB}/pc.${EXT}`);
+      pc.__resetAiPointer();
+      pc.setPcConfig(3791, "t");
+      const a = await ex("pc_announce")({ x: 5, y: 6 });
+      assert(a.includes("Announced"), a);
+      const ptr = pc.getAiPointer();
+      assert(ptr && ptr.action === "announce" && ptr.x === 5 && ptr.y === 6, JSON.stringify(ptr));
+      const m = await ex("pc_move")({ x: 7, y: 8, announce: true });
+      assert(m.includes("visible marker"), m);
+      assert(pc.getAiPointer()?.action === "announce", "announce should be last");
+      const m2 = await ex("pc_move")({ x: 1, y: 2 });
+      assert(pc.getAiPointer()?.action === "move", "plain move records move");
+      await expectThrow(() => ex("pc_announce")({ x: -1, y: 0 }), "coord guard");
+    } finally {
+      globalThis.fetch = realFetch;
+      const pc = await import(`${LIB}/pc.${EXT}`);
+      pc.clearPcConfig();
+      pc.__resetAiPointer();
     }
   });
   await run("pc client: unreachable + bad token", async () => {

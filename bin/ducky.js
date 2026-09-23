@@ -849,6 +849,31 @@ async function runBridge() {
         return send(res, r.ok ? 200 : 400, r);
       }
 
+      if (url.pathname === "/wiggle") {
+        // Visible "AI is HERE" marker: quick circle around the point, then
+        // back exactly where it started. Needs --input + xdotool (Linux/X11).
+        const x = intArg(body.x, 0, 10000, "x");
+        if (x.error) return send(res, 400, { ok: false, error: x.error });
+        const y = intArg(body.y, 0, 10000, "y");
+        if (y.error) return send(res, 400, { ok: false, error: y.error });
+        if (!inputUnlocked) {
+          return send(res, 400, { ok: false, error: "Input control is locked — restart the bridge with `ducky bridge --input`." });
+        }
+        if (inputHelper !== "xdotool") {
+          return send(res, 400, { ok: false, error: "Wiggle needs xdotool (Linux/X11)." });
+        }
+        const R = 34;
+        const pts = [];
+        for (let i = 0; i <= 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          pts.push("mousemove", String(Math.round(x.value + R * Math.cos(a))), String(Math.round(y.value + R * Math.sin(a))));
+        }
+        pts.push("mousemove", String(x.value), String(y.value));
+        const r = await runHelper("xdotool", pts, 10000);
+        if (r.code !== 0) return send(res, 400, { ok: false, error: `Wiggle failed (exit ${r.code}).` });
+        return send(res, 200, { ok: true, message: `Announced at ${x.value},${y.value}.` });
+      }
+
       if (url.pathname === "/type") {
         const r = await runInput("type", { text: body.text });
         return send(res, r.ok ? 200 : 400, r);
@@ -859,7 +884,7 @@ async function runBridge() {
         return send(res, r.ok ? 200 : 400, r);
       }
 
-      return send(res, 404, { ok: false, error: "Unknown route. Try /status /caps /screen /exec /ls /read /write /move /click /type /key." });
+      return send(res, 404, { ok: false, error: "Unknown route. Try /status /caps /screen /exec /ls /read /write /move /click /type /key /wiggle." });
     });
   });
 

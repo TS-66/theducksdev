@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  Crosshair,
   Files,
   MessagesSquare,
   PanelLeft,
@@ -21,6 +22,11 @@ import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { PLUGINS } from "@/lib/ducky/plugins";
 import { modelDisplayName } from "@/lib/ducky/models";
+import {
+  getAiPointer,
+  getAiPointerRev,
+  subscribeAiPointer,
+} from "@/lib/ducky/pc";
 import { fmtK, shortId } from "./format";
 
 /* ─────────────────────────── activity rail ─────────────────────────── */
@@ -189,6 +195,36 @@ export function IdeTabBar({
   );
 }
 
+/** Live readout of where the AI last acted on the real screen. */
+function AiPointerReadout() {
+  const rev = React.useSyncExternalStore(subscribeAiPointer, getAiPointerRev, getAiPointerRev);
+  const pointer = React.useMemo(() => getAiPointer(), [rev]);
+  if (!pointer) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No PC actions yet. When the agent moves, clicks or announces on your
+        real screen, the coordinates land here — and a marker wiggles on the
+        screen itself.
+      </p>
+    );
+  }
+  const ago = Math.max(0, Math.round((Date.now() - pointer.at) / 1000));
+  return (
+    <div className="space-y-1.5 rounded-lg border border-[#FDC00A]/25 bg-[#FDC00A]/[0.06] p-2.5">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="ducky-pulse-dot inline-block size-2 rounded-full bg-[#FDC00A]" />
+        <span className="font-mono text-xs font-semibold capitalize">{pointer.action}</span>
+        <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+          {ago < 5 ? "just now" : `${ago}s ago`}
+        </span>
+      </div>
+      <p className="font-mono text-[11px] text-muted-foreground">
+        x {pointer.x} · y {pointer.y}
+      </p>
+    </div>
+  );
+}
+
 /* ──────────────────────────── inspector ──────────────────────────── */
 
 function Section({ title, icon, children, defaultOpen = true }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -319,6 +355,10 @@ export function IdeInspector({
         <button type="button" onClick={onOpenPlugins} className="mt-2 w-full rounded-md border px-2 py-1 font-mono text-[11px] hover:bg-accent">
           Manage plugins
         </button>
+      </Section>
+
+      <Section title="AI pointer" icon={<Crosshair className="size-3" />} defaultOpen={false}>
+        <AiPointerReadout />
       </Section>
 
       <Section title="Activity" icon={<GitBranch className="size-3 rotate-90" />} defaultOpen={false}>

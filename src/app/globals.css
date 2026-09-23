@@ -271,12 +271,12 @@
   box-shadow: inset 0 1px 0 color-mix(in oklab, #fdc00a 35%, transparent);
 }
 
-/* chat canvas: softer grid + vignette for long sessions */
+/* chat canvas: clean flat black with a faint top glow (no texture) */
 .ducky-grid-bg {
   background-image: radial-gradient(
-    circle at 1px 1px,
-    color-mix(in oklab, var(--muted-foreground) 12%, transparent) 1px,
-    transparent 0
+    900px 220px at 50% -60px,
+    color-mix(in oklab, #fdc00a 5%, transparent),
+    transparent 70%
   );
 }
 

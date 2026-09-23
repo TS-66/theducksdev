@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  Activity,
   Copy,
   Download,
   FilePlus2,
@@ -11,6 +12,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Puzzle,
   RotateCcw,
   Search,
   Star,
@@ -59,9 +61,42 @@ interface SidebarProps {
   /** fires after a session is picked — used by the mobile Sheet to auto-close */
   onAfterSelect?: () => void;
   onPreviewFile: (path: string) => void;
+  onOpenPalette?: () => void;
+  onOpenActivity?: () => void;
+  onOpenPlugins?: () => void;
 }
 
-export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
+function NavRow({
+  icon,
+  label,
+  kbd,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  kbd?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-foreground/80 transition-colors hover:bg-white/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <span className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground">
+        {icon}
+      </span>
+      <span className="flex-1 truncate">{label}</span>
+      {kbd && (
+        <kbd className="pointer-events-none select-none font-mono text-[10px] text-muted-foreground/60">
+          {kbd}
+        </kbd>
+      )}
+    </button>
+  );
+}
+
+export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenActivity, onOpenPlugins }: SidebarProps) {
   const sessions = useDuckyStore((s) => s.sessions);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const [query, setQuery] = React.useState("");
@@ -180,21 +215,40 @@ export function Sidebar({ onAfterSelect, onPreviewFile }: SidebarProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* New task */}
-      <div className="p-2">
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2"
+      {/* primary nav — ZCode-style rows with hints */}
+      <nav aria-label="Primary" className="space-y-0.5 px-2 pb-1 pt-2">
+        <NavRow
+          icon={<Plus className="size-4" aria-hidden />}
+          label="New task"
+          kbd="⌘K"
           onClick={newTask}
-          aria-label="New task"
-        >
-          <Plus className="size-4" />
-          <span>New task</span>
-          <kbd className="pointer-events-none ml-auto select-none rounded border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
-            ⌘K
-          </kbd>
-        </Button>
-      </div>
+        />
+        {onOpenPalette && (
+          <NavRow
+            icon={<Search className="size-4" aria-hidden />}
+            label="Search"
+            kbd="⌘P"
+            onClick={onOpenPalette}
+          />
+        )}
+        {onOpenActivity && (
+          <NavRow
+            icon={<Activity className="size-4" aria-hidden />}
+            label="Activity"
+            kbd="⌘E"
+            onClick={onOpenActivity}
+          />
+        )}
+        {onOpenPlugins && (
+          <NavRow
+            icon={<Puzzle className="size-4" aria-hidden />}
+            label="Plugins"
+            onClick={onOpenPlugins}
+          />
+        )}
+      </nav>
+
+      <div className="mx-3 mb-1 h-px bg-white/[0.06]" aria-hidden />
 
       {/* Search + Sessions */}
       {sessions.length > 0 && (
@@ -584,33 +638,30 @@ function SessionRow({
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [draft, setDraft] = React.useState(session.title);
 
-  const msgCount = session.messages.filter((m) => m.role !== "tool" && m.role !== "system").length;
-
   return (
     <div
       className={cn(
-        "group relative flex items-center rounded-md transition-colors",
+        "group relative flex items-center rounded-lg transition-colors",
         active
-          ? "bg-accent text-accent-foreground"
-          : "hover:bg-muted/60 focus-within:bg-muted/60",
+          ? "bg-white/[0.07] text-foreground ring-1 ring-white/10"
+          : "hover:bg-white/[0.04] focus-within:bg-white/[0.04]",
       )}
     >
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2 pr-8 text-left focus-visible:outline-none"
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2.5 pr-8 text-left focus-visible:outline-none"
         aria-current={active ? "true" : undefined}
       >
-        <Star
-          className={cn(
-            "size-3 shrink-0",
-            session.starred ? "fill-amber-400 text-amber-400" : "text-transparent group-hover:text-muted-foreground/50",
-          )}
+        <span
           aria-hidden
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            session.starred ? "bg-amber-400" : active ? "bg-emerald-400" : "bg-muted-foreground/30",
+          )}
         />
-        <span className="min-w-0 flex-1 truncate text-[13px]">{session.title}</span>
-        <span className="shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
-          {msgCount > 0 && `${msgCount}·`}
+        <span className="min-w-0 flex-1 truncate text-[13.5px]">{session.title}</span>
+        <span className="shrink-0 pl-1 font-mono text-[10px] text-muted-foreground/70">
           {relTime(session.updatedAt)}
         </span>
       </button>

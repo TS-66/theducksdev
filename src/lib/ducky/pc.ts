@@ -218,3 +218,59 @@ export async function pcKey(key: string): Promise<string> {
   const r = await post<{ message?: string } & { ok: boolean }>("/key", { key });
   return String(r.message ?? "Pressed.");
 }
+
+/**
+ * Visible "AI is HERE" wiggle: quick circle around screen pixels, ending
+ * exactly where it started. Needs bridge --input + xdotool (Linux/X11).
+ */
+export async function pcWiggle(x: number, y: number): Promise<string> {
+  const r = await post<{ message?: string } & { ok: boolean }>("/wiggle", { x, y });
+  return String(r.message ?? "Announced.");
+}
+
+/* ------------------------- AI pointer registry --------------------------- */
+
+export interface AiPointer {
+  action: "move" | "click" | "announce";
+  x: number;
+  y: number;
+  at: number;
+}
+
+let aiPointer: AiPointer | null = null;
+let aiPointerRev = 0;
+const aiPointerListeners = new Set<() => void>();
+
+/** Record where the AI last acted on the real screen (for the UI readout). */
+export function recordAiPointer(action: AiPointer["action"], x: number, y: number): void {
+  aiPointer = { action, x, y, at: Date.now() };
+  aiPointerRev++;
+  for (const l of [...aiPointerListeners]) {
+    try {
+      l();
+    } catch {
+      // UI listeners must never break tools
+    }
+  }
+}
+
+export function getAiPointer(): AiPointer | null {
+  return aiPointer;
+}
+
+export function subscribeAiPointer(fn: () => void): () => void {
+  aiPointerListeners.add(fn);
+  return () => {
+    aiPointerListeners.delete(fn);
+  };
+}
+
+export function getAiPointerRev(): number {
+  return aiPointerRev;
+}
+
+/** Test helper: reset the registry. */
+export function __resetAiPointer(): void {
+  aiPointer = null;
+  aiPointerRev++;
+}

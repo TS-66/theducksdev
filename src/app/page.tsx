@@ -702,7 +702,7 @@ export default function DuckyCoderPage() {
 
         {/* desktop explorer */}
         {leftOpen && (
-          <aside className="hidden w-[300px] shrink-0 flex-col border-r bg-muted/10 lg:flex">
+          <aside className="hidden w-[300px] shrink-0 flex-col border-r border-white/[0.06] bg-black/20 lg:flex">
             <div className="flex h-10 shrink-0 items-center gap-2 border-b px-3">
               <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Explorer
@@ -720,7 +720,12 @@ export default function DuckyCoderPage() {
               </button>
             </div>
             <div className="min-h-0 flex-1">
-              <Sidebar onPreviewFile={handlePreviewFile} />
+              <Sidebar
+                onPreviewFile={handlePreviewFile}
+                onOpenPalette={() => setPaletteOpen(true)}
+                onOpenActivity={() => setActivityOpen(true)}
+                onOpenPlugins={() => setPluginsOpen(true)}
+              />
             </div>
           </aside>
         )}
@@ -739,6 +744,18 @@ export default function DuckyCoderPage() {
                   setMobileNavOpen(false);
                 }}
                 onAfterSelect={() => setMobileNavOpen(false)}
+                onOpenPalette={() => {
+                  setPaletteOpen(true);
+                  setMobileNavOpen(false);
+                }}
+                onOpenActivity={() => {
+                  setActivityOpen(true);
+                  setMobileNavOpen(false);
+                }}
+                onOpenPlugins={() => {
+                  setPluginsOpen(true);
+                  setMobileNavOpen(false);
+                }}
               />
             </div>
           </SheetContent>

@@ -46,7 +46,7 @@ import {
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
 import { callMcpTool, listMcpServers, listMcpTools } from './mcp';
-import { pcCaps, pcClick, pcExec, pcKey, pcList, pcMove, pcRead, pcScreen, pcStatus, pcType, pcWrite } from './pc';
+import { pcCaps, pcClick, pcExec, pcKey, pcList, pcMove, pcRead, pcScreen, pcStatus, pcType, pcWiggle, pcWrite, recordAiPointer } from './pc';
 import { closeTab, getActiveTab, listTabs, openTab } from './browser-tabs';
 import { captureScreenToWorkspace } from './screen';
 
@@ -332,7 +332,7 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'THIS PC (real machine): runs only while the human runs `ducky bridge` on their computer — real shell commands and real files rooted at the bridge folder, guarded by a one-time token. This is actual computer use, not the virtual workspace: confirm destructive commands with the human first. Disabled by default — enable it when the bridge is up.',
-    tools: ['pc_status', 'pc_caps', 'pc_screen', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls', 'pc_move', 'pc_click', 'pc_type', 'pc_key'],
+    tools: ['pc_status', 'pc_caps', 'pc_screen', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls', 'pc_move', 'pc_click', 'pc_type', 'pc_key', 'pc_announce'],
     category: 'shell',
     defaultEnabled: false,
   },
@@ -800,8 +800,14 @@ export function buildToolDefinitions(): ToolDefinition[] {
       name: 'browser_open',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-browser`).id,
       description:
-        'BROWSER USE: open an http(s) URL in the IDE browser panel (visible to the human) and register the tab. Follow with browser_snapshot to read the page text through the server proxy.',
-      parameters: obj({ url: str('Absolute http(s) URL to open.') }, ['url']),
+        'BROWSER USE: open an http(s) URL. Panel mode shows it in the IDE browser tab AND registers it for browser_snapshot. Real mode (outside=true) opens it in the human REAL browser as a new tab — use this when they say "open this in the browser".',
+      parameters: obj(
+        {
+          url: str('Absolute http(s) URL to open.'),
+          outside: bool('Open in the REAL browser (new tab) instead of the IDE panel. Defaults to false.'),
+        },
+        ['url'],
+      ),
     },
     {
       name: 'browser_snapshot',
@@ -1214,6 +1220,7 @@ export function buildToolDefinitions(): ToolDefinition[] {
         {
           x: num('Horizontal pixel (0–10000).'),
           y: num('Vertical pixel (0–10000).'),
+          announce: bool('Wiggle a visible marker afterwards so the human sees where you are. Defaults to false.'),
         },
         ['x', 'y'],
       ),
@@ -1233,6 +1240,21 @@ export function buildToolDefinitions(): ToolDefinition[] {
             enum: ['left', 'right', 'middle'],
             description: 'Mouse button. Defaults to left.',
           },
+          announce: bool('Wiggle a visible marker afterwards so the human sees where you clicked. Defaults to false.'),
+        },
+        ['x', 'y'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_announce',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Show the human where you are: wiggle a visible cursor marker in a circle around screen pixels, ending exactly on target. Use after arriving somewhere important, or when they ask "where are you". Needs --input + xdotool.',
+      parameters: obj(
+        {
+          x: num('Horizontal pixel (0–10000).'),
+          y: num('Vertical pixel (0–10000).'),
         },
         ['x', 'y'],
       ),
@@ -1827,12 +1849,34 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
   /* ---------------------------- browser (web use) ------------------------- */
 
   browser_open:
-    () =>
+    (ctx) =>
     async (args) => {
       const url = asString(args.url).trim();
       if (!/^https?:\/\//i.test(url)) throw new Error('browser_open: "url" must be an absolute http(s) URL');
       const tab = openTab(url);
-      return `Opened in the browser panel: ${tab.title}\n  tab: ${tab.id.slice(0, 8)} · ${tab.url}\nUse browser_snapshot to read the page text.`;
+      let line = `Opened in the browser panel: ${tab.title}\n  tab: ${tab.id.slice(0, 8)} · ${tab.url}\nUse browser_snapshot to read the page text.`;
+      if (args.outside === true) {
+        if (typeof window === 'undefined') {
+          throw new Error('browser_open: real-browser mode needs a real browser (unavailable here)');
+        }
+        try {
+          const w = window.open(url, '_blank', 'noopener');
+          if (!w) {
+            line += '\n[ducky: the real browser BLOCKED the popup — it is still open in the IDE panel. Tell the human to allow popups for this site, then ask again.]';
+          } else {
+            try {
+              w.opener = null;
+            } catch {
+              // cross-origin — opener already nulled via features string
+            }
+            line += '\nOpened in the human REAL browser too (new tab).';
+          }
+        } catch (e) {
+          line += `\n[ducky: real-browser open failed (${(e as Error).message}) — page stays in the IDE panel.]`;
+        }
+      }
+      void ctx;
+      return line;
     },
 
   browser_snapshot:
@@ -2282,7 +2326,18 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
         throw new Error('pc_move: x and y must be integers 0–10000 (read them off a pc_screen via vision_describe).');
       }
       try {
-        return await pcMove(x, y);
+        const out = await pcMove(x, y);
+        recordAiPointer('move', x, y);
+        if (args.announce === true) {
+          try {
+            await pcWiggle(x, y);
+            recordAiPointer('announce', x, y);
+            return `${out} Announced with a visible marker.`;
+          } catch (e) {
+            return `${out} (announce failed: ${(e as Error).message})`;
+          }
+        }
+        return out;
       } catch (e) {
         throw new Error(`${(e as Error).message}`);
       }
@@ -2299,7 +2354,35 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
       }
       if (!['left', 'right', 'middle'].includes(button)) throw new Error('pc_click: button must be left | right | middle.');
       try {
-        return await pcClick(x, y, button);
+        const out = await pcClick(x, y, button);
+        recordAiPointer('click', x, y);
+        if (args.announce === true) {
+          try {
+            await pcWiggle(x, y);
+            recordAiPointer('announce', x, y);
+            return `${out} Announced with a visible marker.`;
+          } catch (e) {
+            return `${out} (announce failed: ${(e as Error).message})`;
+          }
+        }
+        return out;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_announce:
+    () =>
+    async (args) => {
+      const x = Math.round(asNumber(args.x) ?? NaN);
+      const y = Math.round(asNumber(args.y) ?? NaN);
+      if (!Number.isFinite(x) || x < 0 || x > 10000 || !Number.isFinite(y) || y < 0 || y > 10000) {
+        throw new Error('pc_announce: x and y must be integers 0–10000.');
+      }
+      try {
+        const out = await pcWiggle(x, y);
+        recordAiPointer('announce', x, y);
+        return out;
       } catch (e) {
         throw new Error(`${(e as Error).message}`);
       }

@@ -20,6 +20,7 @@ import {
   ClipboardCopy,
   ClipboardList,
   Copy,
+  Crosshair,
   Dices,
   Download,
   Keyboard,
@@ -519,6 +520,12 @@ const REGISTRY: Record<string, ToolMeta> = {
     tint: "text-emerald-400",
     accent: "border-l-emerald-400/70",
     label: "pc-key",
+  },
+  pc_announce: {
+    icon: Crosshair,
+    tint: "text-[#FDC00A]",
+    accent: "border-l-[#FDC00A]/70",
+    label: "here",
   },
   disk_ls: {
     icon: Monitor,
