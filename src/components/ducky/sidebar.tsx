@@ -102,15 +102,32 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
   const sessions = useDuckyStore((s) => s.sessions);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const [query, setQuery] = React.useState("");
+  const [projectFilter, setProjectFilter] = React.useState<string | null>(null);
   const [newFileOpen, setNewFileOpen] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const dragDepth = React.useRef(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const projectNames = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sessions
+            .map((s) => s.projectName?.trim() || (Object.keys(s.workspace).length > 0 ? "workspace" : ""))
+            .filter(Boolean),
+        ),
+      ).sort() as string[],
+    [sessions],
+  );
+
   const sorted = React.useMemo(
     () =>
       [...sessions]
         .filter((s) => {
+          if (projectFilter) {
+            const label = s.projectName?.trim() || (Object.keys(s.workspace).length > 0 ? "workspace" : "");
+            if (label !== projectFilter) return false;
+          }
           const q = query.trim().toLowerCase();
           if (!q) return true;
           if (s.title.toLowerCase().includes(q)) return true;
@@ -119,7 +136,7 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
         .sort(
           (a, b) => Number(b.starred) - Number(a.starred) || b.updatedAt - a.updatedAt,
         ),
-    [sessions, query],
+    [sessions, query, projectFilter],
   );
 
   /** git-log day grouping over the sorted list: pinned → today → … */
@@ -258,6 +275,42 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
       </nav>
 
       <div className="mx-3 mb-1 h-px bg-white/[0.06]" aria-hidden />
+
+      {/* Group / Project filter chips */}
+      {projectNames.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2" role="group" aria-label="Filter sessions by project">
+          <button
+            type="button"
+            onClick={() => setProjectFilter(null)}
+            aria-pressed={projectFilter === null}
+            className={cn(
+              "rounded-full border px-2.5 py-1 font-mono text-[10px] transition-colors",
+              projectFilter === null
+                ? "border-white/25 bg-white/[0.08] text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            # Group
+          </button>
+          {projectNames.slice(0, 6).map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setProjectFilter((f) => (f === name ? null : name))}
+              aria-pressed={projectFilter === name}
+              title={name}
+              className={cn(
+                "max-w-32 truncate rounded-full border px-2.5 py-1 font-mono text-[10px] transition-colors",
+                projectFilter === name
+                  ? "border-[#FF7A1A]/60 bg-[#FF7A1A]/10 text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              📁 {name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search + Sessions */}
       <p className="px-4 pb-1 pt-2 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground/50">

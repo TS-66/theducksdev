@@ -309,6 +309,17 @@
   outline-offset: 1px;
 }
 
+/* ─────────── interface type scale (ZCode DESIGN.md discipline) ──────────
+ * UI text uses these tokens — never ad-hoc sizes for interface chrome.
+ * (Code, diffs and terminal keep their own numeric sizes.) */
+.t-display { font-size: 2.75rem; line-height: 1.02; letter-spacing: -0.03em; font-weight: 700; }
+@media (min-width: 768px) { .t-display { font-size: 4.25rem; } }
+.t-title { font-size: 1.25rem; line-height: 1.2; letter-spacing: -0.01em; font-weight: 700; }
+.t-body { font-size: 0.875rem; line-height: 1.55; }
+.t-caption { font-size: 0.75rem; line-height: 1.5; }
+.t-mini { font-family: var(--font-mono); font-size: 0.6875rem; line-height: 1.5; letter-spacing: 0.04em; }
+.t-input-safe { font-size: 16px; line-height: 1.55; } /* mobile editable inputs: prevents iOS focus zoom */
+
 /* ─────────────────── Midnight Glass v2 (new UI design) ───────────────── */
 
 .ducky-headline {

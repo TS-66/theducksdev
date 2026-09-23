@@ -198,7 +198,7 @@ export function Hero({
       <p className="ducky-fade-up relative mt-12 font-mono text-[11px] uppercase tracking-[0.28em] text-[#FF7A1A]/90 md:mt-16">
         {greeting} · ducky ai
       </p>
-      <h1 className="ducky-headline ducky-fade-up relative mt-3 max-w-3xl text-[2.6rem] font-bold leading-[1.02] md:text-7xl [animation-delay:80ms]">
+      <h1 className="ducky-headline ducky-fade-up t-display relative mt-3 max-w-3xl [animation-delay:80ms]">
         What are we building today?
       </h1>
 

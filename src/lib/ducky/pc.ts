@@ -228,6 +228,18 @@ export async function pcWiggle(x: number, y: number): Promise<string> {
   return String(r.message ?? "Announced.");
 }
 
+export interface PcWindow {
+  id?: string;
+  name: string;
+  geo?: string;
+}
+
+/** List visible windows/apps on the PC (what exists before you act). */
+export async function pcWindows(): Promise<PcWindow[]> {
+  const r = await post<{ windows: PcWindow[] } & { ok: boolean }>("/windows", {});
+  return Array.isArray(r.windows) ? r.windows : [];
+}
+
 /* ------------------------- AI pointer registry --------------------------- */
 
 export interface AiPointer {

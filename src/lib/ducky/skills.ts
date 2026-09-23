@@ -9,12 +9,15 @@
 export interface Skill {
   name: string;
   description: string;
+  /** trigger phrases that mean "load me" (ZCode SKILL.md-style frontmatter) */
+  triggers: string[];
   body: string;
 }
 
 export const SKILLS: Skill[] = [
   {
     name: "code-review",
+    triggers: ["review this", "review the code", "look over my code", "is this correct", "find bugs"],
     description: "Review workspace changes like a senior engineer: correctness, security, edge cases.",
     body: [
       "# Skill: code-review",
@@ -27,6 +30,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "debug",
+    triggers: ["debug", "fix the bug", "not working", "broken", "error", "why does this fail"],
     description: "Systematic debugging: reproduce, isolate, fix, verify — no guessing.",
     body: [
       "# Skill: debug",
@@ -39,6 +43,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "refactor",
+    triggers: ["refactor", "clean up", "restructure", "simplify the code"],
     description: "Safe refactors: checklist first, small steps, verify after each step.",
     body: [
       "# Skill: refactor",
@@ -51,6 +56,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "plan",
+    triggers: ["plan", "design", "how should i build", "architecture", "approach"],
     description: "Write implementation plans worth approving: phases, risks, verification.",
     body: [
       "# Skill: plan",
@@ -62,6 +68,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "commit",
+    triggers: ["commit", "commit message", "what should i commit"],
     description: "Write commit messages that explain WHY, not what.",
     body: [
       "# Skill: commit",
@@ -73,6 +80,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "docs",
+    triggers: ["document", "write docs", "readme", "explain this code"],
     description: "Documentation that stays true: short, example-led, colocated.",
     body: [
       "# Skill: docs",
@@ -84,6 +92,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "test-gen",
+    triggers: ["write tests", "add tests", "test coverage", "unit test"],
     description: "Generate tests that actually protect: happy path, edges, regressions.",
     body: [
       "# Skill: test-gen",
@@ -95,6 +104,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "web-research",
+    triggers: ["search the web", "look up", "latest", "what is new", "research"],
     description: "Research the live web fast: search broad, fetch narrow, cite sources.",
     body: [
       "# Skill: web-research",
@@ -106,6 +116,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "mcp-integration",
+    triggers: ["mcp", "blender", "roblox", "connect an app", "external tool"],
     description: "Connect the agent to outside apps (Blender, Roblox Studio…) via MCP bridges.",
     body: [
       "# Skill: mcp-integration",
@@ -118,6 +129,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "api-design",
+    triggers: ["design an api", "rest api", "endpoints", "api design"],
     description: "Design clean APIs: resources, verbs, errors, versioning.",
     body: [
       "# Skill: api-design",
@@ -129,6 +141,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "sql",
+    triggers: ["sql", "query", "database query", "postgres"],
     description: "Write safe SQL: read-only first, explicit columns, measured joins.",
     body: [
       "# Skill: sql",
@@ -140,6 +153,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "regex",
+    triggers: ["regex", "regular expression", "pattern match"],
     description: "Craft correct regular expressions: build up, test edges, mind catastrophic backtracking.",
     body: [
       "# Skill: regex",
@@ -151,6 +165,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "git",
+    triggers: ["git", "rebase", "merge conflict", "pull request"],
     description: "Git hygiene: small commits, honest messages, clean history.",
     body: [
       "# Skill: git",
@@ -162,6 +177,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "perf",
+    triggers: ["slow", "performance", "optimize", "bottleneck", "speed up"],
     description: "Performance work that holds up: measure first, fix the bottleneck, prove it.",
     body: [
       "# Skill: perf",
@@ -173,6 +189,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "security-review",
+    triggers: ["security", "vulnerability", "xss", "injection", "audit"],
     description: "Security pass: injection, auth, secrets, dependencies.",
     body: [
       "# Skill: security-review",
@@ -184,6 +201,7 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "local-pc",
+    triggers: ["my computer", "my pc", "on my machine", "screenshot", "click", "take over"],
     description: "Control the human's REAL computer: see the screen, click, type — the full loop.",
     body: [
       "# Skill: local-pc",
@@ -195,7 +213,37 @@ export const SKILLS: Skill[] = [
     ].join("\n"),
   },
   {
+    name: "agent-browser",
+    description: "Drive web pages like a user: open, read, click, fill, screenshot, verify.",
+    triggers: ["open a website", "fill out a form", "click a button", "take a screenshot", "scrape", "test this web app", "log in", "automate the browser"],
+    body: [
+      "# Skill: agent-browser",
+      "Triggers: open a website · fill a form · click something · screenshot a page · scrape data · test a web app.",
+      "1. OPEN: `browser_open` (IDE panel) — or `outside: true` when the human wants THEIR browser. One page per step.",
+      "2. READ: `browser_snapshot` immediately after every navigation — never act on a page you have not read this turn.",
+      "3. Chain cheap steps in ONE turn (open → snapshot → screenshot), but stop and read before every state-changing click (logins, submits, deletes).",
+      "4. FORMS: read first, then fill every field, then submit — then snapshot again to VERIFY the result (URL? success text? error?).",
+      "5. AUTH: never invent credentials. If a login wall appears, stop and ask the human (or have them log in inside the open tab).",
+      "6. EVIDENCE: quote the exact text/URL you acted on. If the page forbids embedding (blank frame), say so — the text path still works.",
+    ].join("\n"),
+  },
+  {
+    name: "react",
+    description: "React + Next.js UI work: components, hooks discipline, styling that survives review.",
+    triggers: ["react", "next.js", "component", "hook", "frontend", "ui bug", "styling"],
+    body: [
+      "# Skill: react",
+      "Triggers: react · next.js · component · hooks · frontend · styling.",
+      "1. Read the component fully before touching it — props, state, effects, and who renders it.",
+      "2. Hooks discipline: no setState in effects (defer or derive), stable deps, no new arrays/objects as deps.",
+      "3. Keep components small and presentational; push data logic into hooks or lib modules.",
+      "4. Styling: follow the repo's tokens (no magic hexes, no ad-hoc font sizes for UI text); mobile inputs stay 16px.",
+      "5. Verify with typecheck + lint + build, then boot the page and confirm HTTP 200.",
+    ].join("\n"),
+  },
+  {
     name: "data-analysis",
+    triggers: ["analyze", "csv", "data", "dataset", "statistics"],
     description: "Analyze CSV-ish data in the workspace: preview, clean, summarize.",
     body: [
       "# Skill: data-analysis",

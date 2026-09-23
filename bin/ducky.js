@@ -874,6 +874,28 @@ async function runBridge() {
         return send(res, 200, { ok: true, message: `Announced at ${x.value},${y.value}.` });
       }
 
+      if (url.pathname === "/windows") {
+        // List visible windows so the agent knows what exists before acting.
+        if (inputHelper === "xdotool") {
+          const ids = await runHelper("xdotool", ["search", "--onlyvisible", "--desktop", "0", ""]);
+          if (ids.code !== 0) return send(res, 200, { ok: true, windows: [] });
+          const out = [];
+          for (const id of ids.out.toString().split("\n").map((s) => s.trim()).filter(Boolean).slice(0, 40)) {
+            const nm = await runHelper("xdotool", ["getwindowname", id]);
+            const geo = await runHelper("xdotool", ["getwindowgeometry", "--shell", id]);
+            out.push({ id, name: nm.out.toString().trim().slice(0, 120) || "(unnamed)", geo: geo.out.toString().trim().slice(0, 120) });
+          }
+          return send(res, 200, { ok: true, windows: out });
+        }
+        if (inputHelper === "osascript") {
+          const r = await runHelper("osascript", ["-e", 'tell application "System Events" to get name of (every process whose background only is false)']);
+          if (r.code !== 0) return send(res, 400, { ok: false, error: "Could not list processes." });
+          const names = r.out.toString().split(", ").map((s) => s.trim()).filter(Boolean).slice(0, 40);
+          return send(res, 200, { ok: true, windows: names.map((name) => ({ name })) });
+        }
+        return send(res, 400, { ok: false, error: "Window listing needs xdotool (Linux/X11) or macOS." });
+      }
+
       if (url.pathname === "/type") {
         const r = await runInput("type", { text: body.text });
         return send(res, r.ok ? 200 : 400, r);
@@ -884,7 +906,7 @@ async function runBridge() {
         return send(res, r.ok ? 200 : 400, r);
       }
 
-      return send(res, 404, { ok: false, error: "Unknown route. Try /status /caps /screen /exec /ls /read /write /move /click /type /key /wiggle." });
+      return send(res, 404, { ok: false, error: "Unknown route. Try /status /caps /screen /windows /exec /ls /read /write /move /click /type /key /wiggle." });
     });
   });
 

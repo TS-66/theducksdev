@@ -324,7 +324,7 @@ export function Composer({
             onPaste={onPaste}
             placeholder="Ask Ducky anything, @ to add context, / for commands"
             aria-label="Ask Ducky"
-            className="min-h-[72px] max-h-[240px] resize-none border-0 bg-transparent px-5 pb-2 pt-4 text-[15px] leading-relaxed placeholder:text-muted-foreground/60 focus-visible:ring-0"
+            className="t-input-safe min-h-[72px] max-h-[240px] resize-none border-0 bg-transparent px-5 pb-2 pt-4 placeholder:text-muted-foreground/60 focus-visible:ring-0"
           />
 
           {fileInput}
@@ -568,7 +568,7 @@ export function Composer({
         }
         disabled={disabledSurface}
         aria-label="Message Ducky"
-        className="min-h-[52px] max-h-[200px] resize-none border-0 bg-transparent px-3 pb-11 pt-1.5 pr-24 focus-visible:ring-0"
+        className="t-input-safe min-h-[52px] max-h-[200px] resize-none border-0 bg-transparent px-3 pb-11 pt-1.5 pr-24 focus-visible:ring-0"
       />
 
       {fileInput}

@@ -172,9 +172,9 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (106 tools, 36 plugins)", async () => {
+await run("registry: counts (107 tools, 36 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 106, `only ${defs.length} tools`);
+  assert(defs.length >= 107, `only ${defs.length} tools`);
   assert(PLUGINS.length >= 36, `only ${PLUGINS.length} plugins`);
 });
 
@@ -795,6 +795,30 @@ await run("registry: every executor has a schema", async () => {
       pc.__resetAiPointer();
     }
   });
+  await run("pc_windows over stubbed bridge", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      if (String(url).endsWith("/windows")) {
+        return new Response(
+          JSON.stringify({ ok: true, windows: [{ id: "0x1", name: "Terminal", geo: "x:0" }, { name: "Browser" }] }),
+          { status: 200 },
+        );
+      }
+      return new Response("nope", { status: 404 });
+    };
+    try {
+      const pc = await import(`${LIB}/pc.${EXT}`);
+      pc.setPcConfig(3791, "t");
+      const out = await ex("pc_windows")({});
+      assert(out.includes("Terminal") && out.includes("Browser"), out);
+      const wins = await pc.pcWindows();
+      assert(wins.length === 2 && wins[0].id === "0x1", "client shape");
+    } finally {
+      globalThis.fetch = realFetch;
+      const pc = await import(`${LIB}/pc.${EXT}`);
+      pc.clearPcConfig();
+    }
+  });
   await run("pc client: unreachable + bad token", async () => {
     const realFetch = globalThis.fetch;
     globalThis.fetch = async () => {
@@ -1012,11 +1036,16 @@ await run("tools-extra direct: json path + diff", async () => {
   assert(extra.lineDiff("same\n", "same\n").includes("identical"), "identical");
 });
 
-await run("skills module: 17 playbooks", async () => {
-  assert(skills.SKILLS.length === 17, `got ${skills.SKILLS.length}`);
+await run("skills module: 19 playbooks with triggers", async () => {
+  assert(skills.SKILLS.length === 19, `got ${skills.SKILLS.length}`);
   assert(skills.getSkill("PLAN")?.name === "plan", "case-insensitive lookup");
   assert(skills.getSkill("mcp-integration")?.name === "mcp-integration", "mcp skill");
   assert(skills.getSkill("local-pc")?.name === "local-pc", "pc skill");
+  assert(skills.getSkill("agent-browser")?.name === "agent-browser", "browser skill");
+  assert(skills.getSkill("react")?.name === "react", "react skill");
+  for (const s of skills.SKILLS) {
+    assert(Array.isArray(s.triggers) && s.triggers.length > 0, `${s.name} missing triggers`);
+  }
 });
 
 await run("browser-tabs module: registry", async () => {

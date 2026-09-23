@@ -46,7 +46,7 @@ import {
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
 import { callMcpTool, listMcpServers, listMcpTools, scanLocalMcp } from './mcp';
-import { pcCaps, pcClick, pcExec, pcKey, pcList, pcMove, pcRead, pcScreen, pcStatus, pcType, pcWiggle, pcWrite, recordAiPointer } from './pc';
+import { pcCaps, pcClick, pcExec, pcKey, pcList, pcMove, pcRead, pcScreen, pcStatus, pcType, pcWiggle, pcWindows, pcWrite, recordAiPointer } from './pc';
 import {
   colorContrast,
   colorConvert,
@@ -314,7 +314,7 @@ export const PLUGINS: PluginManifest[] = [
     name: 'ducky-tool-skills',
     version: '1.0.0',
     description:
-      'Skill playbooks (17): code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis, local-pc. List them, then pull one into context before starting that kind of work.',
+      'Skill playbooks (19, ZCode SKILL.md-style with trigger phrases): code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis, local-pc, agent-browser, react. List them, then pull one into context before starting that kind of work.',
     tools: ['skill_list', 'skill_show'],
     category: 'meta',
     defaultEnabled: true,
@@ -434,7 +434,7 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'THIS PC (real machine): runs only while the human runs `ducky bridge` on their computer — real shell commands and real files rooted at the bridge folder, guarded by a one-time token. This is actual computer use, not the virtual workspace: confirm destructive commands with the human first. Disabled by default — enable it when the bridge is up.',
-    tools: ['pc_status', 'pc_caps', 'pc_screen', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls', 'pc_move', 'pc_click', 'pc_type', 'pc_key', 'pc_announce'],
+    tools: ['pc_status', 'pc_caps', 'pc_screen', 'pc_windows', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls', 'pc_move', 'pc_click', 'pc_type', 'pc_key', 'pc_announce'],
     category: 'shell',
     defaultEnabled: false,
   },
@@ -1103,7 +1103,7 @@ export function buildToolDefinitions(): ToolDefinition[] {
       name: 'skill_list',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-skills`).id,
       description:
-        'List built-in skill playbooks (17: code-review, debug, refactor, plan, commit, docs, test-gen, web-research, mcp-integration, api-design, sql, regex, git, perf, security-review, data-analysis, local-pc) with one-line descriptions. Call BEFORE starting that kind of work, then skill_show.',
+        'List built-in skill playbooks (19) with descriptions and trigger phrases. Call BEFORE starting that kind of work, then skill_show.',
       parameters: obj({}, []),
     },
     {
@@ -1361,6 +1361,13 @@ export function buildToolDefinitions(): ToolDefinition[] {
         ['x', 'y'],
       ),
       sideEffects: true,
+    },
+    {
+      name: 'pc_windows',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'List visible windows/apps on the PC (names + geometry where available). Call before acting on any app — know what exists first. Read-only.',
+      parameters: obj({}, []),
     },
     {
       name: 'pc_type',
@@ -2468,7 +2475,7 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
   /* --------------------------------- skills -------------------------------- */
 
   skill_list: () => async () => {
-    return SKILLS.map((s) => `${s.name} — ${s.description}`).join('\n');
+    return SKILLS.map((s) => `${s.name} — ${s.description} (load on: ${s.triggers.slice(0, 4).join(', ')})`).join('\n');
   },
 
   skill_show: () => async (args) => {
@@ -2684,6 +2691,23 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
       if (!key) throw new Error('pc_key: "key" is required (e.g. "Enter" or "ctrl+s").');
       try {
         return await pcKey(key);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  /* ------------------------------- pc windows ------------------------------ */
+
+  pc_windows:
+    () =>
+    async () => {
+      try {
+        const wins = await pcWindows();
+        if (!wins.length) return 'No visible windows reported (headless machine, or helper missing — see pc_caps).';
+        return wins
+          .slice(0, 40)
+          .map((w) => `- ${w.name}${w.id ? ` [${w.id}]` : ''}${w.geo ? ` · ${w.geo.replace(/\n/g, ' ')}` : ''}`)
+          .join('\n');
       } catch (e) {
         throw new Error(`${(e as Error).message}`);
       }

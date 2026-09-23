@@ -21,6 +21,7 @@ import {
   CalendarClock,
   ClipboardCopy,
   ClipboardList,
+  AppWindow,
   Copy,
   Crosshair,
   Dices,
@@ -538,6 +539,12 @@ const REGISTRY: Record<string, ToolMeta> = {
     tint: "text-[#FF7A1A]",
     accent: "border-l-[#FF7A1A]/70",
     label: "here",
+  },
+  pc_windows: {
+    icon: AppWindow,
+    tint: "text-emerald-400",
+    accent: "border-l-emerald-400/70",
+    label: "windows",
   },
   url_parse: {
     icon: Link2,
