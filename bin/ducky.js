@@ -103,6 +103,9 @@ function printHelp() {
                                 paste it into Settings → Connections → This PC.
                                 Ctrl+C disconnects instantly. Nothing above
                                 --root is ever reachable.
+    ducky bridge --input        ALSO unlock real mouse/keyboard/screen control
+                                (screenshot is read-only and always on when the
+                                OS allows it; input stays locked otherwise).
 
   How the key stays hidden:
     • key lives ONLY in server memory/env: OS keychain → shell env → locked file
@@ -457,10 +460,11 @@ if (ARGS[0] === "setup") {
 }
 
 if (ARGS[0] === "bridge") {
-  // Local PC bridge: exposes THIS computer (shell + files, rooted at --root)
-  // to the browser UI over loopback only, guarded by a one-time token.
-  // The browser can never touch your PC otherwise — this command IS the
-  // explicit consent. Keep this terminal open; Ctrl+C stops everything.
+  // Local PC bridge: exposes THIS computer over loopback only, guarded by a
+  // one-time token. The browser can never touch your PC otherwise — this
+  // command IS the explicit consent. Keep this terminal open; Ctrl+C stops
+  // everything. Add --input to ALSO unlock real mouse/keyboard control
+  // (screenshot is read-only and always available when the OS allows it).
   runBridge();
   return;
 }
@@ -476,6 +480,180 @@ async function runBridge() {
   const MAX_OUT = 64 * 1024;
   const MAX_READ = 512 * 1024;
   const MAX_WRITE = 2 * 1024 * 1024;
+  const MAX_SHOT = 2 * 1024 * 1024;
+  // Real input control is OFF unless explicitly unlocked: --input means "the
+  // agent may move my mouse and type". Screenshot stays read-only.
+  const inputUnlocked = has("--input");
+
+  /* ---------- OS input/screen helpers (best available per platform) ------- */
+  const hasBin = (name) => {
+    try {
+      const r = spawnSync(process.platform === "win32" ? "where" : "which", [name], { stdio: "ignore" });
+      return !r.error && r.status === 0;
+    } catch {
+      return false;
+    }
+  };
+  const shotHelper =
+    process.platform === "darwin"
+      ? "screencapture"
+      : process.platform === "win32"
+        ? null
+        : hasBin("grim")
+          ? "grim"
+          : hasBin("scrot")
+            ? "scrot"
+            : hasBin("import")
+              ? "import"
+              : null;
+  const inputHelper =
+    process.platform === "darwin"
+      ? "osascript"
+      : process.platform === "win32"
+        ? null
+        : hasBin("xdotool")
+          ? "xdotool"
+          : null;
+
+  const runHelper = (cmd, args, timeoutMs = 15000) =>
+    new Promise((resolve) => {
+      const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+      const out = [];
+      let size = 0;
+      let done = false;
+      const finish = (code, err) => {
+        if (done) return;
+        done = true;
+        resolve({ code: code ?? -1, out: Buffer.concat(out), err: String(err || "") });
+      };
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+        finish(-1, "helper timed out");
+      }, timeoutMs);
+      child.stdout.on("data", (c) => {
+        if (size < MAX_SHOT * 2) {
+          out.push(c);
+          size += c.length;
+        }
+      });
+      child.stderr.on("data", () => {});
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        finish(-1, e.message);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        finish(code, "");
+      });
+    });
+
+  const takeScreenshot = async () => {
+    if (!shotHelper) return { ok: false, error: "No screenshot helper on this machine (macOS: built-in · Linux: install grim or scrot)." };
+    const tmp = path.join(os.tmpdir(), `ducky-shot-${Date.now()}.png`);
+    let r;
+    if (shotHelper === "screencapture") r = await runHelper("screencapture", ["-x", "-t", "png", tmp]);
+    else if (shotHelper === "grim") r = await runHelper("grim", [tmp]);
+    else if (shotHelper === "scrot") r = await runHelper("scrot", ["-z", tmp]);
+    else r = await runHelper("import", ["-window", "root", tmp]);
+    try {
+      if (r.code !== 0) return { ok: false, error: `Screenshot failed (${shotHelper}, exit ${r.code}).` };
+      const buf = fs.readFileSync(tmp);
+      if (!buf.length) return { ok: false, error: "Screenshot came back empty (no display?)." };
+      if (buf.length > MAX_SHOT) {
+        return { ok: false, error: `Screenshot is ${(buf.length / 1024 / 1024).toFixed(1)} MB (cap 2 MB) — lower the display resolution and retry.` };
+      }
+      return { ok: true, image: buf.toString("base64"), bytes: buf.length };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    } finally {
+      try {
+        fs.unlinkSync(tmp);
+      } catch {}
+    }
+  };
+
+  const KEY_RE = /^(ctrl\+|alt\+|shift\+|super\+|meta\+)*(enter|tab|escape|esc|space|backspace|delete|home|end|page_up|page_down|up|down|left|right|f[1-9]|f1[0-2]|[a-z0-9])$/i;
+
+  const runInput = async (kind, arg) => {
+    if (!inputUnlocked) {
+      return { ok: false, error: "Input control is locked — restart the bridge with `ducky bridge --input` to unlock mouse/keyboard." };
+    }
+    if (!inputHelper) {
+      return {
+        ok: false,
+        error: "No input helper on this machine (macOS: built-in osascript · Linux: `sudo apt install xdotool` on X11).",
+      };
+    }
+    try {
+      if (inputHelper === "osascript") {
+        const apple = (script) => runHelper("osascript", ["-e", script]);
+        if (kind === "move" || kind === "click") {
+          const { x, y, button } = arg;
+          await apple(`tell application "System Events" to set mouseLoc to {${x}, ${y}}`);
+          // Note: System Events has no direct click-at; key code 36 fallback is unreliable —
+          // report honestly: macOS needs cliclick for clicks (brew install cliclick).
+          if (kind === "click") {
+            if (hasBin("cliclick")) {
+              const btn = button === "right" ? "rc" : button === "middle" ? "mc" : "c";
+              const r = await runHelper("cliclick", [`${btn}:${x},${y}`]);
+              if (r.code !== 0) return { ok: false, error: `cliclick failed (exit ${r.code}).` };
+              return { ok: true, message: `Clicked ${button} at ${x},${y}.` };
+            }
+            return { ok: false, error: "macOS moved the pointer, but clicking needs `brew install cliclick`." };
+          }
+          return { ok: true, message: `Pointer moved to ${x},${y}.` };
+        }
+        if (kind === "type") {
+          const safe = String(arg.text).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          const r = await apple(`tell application "System Events" to keystroke "${safe}"`);
+          if (r.code !== 0) return { ok: false, error: `Typing failed (exit ${r.code}) — grant accessibility permission?` };
+          return { ok: true, message: `Typed ${String(arg.text).length} chars.` };
+        }
+        if (kind === "key") {
+          const map = { enter: "36", tab: "48", escape: "53", esc: "53", space: "49", backspace: "51", delete: "117" };
+          const k = String(arg.key).toLowerCase();
+          const code = map[k];
+          if (!code) return { ok: false, error: `Key "${arg.key}" not mapped on macOS (Enter/Tab/Escape/Space/Backspace/Delete supported).` };
+          const r = await apple(`tell application "System Events" to key code ${code}`);
+          if (r.code !== 0) return { ok: false, error: `Key press failed (exit ${r.code}).` };
+          return { ok: true, message: `Pressed ${k}.` };
+        }
+      }
+      // xdotool (Linux/X11)
+      if (kind === "move") {
+        const r = await runHelper("xdotool", ["mousemove", String(arg.x), String(arg.y)]);
+        if (r.code !== 0) return { ok: false, error: `mousemove failed (exit ${r.code}) — is an X session running?` };
+        return { ok: true, message: `Pointer moved to ${arg.x},${arg.y}.` };
+      }
+      if (kind === "click") {
+        const btn = arg.button === "right" ? "3" : arg.button === "middle" ? "2" : "1";
+        const r = await runHelper("xdotool", ["mousemove", String(arg.x), String(arg.y), "click", btn]);
+        if (r.code !== 0) return { ok: false, error: `click failed (exit ${r.code}).` };
+        return { ok: true, message: `Clicked ${arg.button} at ${arg.x},${arg.y}.` };
+      }
+      if (kind === "type") {
+        const text = String(arg.text);
+        if (!text) return { ok: false, error: "Nothing to type." };
+        if (text.length > 2000) return { ok: false, error: "Type at most 2000 chars per call." };
+        const r = await runHelper("xdotool", ["type", "--clearmodifiers", "--delay", "10", "--", text], 60000);
+        if (r.code !== 0) return { ok: false, error: `Typing failed (exit ${r.code}).` };
+        return { ok: true, message: `Typed ${text.length} chars.` };
+      }
+      if (kind === "key") {
+        const k = String(arg.key);
+        if (!KEY_RE.test(k)) return { ok: false, error: `Key "${k}" not allowed (Enter/Tab/Escape/arrows/F-keys/single chars + ctrl/alt/shift/super).` };
+        const seq = k.toLowerCase().replace(/\+/g, "+");
+        const r = await runHelper("xdotool", ["key", "--clearmodifiers", seq]);
+        if (r.code !== 0) return { ok: false, error: `Key press failed (exit ${r.code}).` };
+        return { ok: true, message: `Pressed ${k}.` };
+      }
+      return { ok: false, error: `Unknown input action "${kind}".` };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    }
+  };
 
   const inside = (p) => {
     const abs = path.resolve(root, p || ".");
@@ -516,7 +694,7 @@ async function runBridge() {
       raw += c;
       if (raw.length > MAX_WRITE + 1024) req.destroy();
     });
-    req.on("end", () => {
+    req.on("end", async () => {
       let body = null;
       try {
         body = JSON.parse(raw || "{}");
@@ -632,7 +810,56 @@ async function runBridge() {
         }
       }
 
-      return send(res, 404, { ok: false, error: "Unknown route. Try /status /exec /ls /read /write." });
+      if (url.pathname === "/caps") {
+        return send(res, 200, {
+          ok: true,
+          platform: process.platform,
+          display: process.env.DISPLAY || null,
+          screenshot: shotHelper,
+          input: inputHelper,
+          inputUnlocked,
+        });
+      }
+
+      if (url.pathname === "/screen") {
+        const shot = await takeScreenshot();
+        if (!shot.ok) return send(res, 400, { ok: false, error: shot.error });
+        return send(res, 200, { ok: true, image: shot.image, bytes: shot.bytes });
+      }
+
+      const intArg = (v, lo, hi, name) => {
+        const n = typeof v === "number" ? v : parseInt(v, 10);
+        if (!Number.isFinite(n) || n < lo || n > hi) return { error: `${name} must be an integer ${lo}–${hi}.` };
+        return { value: Math.round(n) };
+      };
+
+      if (url.pathname === "/move" || url.pathname === "/click") {
+        const x = intArg(body.x, 0, 10000, "x");
+        if (x.error) return send(res, 400, { ok: false, error: x.error });
+        const y = intArg(body.y, 0, 10000, "y");
+        if (y.error) return send(res, 400, { ok: false, error: y.error });
+        const button = String(body.button || "left").toLowerCase();
+        if (!["left", "right", "middle"].includes(button)) {
+          return send(res, 400, { ok: false, error: 'button must be left | right | middle.' });
+        }
+        const r =
+          url.pathname === "/move"
+            ? await runInput("move", { x: x.value, y: y.value })
+            : await runInput("click", { x: x.value, y: y.value, button });
+        return send(res, r.ok ? 200 : 400, r);
+      }
+
+      if (url.pathname === "/type") {
+        const r = await runInput("type", { text: body.text });
+        return send(res, r.ok ? 200 : 400, r);
+      }
+
+      if (url.pathname === "/key") {
+        const r = await runInput("key", { key: body.key });
+        return send(res, r.ok ? 200 : 400, r);
+      }
+
+      return send(res, 404, { ok: false, error: "Unknown route. Try /status /caps /screen /exec /ls /read /write /move /click /type /key." });
     });
   });
 

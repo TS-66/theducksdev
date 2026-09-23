@@ -46,7 +46,7 @@ import {
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
 import { callMcpTool, listMcpServers, listMcpTools } from './mcp';
-import { pcExec, pcList, pcRead, pcStatus, pcWrite } from './pc';
+import { pcCaps, pcClick, pcExec, pcKey, pcList, pcMove, pcRead, pcScreen, pcStatus, pcType, pcWrite } from './pc';
 import { closeTab, getActiveTab, listTabs, openTab } from './browser-tabs';
 import { captureScreenToWorkspace } from './screen';
 
@@ -332,7 +332,7 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'THIS PC (real machine): runs only while the human runs `ducky bridge` on their computer — real shell commands and real files rooted at the bridge folder, guarded by a one-time token. This is actual computer use, not the virtual workspace: confirm destructive commands with the human first. Disabled by default — enable it when the bridge is up.',
-    tools: ['pc_status', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls'],
+    tools: ['pc_status', 'pc_caps', 'pc_screen', 'pc_exec', 'pc_read', 'pc_write', 'pc_ls', 'pc_move', 'pc_click', 'pc_type', 'pc_key'],
     category: 'shell',
     defaultEnabled: false,
   },
@@ -1190,6 +1190,69 @@ export function buildToolDefinitions(): ToolDefinition[] {
         },
         [],
       ),
+    },
+    {
+      name: 'pc_caps',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Ask the bridge what REAL control exists here: screenshot helper? mouse/keyboard helper? input unlocked (--input)? Call before any pc_screen/click/type — unavailable helpers fail clearly instead.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'pc_screen',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Take a REAL screenshot of the PC screen into images/ and return its path — the eyes of computer use. Follow with vision_describe, read what is on screen, then act with pc_move/pc_click/pc_type. Needs a display; headless machines fail clearly.',
+      parameters: obj({}, []),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_move',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description: 'Move the REAL mouse pointer to screen pixels (x, y). Needs the bridge started with --input.',
+      parameters: obj(
+        {
+          x: num('Horizontal pixel (0–10000).'),
+          y: num('Vertical pixel (0–10000).'),
+        },
+        ['x', 'y'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_click',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Click the REAL mouse at screen pixels. Confirm the target with the human first when the click changes state (buttons, deletes, sends). Needs --input.',
+      parameters: obj(
+        {
+          x: num('Horizontal pixel (0–10000).'),
+          y: num('Vertical pixel (0–10000).'),
+          button: {
+            type: 'string',
+            enum: ['left', 'right', 'middle'],
+            description: 'Mouse button. Defaults to left.',
+          },
+        },
+        ['x', 'y'],
+      ),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_type',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Type REAL text into the focused window (≤2000 chars per call). Make sure the right field is focused first (click it). Never type secrets you were not explicitly given. Needs --input.',
+      parameters: obj({ text: str('Exact text to type.') }, ['text']),
+      sideEffects: true,
+    },
+    {
+      name: 'pc_key',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-pc`).id,
+      description:
+        'Press a REAL key: Enter/Tab/Escape/arrows/F1–F12/single characters, optionally with ctrl/alt/shift/super (e.g. "ctrl+s"). Anything else is refused. Needs --input.',
+      parameters: obj({ key: str('Key name, e.g. "Enter" or "ctrl+s".') }, ['key']),
+      sideEffects: true,
     },
     {
       name: 'mcp_servers',
@@ -2174,6 +2237,94 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
         const lines = entries.slice(0, cap).map((e) => `${e.dir ? '📁' : '📄'} ${e.path}${e.dir ? '' : ` (${e.size} B)`}`);
         if (entries.length > cap) lines.push(`… +${entries.length - cap} more`);
         return lines.join('\n');
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  /* --------------------------- pc: real control ---------------------------- */
+
+  pc_caps: () => async () => {
+    try {
+      const c = await pcCaps();
+      const lines = [
+        `platform: ${c.platform}${c.display ? ` · display ${c.display}` : ' · no display'}`,
+        `screenshot: ${c.screenshot ?? 'unavailable'} · input helper: ${c.input ?? 'unavailable'}`,
+        `input control: ${c.inputUnlocked ? 'UNLOCKED (--input) — mouse/keyboard live' : 'LOCKED — restart bridge with --input'}`,
+      ];
+      return lines.join('\n');
+    } catch (e) {
+      throw new Error(`${(e as Error).message}`);
+    }
+  },
+
+  pc_screen:
+    (ctx) =>
+    async () => {
+      try {
+        const shot = await pcScreen();
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const p = `images/pc-screen-${stamp}.png`;
+        ctx.writeFile(p, `data:image/png;base64,${shot.image}`);
+        const kb = Math.round((shot.bytes / 1024) * 10) / 10;
+        return `Real screenshot captured (${kb} KB) → ${p}. Use vision_describe on it, then act with pc_move/pc_click/pc_type.`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_move:
+    () =>
+    async (args) => {
+      const x = Math.round(asNumber(args.x) ?? NaN);
+      const y = Math.round(asNumber(args.y) ?? NaN);
+      if (!Number.isFinite(x) || x < 0 || x > 10000 || !Number.isFinite(y) || y < 0 || y > 10000) {
+        throw new Error('pc_move: x and y must be integers 0–10000 (read them off a pc_screen via vision_describe).');
+      }
+      try {
+        return await pcMove(x, y);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_click:
+    () =>
+    async (args) => {
+      const x = Math.round(asNumber(args.x) ?? NaN);
+      const y = Math.round(asNumber(args.y) ?? NaN);
+      const button = asString(args.button) || 'left';
+      if (!Number.isFinite(x) || x < 0 || x > 10000 || !Number.isFinite(y) || y < 0 || y > 10000) {
+        throw new Error('pc_click: x and y must be integers 0–10000.');
+      }
+      if (!['left', 'right', 'middle'].includes(button)) throw new Error('pc_click: button must be left | right | middle.');
+      try {
+        return await pcClick(x, y, button);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_type:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('pc_type: "text" is required');
+      if (text.length > 2000) throw new Error('pc_type: at most 2000 chars per call.');
+      try {
+        return await pcType(text);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  pc_key:
+    () =>
+    async (args) => {
+      const key = asString(args.key).trim();
+      if (!key) throw new Error('pc_key: "key" is required (e.g. "Enter" or "ctrl+s").');
+      try {
+        return await pcKey(key);
       } catch (e) {
         throw new Error(`${(e as Error).message}`);
       }

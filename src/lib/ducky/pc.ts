@@ -162,3 +162,59 @@ export async function pcList(path = ".", recursive = false): Promise<PcEntry[]> 
   const r = await post<{ entries: PcEntry[] } & { ok: boolean }>("/ls", { path, recursive });
   return Array.isArray(r.entries) ? r.entries : [];
 }
+
+export interface PcCaps {
+  platform: string;
+  display: string | null;
+  screenshot: string | null;
+  input: string | null;
+  inputUnlocked: boolean;
+}
+
+/** What this bridge can do (helpers present? input unlocked?). */
+export async function pcCaps(): Promise<PcCaps> {
+  const r = await post<PcCaps & { ok: boolean }>("/caps", {});
+  return {
+    platform: String(r.platform ?? ""),
+    display: (r.display as string | null) ?? null,
+    screenshot: (r.screenshot as string | null) ?? null,
+    input: (r.input as string | null) ?? null,
+    inputUnlocked: r.inputUnlocked === true,
+  };
+}
+
+export interface PcShot {
+  image: string;
+  bytes: number;
+}
+
+/** REAL screenshot from the PC (base64 PNG). Needs a display + helper. */
+export async function pcScreen(): Promise<PcShot> {
+  const r = await post<{ image: string; bytes: number } & { ok: boolean }>("/screen", {});
+  if (typeof r.image !== "string" || !r.image) throw new Error("PC bridge returned no image.");
+  return { image: r.image, bytes: r.bytes };
+}
+
+/** Move the REAL pointer. Coordinates in screen pixels. */
+export async function pcMove(x: number, y: number): Promise<string> {
+  const r = await post<{ message?: string } & { ok: boolean }>("/move", { x, y });
+  return String(r.message ?? "Moved.");
+}
+
+/** Click the REAL mouse at screen pixels. */
+export async function pcClick(x: number, y: number, button = "left"): Promise<string> {
+  const r = await post<{ message?: string } & { ok: boolean }>("/click", { x, y, button });
+  return String(r.message ?? "Clicked.");
+}
+
+/** Type REAL text into the focused window (≤2000 chars). */
+export async function pcType(text: string): Promise<string> {
+  const r = await post<{ message?: string } & { ok: boolean }>("/type", { text });
+  return String(r.message ?? "Typed.");
+}
+
+/** Press a REAL key (whitelisted: Enter/Tab/Escape/arrows/F-keys/chars + modifiers). */
+export async function pcKey(key: string): Promise<string> {
+  const r = await post<{ message?: string } & { ok: boolean }>("/key", { key });
+  return String(r.message ?? "Pressed.");
+}

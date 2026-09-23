@@ -172,9 +172,9 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (77 tools, 28 plugins)", async () => {
+await run("registry: counts (83 tools, 28 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 77, `only ${defs.length} tools`);
+  assert(defs.length >= 83, `only ${defs.length} tools`);
   assert(PLUGINS.length >= 28, `only ${PLUGINS.length} plugins`);
 });
 
@@ -691,6 +691,46 @@ await run("registry: every executor has a schema", async () => {
       assert(pc.getPcConfig()?.port === 3791, "config roundtrip");
       pc.clearPcConfig();
       assert(pc.getPcConfig() === null, "unpair");
+    } finally {
+      globalThis.fetch = realFetch;
+      pc.clearPcConfig();
+    }
+  });
+  await run("pc real control over stubbed bridge", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      if (String(url).endsWith("/caps")) {
+        return new Response(
+          JSON.stringify({ ok: true, platform: "linux", display: ":0", screenshot: "scrot", input: "xdotool", inputUnlocked: true }),
+          { status: 200 },
+        );
+      }
+      if (String(url).endsWith("/screen")) {
+        return new Response(JSON.stringify({ ok: true, image: "aVBORw0KGgo=", bytes: 8 }), { status: 200 });
+      }
+      const actions = ["/move", "/click", "/type", "/key"];
+      if (actions.some((a) => String(url).endsWith(a))) {
+        if (body.token !== "t") return new Response(JSON.stringify({ ok: false, error: "Bad token" }), { status: 401 });
+        return new Response(JSON.stringify({ ok: true, message: "did it" }), { status: 200 });
+      }
+      return new Response("nope", { status: 404 });
+    };
+    try {
+      pc.setPcConfig(3791, "t");
+      const caps = await ex("pc_caps")({});
+      assert(caps.includes("UNLOCKED"), caps);
+      const shot = await ex("pc_screen")({});
+      const imgPath = shot.match(/images\/[A-Za-z0-9_.-]+\.png/)?.[0] ?? "";
+      assert(shot.includes("images/pc-screen-") && imgPath !== "" && ctx.readFile(imgPath) !== null, shot);
+      assert((await ex("pc_move")({ x: 10, y: 20 })).includes("did it"), "move");
+      assert((await ex("pc_click")({ x: 10, y: 20, button: "right" })).includes("did it"), "click");
+      assert((await ex("pc_type")({ text: "hi" })).includes("did it"), "type");
+      assert((await ex("pc_key")({ key: "Enter" })).includes("did it"), "key");
+      await expectThrow(() => ex("pc_move")({ x: -5, y: 0 }), "coord guard");
+      await expectThrow(() => ex("pc_click")({ x: 0, y: 0, button: "nuke" }), "button guard");
+      await expectThrow(() => ex("pc_type")({ text: "" }), "empty type");
+      await expectThrow(() => ex("pc_key")({ key: "" }), "empty key");
     } finally {
       globalThis.fetch = realFetch;
       pc.clearPcConfig();

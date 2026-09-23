@@ -184,14 +184,14 @@ export const SKILLS: Skill[] = [
   },
   {
     name: "local-pc",
-    description: "Work on the human's REAL machine via the ducky bridge: pair, verify, act carefully.",
+    description: "Control the human's REAL computer: see the screen, click, type — the full loop.",
     body: [
       "# Skill: local-pc",
-      "1. `pc_status` FIRST — if the bridge is down, tell the human to run `ducky bridge` and paste the token in Settings → Connections → This PC. Never invent paths.",
-      "2. Explore with `pc_ls` / `pc_read` before any write; the bridge root is the whole world — paths above it do not exist for you.",
-      "3. `pc_exec` for read-only commands freely; destructive commands need explicit human confirmation IN CHAT first (the tool itself refuses machine-level destruction).",
-      "4. Prefer the virtual workspace (`write_file`, `bash`) for drafts; use the PC only for things that must live on their machine.",
-      "5. Report exactly where each change landed: workspace path vs PC path.",
+      "1. `pc_status` FIRST, then `pc_caps` — know what exists (screenshot? input unlocked?) before promising anything. If down/locked, tell the human the exact command (`ducky bridge [--input]` + token paste).",
+      "2. THE LOOP for anything visual: `pc_screen` → `vision_describe` (read text, buttons, coordinates) → `pc_move`/`pc_click`/`pc_type` → `pc_screen` again to VERIFY the result. Never click blind.",
+      "3. Coordinates come from vision_describe on YOUR OWN screenshot only — never guess pixels, never reuse coordinates across different screen states.",
+      "4. `pc_exec` for commands freely (read-only first); destructive ones need explicit human confirmation IN CHAT (the tool refuses machine-level destruction on its own).",
+      "5. Prefer the virtual workspace for drafts; the PC is for things that must live on their machine. Report every landing zone: workspace vs PC path.",
     ].join("\n"),
   },
   {
