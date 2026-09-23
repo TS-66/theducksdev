@@ -405,7 +405,7 @@ export function StatusBar({
         <span aria-label="Current time">{now || "--:--"}</span>
         <span
           aria-hidden
-          className="select-none font-semibold text-[#FF7A1A]/70"
+          className="font-pixel select-none text-[8px] text-[#FF7A1A]/80"
           title="Ducky AI | Coder"
         >
           ▲ ducky

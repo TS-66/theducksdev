@@ -3,6 +3,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.font-pixel {
+  font-family: var(--font-pixel), var(--font-geist-mono), monospace;
+  font-smooth: never;
+  -webkit-font-smoothing: none;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -79,24 +85,31 @@
 }
 
 .dark {
-  --background: #0a0a0c;
-  --foreground: #ecedee;
-  --card: #131316;
-  --card-foreground: #ecedee;
-  --popover: #17171c;
-  --popover-foreground: #ecedee;
+  --background: #161616;
+  --foreground: #f4f4f5;
+  --card: #2b2b2b;
+  --card-foreground: #f4f4f5;
+  --popover: #2b2b2b;
+  --popover-foreground: #f4f4f5;
   --primary: #ff7a1a;
   --primary-foreground: #1c0e02;
-  --secondary: #1c1c21;
-  --secondary-foreground: #ecedee;
-  --muted: #191920;
-  --muted-foreground: #9ba1a6;
-  --accent: #1f1f25;
-  --accent-foreground: #ecedee;
+  --secondary: #202020;
+  --secondary-foreground: #f4f4f5;
+  --muted: #202020;
+  --muted-foreground: #a1a1aa;
+  --accent: #26262b;
+  --accent-foreground: #f4f4f5;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: rgb(255 255 255 / 0.08);
+  --border: rgb(255 255 255 / 0.1);
   --input: rgb(255 255 255 / 0.12);
   --ring: #ff7a1a;
+  /* trajectory role colors (ZCode Zai Dark): user blue, assistant teal,
+     reasoning violet, tool-call amber, tool-result sky */
+  --traj-user: #60a5fa;
+  --traj-assistant: #2dd4bf;
+  --traj-reasoning: #a78bfa;
+  --traj-tool-call: #f59e0b;
+  --traj-tool-result: #38bdf8;
   --chart-1: oklch(0.86 0.155 95);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);

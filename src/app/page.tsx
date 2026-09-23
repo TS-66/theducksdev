@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Command, Menu, PanelRight, Puzzle, Settings, SquareTerminal } from "lucide-react";
+import { ArrowLeft, ArrowRight, Command, Menu, PanelRight, Puzzle, Settings, SquareTerminal } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -711,7 +711,7 @@ export default function DuckyCoderPage() {
       <div className="flex min-h-0 flex-1">
         {/* desktop sidebar */}
         {leftOpen && (
-          <aside className="hidden w-[320px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0d10] lg:flex">
+          <aside className="hidden w-[320px] shrink-0 flex-col border-r border-white/[0.06] bg-transparent lg:flex">
             {/* identity */}
             <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
               <img
@@ -720,7 +720,7 @@ export default function DuckyCoderPage() {
                 className="size-7 rounded-lg border border-white/10 bg-black shadow-[0_0_16px_-4px_rgba(255,122,26,0.6)]"
               />
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="truncate text-[14px] font-bold tracking-tight">Ducky AI</p>
+                <p className="font-pixel truncate text-[11px] text-foreground">Ducky AI</p>
                 <p className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
                   <span
                     aria-hidden
@@ -732,6 +732,26 @@ export default function DuckyCoderPage() {
                   {agent.running ? "working" : "ready"}
                 </p>
               </div>
+              <span className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  aria-label="Back"
+                  title="Back"
+                  onClick={() => window.history.back()}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                >
+                  <ArrowLeft className="size-3.5" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Forward"
+                  title="Forward"
+                  onClick={() => window.history.forward()}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                >
+                  <ArrowRight className="size-3.5" aria-hidden />
+                </button>
+              </span>
               <button
                 type="button"
                 aria-label="Hide sidebar (⌘B)"

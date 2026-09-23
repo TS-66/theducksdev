@@ -471,7 +471,8 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   {testing ? "testing…" : "test →"}
                 </span>
               </button>
-              <section className="space-y-3 rounded-md border p-3">
+              <div className="grid items-start gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
+              <section className="space-y-3 rounded-md border p-3 lg:order-2">
                 <div className="flex items-center gap-2">
                   <KeyRound className="size-4 text-[#FF7A1A]" aria-hidden />
                   <h3 className="text-xs font-semibold">Your model connection</h3>
@@ -609,7 +610,8 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   </p>
                 )}
               </section>
-              <section className="space-y-3 rounded-md border p-3">
+              <section className="space-y-3 rounded-md border p-3 lg:order-1">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">Providers</p>
                 <div className="flex items-center gap-2">
                   <Server className="size-4 text-violet-400" aria-hidden />
                   <h3 className="text-xs font-semibold">Saved connections</h3>
@@ -729,6 +731,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   </Button>
                 </div>
               </section>
+              </div>
               </div>
             )}
             {tab === "mcp" && (

@@ -49,9 +49,10 @@ function ReasoningCard({ text, streaming }: { text: string; streaming: boolean }
       open={open}
       onOpenChange={setOpen}
       className="rounded-md border border-dashed bg-muted/20"
+      style={{ borderColor: "color-mix(in oklab, var(--traj-reasoning) 40%, transparent)" }}
     >
       <div className="flex items-center gap-1.5 px-3 py-1.5">
-        <Brain className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <Brain className="size-3.5 shrink-0" style={{ color: "var(--traj-reasoning)" }} aria-hidden />
         <span className="flex-1 truncate text-xs italic text-muted-foreground">
           Thinking{streaming ? "…" : ""}
         </span>
@@ -98,7 +99,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
       >
         <div className="ducky-glass min-w-0 flex-1 rounded-2xl px-4 py-3">
           <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed">
-            <span aria-hidden className="mr-2 select-none font-mono text-[#FF7A1A]">
+            <span aria-hidden className="mr-2 select-none font-mono" style={{ color: "var(--traj-user)" }}>
               ❯
             </span>
             {m.content}
@@ -127,7 +128,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
       className="group/msg space-y-1"
     >
       <div className="flex items-start justify-between gap-3">
-        <span aria-hidden className="select-none font-mono text-sm leading-6 text-[#FF7A1A]">
+        <span aria-hidden className="select-none font-mono text-sm leading-6" style={{ color: "var(--traj-assistant)" }}>
           ✦
         </span>
         <div className="flex items-center gap-1.5">
