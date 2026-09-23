@@ -72,6 +72,7 @@ export const SLASH_COMMANDS = [
   { cmd: "/screen", desc: "Capture the screen into images/" },
   { cmd: "/tools", desc: "Browse the 70+ agent tools" },
   { cmd: "/plugins", desc: "Open the plugin manager" },
+  { cmd: "/market", desc: "Browse the plugin marketplace" },
   { cmd: "/mcp", desc: "Manage MCP servers (Blender, Roblox…)" },
   { cmd: "/activity", desc: "Open the activity timeline (⌘E)" },
   { cmd: "/export", desc: "Download the session as a Markdown transcript" },

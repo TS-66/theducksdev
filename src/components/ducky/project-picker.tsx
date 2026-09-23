@@ -372,8 +372,18 @@ function RenameProjectDialog({
 }) {
   const [name, setName] = React.useState("");
 
+  // Deferred prefill when the target project changes (no render-phase cascade).
   React.useEffect(() => {
-    if (project) setName(project.name);
+    if (!project) return;
+    const next = project.name;
+    let live = true;
+    const t = setTimeout(() => {
+      if (live) setName(next);
+    }, 0);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
   }, [project]);
 
   const submit = () => {

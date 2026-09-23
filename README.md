@@ -11,7 +11,7 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **Bring your own model** — base URL + API key + model id in Settings → Connections (Discover lists models, Test verifies). Server env (`AI_*`) is only a shared fallback. Retries with backoff make the connection strong.
 - **Streaming chat with tools** — the model calls tools across multiple iterations; results stream back as tool cards (per-tool icons, diff previews for edits, live output).
 - **Virtual workspace** — a sandboxed filesystem stored in your browser (seeded with a sample repo). `read_file`, `write_file`, `edit_file`, `glob`, `grep` and a simulated `bash` (pipes, redirects, `&&` chains) all operate on it. Paste or import images, preview them, export everything as a valid `.zip`.
-- **Everything is a plugin** — 28 plugins / 84 tools (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-pc`, `@ducky-ai/ducky-tool-mcp`, …). Toggling a plugin unloads its tools from the model's schema. `npm run test:tools` executes every tool (52 checks green).
+- **Everything is a plugin** — 36 plugins / 106 tools (`@ducky-ai/ducky-tool-fs`, `ducky-tool-bash`, `ducky-tool-pc`, `@ducky-ai/ducky-tool-mcp`, …). Toggling a plugin unloads its tools from the model's schema. `npm run test:tools` executes every tool (62 checks green).
 - **Self-driving harness** — `get/set_config` lets the agent retune policy, temperature and budgets mid-run (gated); `session_list/new/rename/switch` manages parallel threads.
 - **Text power tools** — `sort/dedupe/count` lines, `regex_edit` with `$1` groups, `preview_csv` tables, `workspace_stats` overviews.
 - **Computer use** — `screen_capture` grabs a user-shared screen frame into `images/` (browser picker first, never silent) and `vision_describe` reads it; `disk_*` tools act on the real folder.
@@ -27,7 +27,9 @@ Ducky AI | Coder is a zero-config, self-hostable coding agent web app:
 - **Subagents** — the `subagent` tool spawns a focused child agent loop with a restricted toolset and returns its report.
 - **Connection guard** — without a key + model the composer says exactly what's missing (nothing fake, nothing simulated).
 - **Activity ledger** — a git-log-style timeline of every prompt, tool call and file change, with filters, copyable shas, workspace rewind (time-travel) and conversation trim.
-- **Command palette & slash commands** — `⌘P` palette (commands + sessions + files + all 70+ tools) plus 34 slash commands: `/goal`, `/retry`, `/undo`, `/compact`, `/models`, `/endpoint`, `/key`, `/conn`, `/temp`, `/tokens`, `/iters`, `/remember`, `/forget`, `/stats`, `/files`, `/reset`, `/rename`, `/star`, `/duplicate`, `/browser`, `/term`, `/screen`, `/tools`, `/mcp` — and the classic `/new`, `/clear`, `/plan`, `/model`, `/policy`, `/plugins`, `/activity`, `/export`, `/zip`, `/backup`, `/help`.
+- **Marketplace** — every plugin searchable with one-click install/remove, categories, live counts.
+- **Saved connections** — name working endpoints (base URL + key + model), switch between them, per-connection test dots.
+- **Command palette & slash commands** — `⌘P` palette (commands + sessions + files + all 100+ tools) plus 35 slash commands: `/goal`, `/retry`, `/undo`, `/compact`, `/models`, `/endpoint`, `/key`, `/conn`, `/temp`, `/tokens`, `/iters`, `/remember`, `/forget`, `/stats`, `/files`, `/reset`, `/rename`, `/star`, `/duplicate`, `/browser`, `/term`, `/screen`, `/tools`, `/mcp`, `/market` — and the classic `/new`, `/clear`, `/plan`, `/model`, `/policy`, `/plugins`, `/activity`, `/export`, `/zip`, `/backup`, `/help`.
 
 ## Quickstart (one copy-paste)
 

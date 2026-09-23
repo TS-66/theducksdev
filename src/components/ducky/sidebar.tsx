@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Search,
   Star,
+  Store,
   Trash2,
   Upload,
   X,
@@ -64,6 +65,7 @@ interface SidebarProps {
   onOpenPalette?: () => void;
   onOpenActivity?: () => void;
   onOpenPlugins?: () => void;
+  onOpenMarketplace?: () => void;
 }
 
 function NavRow({
@@ -96,7 +98,7 @@ function NavRow({
   );
 }
 
-export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenActivity, onOpenPlugins }: SidebarProps) {
+export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenActivity, onOpenPlugins, onOpenMarketplace }: SidebarProps) {
   const sessions = useDuckyStore((s) => s.sessions);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const [query, setQuery] = React.useState("");
@@ -244,6 +246,13 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
             icon={<Puzzle className="size-4" aria-hidden />}
             label="Plugins"
             onClick={onOpenPlugins}
+          />
+        )}
+        {onOpenMarketplace && (
+          <NavRow
+            icon={<Store className="size-4" aria-hidden />}
+            label="Marketplace"
+            onClick={onOpenMarketplace}
           />
         )}
       </nav>

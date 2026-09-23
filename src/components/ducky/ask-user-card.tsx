@@ -31,7 +31,17 @@ export function AskUserCard({ pendingAsk, respondAsk }: AskUserCardProps) {
   }, [pendingAsk.questions]);
 
   const [selections, setSelections] = React.useState<Record<string, string[]>>(initial);
-  React.useEffect(() => setSelections(initial), [initial]);
+  // Deferred re-seed when a new question set arrives (no render-phase cascade).
+  React.useEffect(() => {
+    let live = true;
+    const t = setTimeout(() => {
+      if (live) setSelections(initial);
+    }, 0);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [initial]);
 
   const toggleMulti = (qid: string, label: string) => {
     setSelections((sel) => {

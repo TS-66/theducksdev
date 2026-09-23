@@ -16,7 +16,9 @@ import {
   KeyRound,
   Monitor,
   Plug,
+  Radar,
   RefreshCw,
+  Server,
   Settings as SettingsIcon,
   Terminal,
   Trash2,
@@ -59,6 +61,14 @@ import {
   removeMcpServer,
   type McpServer,
 } from "@/lib/ducky/mcp";
+import {
+  deleteProfile,
+  listProfiles,
+  maskKeyHint,
+  recordProfileTest,
+  saveProfile,
+  type ModelProfile,
+} from "@/lib/ducky/profiles";
 import {
   clearPcConfig,
   getPcConfig,
@@ -183,6 +193,8 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
   const [mcpServers, setMcpServers] = React.useState<McpServer[]>([]);
   const [mcpName, setMcpName] = React.useState("");
   const [mcpUrl, setMcpUrl] = React.useState("");
+  const [profiles, setProfiles] = React.useState<ModelProfile[]>([]);
+  const [profileName, setProfileName] = React.useState("");
   const [pcPort, setPcPort] = React.useState("3791");
   const [pcToken, setPcToken] = React.useState("");
   const [pcState, setPcState] = React.useState<{ live: boolean; text: string } | null>(null);
@@ -234,6 +246,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
       setDiscovered([]);
       setMcpServers(listMcpServers());
       setMemories(listMemories());
+      setProfiles(listProfiles());
       const pc = getPcConfig();
       setPcPort(String(pc?.port ?? 3791));
       setPcToken(pc?.token ?? "");
@@ -568,6 +581,126 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   </p>
                 )}
               </section>
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <Server className="size-4 text-violet-400" aria-hidden />
+                  <h3 className="text-xs font-semibold">Saved connections</h3>
+                  <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                    {profiles.length}/20
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Name the working setup above; switching copies it back into
+                  the form. Dots show the last test per connection.
+                </p>
+                {profiles.length > 0 && (
+                  <ul className="space-y-1">
+                    {profiles.map((p) => {
+                      const active =
+                        draft.baseUrl.trim() === p.baseUrl.trim() &&
+                        draft.model.trim() === p.model.trim() &&
+                        draft.apiKey.trim() === p.apiKey.trim();
+                      return (
+                        <li
+                          key={p.id}
+                          className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1.5"
+                        >
+                          <span
+                            aria-hidden
+                            title={p.lastTest ? p.lastTest.message : "never tested"}
+                            className={
+                              p.lastTest
+                                ? p.lastTest.ok
+                                  ? "size-1.5 shrink-0 rounded-full bg-emerald-400"
+                                  : "size-1.5 shrink-0 rounded-full bg-red-400"
+                                : "size-1.5 shrink-0 rounded-full bg-muted-foreground/30"
+                            }
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-medium">
+                              {p.name}
+                              {active && <span className="ml-1.5 text-[10px] text-[#FDC00A]">active</span>}
+                            </span>
+                            <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                              {p.model || "(no model)"} · {maskKeyHint(p.apiKey)}
+                            </span>
+                          </span>
+                          {!active && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                patch({ baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model });
+                                toast.success(`Switched to ${p.name}`, {
+                                  description: "Save settings to apply it to the agent.",
+                                });
+                              }}
+                              className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] hover:bg-accent"
+                            >
+                              Use
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Test ${p.name}`}
+                            title="Test this connection"
+                            onClick={() => {
+                              toast.info(`Testing ${p.name}…`);
+                              testConnection(p.baseUrl, p.apiKey, p.model).then((r) => {
+                                recordProfileTest(p.id, r.ok, r.message);
+                                setProfiles(listProfiles());
+                                toast[r.ok ? "success" : "error"](r.ok ? `${p.name}: live` : `${p.name}: failed`, {
+                                  description: r.message.slice(0, 160),
+                                });
+                              });
+                            }}
+                            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            <Zap className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Delete ${p.name}`}
+                            onClick={() => {
+                              deleteProfile(p.id);
+                              setProfiles(listProfiles());
+                            }}
+                            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <div className="flex gap-1.5">
+                  <Input
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    placeholder="Name this setup (e.g. work-gpt)"
+                    aria-label="Profile name"
+                    className="h-8 font-mono text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!draft.baseUrl.trim() || !draft.apiKey.trim()}
+                    onClick={() => {
+                      try {
+                        saveProfile(profileName || "Profile", draft.baseUrl, draft.apiKey, draft.model);
+                        setProfiles(listProfiles());
+                        setProfileName("");
+                        toast.success("Connection saved");
+                      } catch (e) {
+                        toast.error("Cannot save", { description: (e as Error).message });
+                      }
+                    }}
+                    className="h-8 shrink-0"
+                  >
+                    Save current
+                  </Button>
+                </div>
+              </section>
               </div>
             )}
             {tab === "mcp" && (
@@ -586,6 +719,7 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                   their tools via <code className="font-mono">mcp_list</code> /{" "}
                   <code className="font-mono">mcp_call</code>.
                 </p>
+                <ScanThisPc onFound={() => setMcpServers(listMcpServers())} />
                 {mcpServers.length > 0 && (
                   <ul className="space-y-1">
                     {mcpServers.map((s) => (
@@ -940,6 +1074,84 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Scan-this-PC: probe candidate localhost MCP bridges, one-click connect. */
+function ScanThisPc({ onFound }: { onFound: () => void }) {
+  const [scanning, setScanning] = React.useState(false);
+  const [hits, setHits] = React.useState<import("@/lib/ducky/mcp").McpScanHit[]>([]);
+  const [ran, setRan] = React.useState(false);
+
+  const scan = () => {
+    setScanning(true);
+    setHits([]);
+    setRan(false);
+    void import("@/lib/ducky/mcp").then(({ scanLocalMcp }) =>
+      scanLocalMcp().then(
+        ({ hits: h }) => {
+          setHits(h);
+          setRan(true);
+          setScanning(false);
+        },
+        () => {
+          setRan(true);
+          setScanning(false);
+        },
+      ),
+    );
+  };
+
+  return (
+    <div className="rounded-md border border-dashed p-2.5">
+      <div className="flex items-center gap-2">
+        <Radar className="size-3.5 text-fuchsia-400" aria-hidden />
+        <p className="flex-1 text-[11px] text-muted-foreground">
+          Look at this PC and try to connect: probes localhost MCP bridges.
+        </p>
+        <Button size="sm" variant="outline" onClick={scan} disabled={scanning} className="h-7 shrink-0">
+          {scanning ? "Scanning…" : "Scan this PC"}
+        </Button>
+      </div>
+      {ran && hits.length === 0 && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          Nothing answered. Start a bridge (Blender / Roblox Studio / browser MCP on localhost), then scan again.
+        </p>
+      )}
+      {hits.length > 0 && (
+        <ul className="mt-1.5 space-y-1">
+          {hits.map((h) => (
+            <li key={h.url} className="flex items-center gap-2 rounded bg-muted/50 px-2 py-1.5">
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-emerald-400" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-mono text-[11px]">{h.url}</span>
+                <span className="block font-mono text-[10px] text-muted-foreground">
+                  {h.tools} tool(s){h.alreadyRegistered ? " · registered" : ""}
+                </span>
+              </span>
+              {!h.alreadyRegistered && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      addMcpServer(`bridge-${h.url.match(/:(\d+)/)?.[1] ?? "local"}`, h.url);
+                      onFound();
+                      setHits((prev) => prev.map((x) => (x.url === h.url ? { ...x, alreadyRegistered: true } : x)));
+                      toast.success("MCP bridge connected");
+                    } catch (e) {
+                      toast.error("Cannot add bridge", { description: (e as Error).message });
+                    }
+                  }}
+                  className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] hover:bg-accent"
+                >
+                  Connect
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

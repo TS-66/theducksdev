@@ -434,6 +434,233 @@ function splitCsvLine(line: string, delimiter: string): string[] {
   return cells;
 }
 
+/* ---------------------------------- URLs --------------------------------- */
+
+/** Split a URL into its parts. Throws on invalid input. */
+export function parseUrlParts(raw: string): Record<string, string | null> {
+  let u: URL;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    throw new Error("url_parse: not an absolute URL (needs scheme, e.g. https://)");
+  }
+  return {
+    scheme: u.protocol.replace(/:$/, ""),
+    host: u.hostname,
+    port: u.port || null,
+    path: u.pathname,
+    query: u.search ? u.search.slice(1) : null,
+    fragment: u.hash ? u.hash.slice(1) : null,
+    user: u.username || null,
+  };
+}
+
+/* ---------------------------------- HTML --------------------------------- */
+
+/** Strip scripts/styles/tags → readable text. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script\s*>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style\s*>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<\/(p|div|h[1-6]|li|tr|br|section|article)\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** Extract links as {text, href} pairs (first 200). */
+export function htmlLinks(html: string): Array<{ text: string; href: string }> {
+  const out: Array<{ text: string; href: string }> = [];
+  const re = /<a\s[^>]*?href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a\s*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null && out.length < 200) {
+    const href = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    if (!href) continue;
+    const text = m[4].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) || href;
+    out.push({ text, href });
+  }
+  return out;
+}
+
+/* -------------------------------- Markdown ------------------------------- */
+
+/** Headings outline with GitHub-style anchors. */
+export function markdownToc(md: string): Array<{ level: number; text: string; anchor: string }> {
+  const out: Array<{ level: number; text: string; anchor: string }> = [];
+  for (const line of md.split("\n")) {
+    const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (!m) continue;
+    const text = m[2].replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").trim();
+    const anchor = text.toLowerCase().replace(/[^a-z0-9 _-]/g, "").trim().replace(/\s+/g, "-");
+    out.push({ level: m[1].length, text, anchor });
+  }
+  return out;
+}
+
+/** Inline + bare links (first 200). */
+export function markdownLinks(md: string): Array<{ text: string; href: string }> {
+  const out: Array<{ text: string; href: string }> = [];
+  const seen = new Set<string>();
+  const push = (text: string, href: string) => {
+    const k = `${text} ${href}`;
+    if (seen.has(k) || out.length >= 200) return;
+    seen.add(k);
+    out.push({ text: text.slice(0, 120) || href, href });
+  };
+  const inline = /\[([^\]]{0,200})\]\((https?:[^)\s]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = inline.exec(md)) !== null) push(m[1].trim(), m[2]);
+  const bare = /(^|[\s(])(https?:\/\/[^\s)<\]]+)/g;
+  while ((m = bare.exec(md)) !== null) push(m[2], m[2]);
+  return out;
+}
+
+/* ---------------------------------- color --------------------------------- */
+
+function parseHexColor(input: string): [number, number, number] {
+  let h = input.trim().toLowerCase();
+  if (h.startsWith("#")) h = h.slice(1);
+  if (/^[0-9a-f]{3}$/.test(h)) h = h.split("").map((c) => c + c).join("");
+  if (!/^[0-9a-f]{6}$/.test(h)) throw new Error(`color: "${input}" is not a hex color (#rgb or #rrggbb)`);
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, Math.round(l * 100)];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+/** hex → rgb() + hsl() strings. */
+export function colorConvert(input: string): { hex: string; rgb: string; hsl: string } {
+  const [r, g, b] = parseHexColor(input);
+  const hex = `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+  const [h, s, l] = rgbToHsl(r, g, b);
+  return { hex, rgb: `rgb(${r}, ${g}, ${b})`, hsl: `hsl(${h}, ${s}%, ${l}%)` };
+}
+
+function luminance(r: number, g: number, b: number): number {
+  const f = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+/** WCAG contrast ratio + AA/AAA verdicts for normal text. */
+export function colorContrast(a: string, b: string): { ratio: number; aa: boolean; aaa: boolean } {
+  const [r1, g1, b1] = parseHexColor(a);
+  const [r2, g2, b2] = parseHexColor(b);
+  const l1 = luminance(r1, g1, b1);
+  const l2 = luminance(r2, g2, b2);
+  const ratio = Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100;
+  return { ratio, aa: ratio >= 4.5, aaa: ratio >= 7 };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const to = (x: number) => Math.round(x * 255).toString(16).padStart(2, "0");
+  return `#${to(f(0))}${to(f(8))}${to(f(4))}`;
+}
+
+/** Complementary + analogous palette mates for a hex color. */
+export function colorPalette(input: string): { base: string; complementary: string; analogous: [string, string] } {
+  const [r, g, b] = parseHexColor(input);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const base = `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+  return {
+    base,
+    complementary: hslToHex((h + 180) % 360, s, l),
+    analogous: [hslToHex((h + 30) % 360, s, l), hslToHex((h + 330) % 360, s, l)],
+  };
+}
+
+/* -------------------------------- datetime ------------------------------- */
+
+const UNIT_MS: Record<string, number> = {
+  minutes: 60_000,
+  hours: 3_600_000,
+  days: 86_400_000,
+  weeks: 604_800_000,
+};
+
+/** Shift an ISO date by N units (minutes|hours|days|weeks). Returns ISO. */
+export function dateAdd(iso: string, amount: number, unit: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) throw new Error(`date: "${iso}" is not a parseable date`);
+  const ms = UNIT_MS[unit];
+  if (!ms) throw new Error(`date: unit must be minutes | hours | days | weeks (got "${unit}")`);
+  if (!Number.isFinite(amount) || Math.abs(amount) > 100000) throw new Error("date: amount out of range");
+  return new Date(t + amount * ms).toISOString();
+}
+
+/** Human breakdown between two ISO dates. */
+export function dateDiff(aIso: string, bIso: string): string {
+  const a = Date.parse(aIso);
+  const b = Date.parse(bIso);
+  if (Number.isNaN(a)) throw new Error(`date: "${aIso}" is not parseable`);
+  if (Number.isNaN(b)) throw new Error(`date: "${bIso}" is not parseable`);
+  let ms = Math.abs(b - a);
+  const days = Math.floor(ms / 86_400_000);
+  ms -= days * 86_400_000;
+  const hours = Math.floor(ms / 3_600_000);
+  ms -= hours * 3_600_000;
+  const minutes = Math.floor(ms / 60_000);
+  const dir = b >= a ? "later" : "earlier";
+  return `${days}d ${hours}h ${minutes}m (${dir})`;
+}
+
+/* ----------------------------------- RSS ---------------------------------- */
+
+/** Minimal RSS/Atom item parser over fetched XML text. */
+export function parseRssItems(xml: string, max = 10): Array<{ title: string; link: string; date: string }> {
+  const out: Array<{ title: string; link: string; date: string }> = [];
+  const blocks = [
+    ...xml.matchAll(/<item[\s>][\s\S]*?<\/item\s*>/gi),
+    ...xml.matchAll(/<entry[\s>][\s\S]*?<\/entry\s*>/gi),
+  ];
+  const text = (s: string, tag: string): string => {
+    const m = s.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}\\s*>`, "i"));
+    if (!m) return "";
+    return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  };
+  const link = (s: string): string => {
+    const href = s.match(/<link[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+    if (href) return (href[1] ?? href[2] ?? "").trim();
+    return text(s, "link").split(/\s/)[0] ?? "";
+  };
+  for (const b of blocks) {
+    if (out.length >= Math.min(30, Math.max(1, max))) break;
+    const title = text(b[0], "title") || "(untitled)";
+    out.push({ title, link: link(b[0]), date: text(b[0], "pubDate") || text(b[0], "published") || text(b[0], "updated") });
+  }
+  return out;
+}
+
 /** Render the head of a CSV file as an aligned table. */
 export function previewCsv(content: string, rows = 10, delimiter = ","): string {
   if (delimiter.length !== 1) throw new Error("csv: delimiter must be one character");

@@ -21,6 +21,7 @@ import { Composer } from "@/components/ducky/composer";
 import { CommandPalette } from "@/components/ducky/command-palette";
 import { HeaderBar } from "@/components/ducky/header-bar";
 import { NewProjectDialog } from "@/components/ducky/project-picker";
+import { MarketplacePanel } from "@/components/ducky/marketplace-panel";
 import { PluginsSheet } from "@/components/ducky/plugins-sheet";
 import { SettingsSheet, type SettingsTab } from "@/components/ducky/settings-sheet";
 import { Sidebar } from "@/components/ducky/sidebar";
@@ -66,6 +67,7 @@ export default function DuckyCoderPage() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [settingsTab, setSettingsTab] = React.useState<SettingsTab | undefined>(undefined);
   const [pluginsOpen, setPluginsOpen] = React.useState(false);
+  const [marketOpen, setMarketOpen] = React.useState(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [activityOpen, setActivityOpen] = React.useState(false);
@@ -472,6 +474,10 @@ export default function DuckyCoderPage() {
         setPluginsOpen(true);
         break;
       }
+      case "/market": {
+        setMarketOpen(true);
+        break;
+      }
       case "/export": {
         if (!sid) return toast.info("Select a session first");
         const target = st.sessions.find((s) => s.id === sid);
@@ -725,6 +731,7 @@ export default function DuckyCoderPage() {
                 onOpenPalette={() => setPaletteOpen(true)}
                 onOpenActivity={() => setActivityOpen(true)}
                 onOpenPlugins={() => setPluginsOpen(true)}
+                onOpenMarketplace={() => setMarketOpen(true)}
               />
             </div>
           </aside>
@@ -754,6 +761,10 @@ export default function DuckyCoderPage() {
                 }}
                 onOpenPlugins={() => {
                   setPluginsOpen(true);
+                  setMobileNavOpen(false);
+                }}
+                onOpenMarketplace={() => {
+                  setMarketOpen(true);
                   setMobileNavOpen(false);
                 }}
               />
@@ -960,6 +971,7 @@ export default function DuckyCoderPage() {
         initialTab={settingsTab}
       />
       <PluginsSheet open={pluginsOpen} onOpenChange={setPluginsOpen} />
+      <MarketplacePanel open={marketOpen} onOpenChange={setMarketOpen} />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <NewProjectDialog open={newProjectOpen} onOpenChange={setNewProjectOpen} />
       <ActivityTimelinePanel

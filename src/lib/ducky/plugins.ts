@@ -45,8 +45,31 @@ import {
   sortLines,
 } from './tools-extra';
 import { getSkill, SKILLS } from './skills';
-import { callMcpTool, listMcpServers, listMcpTools } from './mcp';
+import { callMcpTool, listMcpServers, listMcpTools, scanLocalMcp } from './mcp';
 import { pcCaps, pcClick, pcExec, pcKey, pcList, pcMove, pcRead, pcScreen, pcStatus, pcType, pcWiggle, pcWrite, recordAiPointer } from './pc';
+import {
+  colorContrast,
+  colorConvert,
+  colorPalette,
+  dateAdd,
+  dateDiff,
+  htmlLinks,
+  htmlToText,
+  markdownLinks,
+  markdownToc,
+  parseRssItems,
+  parseUrlParts,
+} from './tools-extra';
+import {
+  deleteBookmark,
+  deleteSnippet,
+  getBookmark,
+  getSnippet,
+  listBookmarks,
+  listSnippets,
+  saveBookmark,
+  saveSnippet,
+} from './snippets';
 import { closeTab, getActiveTab, listTabs, openTab } from './browser-tabs';
 import { captureScreenToWorkspace } from './screen';
 
@@ -322,9 +345,88 @@ export const PLUGINS: PluginManifest[] = [
     version: '1.0.0',
     description:
       'MCP CONNECTIONS: call tools on user-configured Model Context Protocol servers (Blender bridges, Roblox Studio bridges, browsers, filesystems…). Servers are registered by the human in Settings → Connections → MCP; the agent lists their tools and calls them. Disabled until at least one server exists.',
-    tools: ['mcp_servers', 'mcp_list', 'mcp_call'],
+    tools: ['mcp_servers', 'mcp_list', 'mcp_call', 'mcp_scan'],
     category: 'delegation',
     defaultEnabled: false,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-url`,
+    name: 'ducky-tool-url',
+    version: '1.0.0',
+    description:
+      'URL plumbing: split absolute URLs into parts, percent-encode/decode text for query strings.',
+    tools: ['url_parse', 'url_encode', 'url_decode'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-html`,
+    name: 'ducky-tool-html',
+    version: '1.0.0',
+    description:
+      'HTML helpers: pages fetched with web_fetch stripped to readable text, link harvester for crawls.',
+    tools: ['html_to_text', 'html_links'],
+    category: 'web',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-markdown`,
+    name: 'ducky-tool-markdown',
+    version: '1.0.0',
+    description:
+      'Markdown navigation: table of contents with anchors, link inventory (inline + bare).',
+    tools: ['md_toc', 'md_links'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-color`,
+    name: 'ducky-tool-color',
+    version: '1.0.0',
+    description:
+      'Color work: hex→rgb/hsl conversion, WCAG contrast ratios with AA/AAA verdicts, complementary + analogous palettes.',
+    tools: ['color_convert', 'color_contrast', 'color_palette'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-datetime`,
+    name: 'ducky-tool-datetime',
+    version: '1.0.0',
+    description: 'Date math without guessing: shift ISO dates, human diffs between two dates.',
+    tools: ['date_add', 'date_diff'],
+    category: 'meta',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-rss`,
+    name: 'ducky-tool-rss',
+    version: '1.0.0',
+    description:
+      'Feed reader: fetch any RSS/Atom URL through the server proxy and get clean headlines + links + dates.',
+    tools: ['rss_read'],
+    category: 'web',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-snippets`,
+    name: 'ducky-tool-snippets',
+    version: '1.0.0',
+    description:
+      'Global snippet library: save reusable code/text once, paste anywhere across sessions.',
+    tools: ['snippet_save', 'snippet_get', 'snippet_list', 'snippet_delete'],
+    category: 'planning',
+    defaultEnabled: true,
+  },
+  {
+    id: `${PLUGIN_PREFIX}ducky-tool-bookmarks`,
+    name: 'ducky-tool-bookmarks',
+    version: '1.0.0',
+    description:
+      'Bookmark shelf: named URLs the agent can open straight into the browser panel.',
+    tools: ['bookmark_save', 'bookmark_list', 'bookmark_open', 'bookmark_delete'],
+    category: 'web',
+    defaultEnabled: true,
   },
   {
     id: `${PLUGIN_PREFIX}ducky-tool-pc`,
@@ -1277,10 +1379,184 @@ export function buildToolDefinitions(): ToolDefinition[] {
       sideEffects: true,
     },
     {
+      name: 'url_parse',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-url`).id,
+      description: 'Split an absolute URL into scheme/host/port/path/query/fragment/user. Errors clearly on relative URLs.',
+      parameters: obj({ url: str('Absolute URL to split.') }, ['url']),
+    },
+    {
+      name: 'url_encode',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-url`).id,
+      description: 'Percent-encode text for query strings and path segments.',
+      parameters: obj({ text: str('Text to encode.') }, ['text']),
+    },
+    {
+      name: 'url_decode',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-url`).id,
+      description: 'Decode percent-encoded text (also turns + into spaces for query strings).',
+      parameters: obj({ text: str('Text to decode.') }, ['text']),
+    },
+    {
+      name: 'html_to_text',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-html`).id,
+      description: 'Strip an HTML string (scripts, styles, tags, entities) down to readable text. Pair with web_fetch output.',
+      parameters: obj({ html: str('HTML source.') }, ['html']),
+    },
+    {
+      name: 'html_links',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-html`).id,
+      description: 'Harvest up to 200 links (text + href) from an HTML string — the crawl frontend for web_fetch.',
+      parameters: obj({ html: str('HTML source.') }, ['html']),
+    },
+    {
+      name: 'md_toc',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-markdown`).id,
+      description: 'Table of contents for Markdown text: indented headings with GitHub-style anchors. Read the file first, then navigate it.',
+      parameters: obj({ text: str('Markdown source.') }, ['text']),
+    },
+    {
+      name: 'md_links',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-markdown`).id,
+      description: 'Inventory of links in Markdown (inline [t](u) plus bare URLs, deduped, capped at 200).',
+      parameters: obj({ text: str('Markdown source.') }, ['text']),
+    },
+    {
+      name: 'color_convert',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-color`).id,
+      description: 'Convert a hex color (#rgb or #rrggbb) to rgb() and hsl() strings.',
+      parameters: obj({ hex: str('Hex color, e.g. "#fdc00a".') }, ['hex']),
+    },
+    {
+      name: 'color_contrast',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-color`).id,
+      description: 'WCAG contrast ratio between two hex colors, with AA/AAA verdicts for normal text.',
+      parameters: obj(
+        {
+          a: str('First hex color.'),
+          b: str('Second hex color.'),
+        },
+        ['a', 'b'],
+      ),
+    },
+    {
+      name: 'color_palette',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-color`).id,
+      description: 'Palette mates for a hex color: complementary + two analogous.',
+      parameters: obj({ hex: str('Base hex color.') }, ['hex']),
+    },
+    {
+      name: 'date_add',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-datetime`).id,
+      description: 'Shift an ISO date by N minutes/hours/days/weeks. Returns ISO. Never do date math in prose.',
+      parameters: obj(
+        {
+          date: str('ISO date, e.g. "2026-09-23".'),
+          amount: num('How many units (negative goes back).'),
+          unit: {
+            type: 'string',
+            enum: ['minutes', 'hours', 'days', 'weeks'],
+            description: 'Unit to shift by.',
+          },
+        },
+        ['date', 'amount', 'unit'],
+      ),
+    },
+    {
+      name: 'date_diff',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-datetime`).id,
+      description: 'Human breakdown between two ISO dates (Xd Xh Xm + direction).',
+      parameters: obj(
+        {
+          a: str('First ISO date.'),
+          b: str('Second ISO date.'),
+        },
+        ['a', 'b'],
+      ),
+    },
+    {
+      name: 'rss_read',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-rss`).id,
+      description: 'Fetch an RSS/Atom feed URL through the server proxy and return clean headlines with links and dates.',
+      parameters: obj(
+        {
+          url: str('Absolute http(s) feed URL.'),
+          max: num('Max items, 1–30. Defaults to 10.'),
+        },
+        ['url'],
+      ),
+    },
+    {
+      name: 'snippet_save',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-snippets`).id,
+      description: 'Save a reusable snippet (code/text ≤20k chars) under a short name. Global across sessions.',
+      parameters: obj(
+        {
+          name: str('Short name (slugified). Overwrites the same name.'),
+          content: str('Snippet content.'),
+        },
+        ['name', 'content'],
+      ),
+    },
+    {
+      name: 'snippet_get',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-snippets`).id,
+      description: 'Retrieve one snippet by name — paste-ready content.',
+      parameters: obj({ name: str('Snippet name.') }, ['name']),
+    },
+    {
+      name: 'snippet_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-snippets`).id,
+      description: 'List snippet names with sizes, newest first.',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'snippet_delete',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-snippets`).id,
+      description: 'Delete a snippet by name.',
+      parameters: obj({ name: str('Snippet name.') }, ['name']),
+    },
+    {
+      name: 'bookmark_save',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-bookmarks`).id,
+      description: 'Shelve a URL under a short name for later.',
+      parameters: obj(
+        {
+          name: str('Short name (slugified).'),
+          url: str('Absolute http(s) URL.'),
+        },
+        ['name', 'url'],
+      ),
+    },
+    {
+      name: 'bookmark_list',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-bookmarks`).id,
+      description: 'List shelved bookmarks (name → URL).',
+      parameters: obj({}, []),
+    },
+    {
+      name: 'bookmark_open',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-bookmarks`).id,
+      description: 'Open a shelved bookmark straight into the IDE browser panel (then browser_snapshot to read it).',
+      parameters: obj({ name: str('Bookmark name.') }, ['name']),
+    },
+    {
+      name: 'bookmark_delete',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-bookmarks`).id,
+      description: 'Delete a bookmark by name.',
+      parameters: obj({ name: str('Bookmark name.') }, ['name']),
+    },
+    {
+      name: 'mcp_scan',
+      pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-mcp`).id,
+      description:
+        'SCAN THIS PC for MCP bridges: probes the candidate localhost URLs with a real tools/list handshake and reports which answer (with tool counts). Tell the human to register hits in Settings → Connections → MCP.',
+      parameters: obj({}, []),
+    },
+    {
       name: 'mcp_servers',
       pluginId: byPlugin(`${PLUGIN_PREFIX}ducky-tool-mcp`).id,
       description:
-        'List configured MCP servers (name + URL). Empty means the human has not connected anything yet — tell them to open Settings → Connections → MCP.',
+        'List configured MCP servers (name + URL). Empty means the human has not connected anything yet — run mcp_scan first, or tell them to open Settings → Connections → MCP.',
       parameters: obj({}, []),
     },
     {
@@ -2415,6 +2691,24 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
 
   /* ---------------------------------- mcp ---------------------------------- */
 
+  mcp_scan:
+    () =>
+    async () => {
+      const { hits, errors } = await scanLocalMcp();
+      const lines: string[] = [];
+      if (hits.length) {
+        lines.push('Reachable MCP bridges on THIS PC:');
+        for (const h of hits) {
+          lines.push(`- ${h.url} (${h.tools} tools${h.alreadyRegistered ? ', already registered' : ''})`);
+        }
+      } else {
+        lines.push('No MCP bridges answered on this PC.');
+      }
+      lines.push('Tell the human to register hits in Settings → Connections → MCP (or run a bridge first: Blender / Roblox Studio / browser bridges listen on localhost).');
+      if (errors.length) lines.push(`[probed ${errors.length} silent URL(s)]`);
+      return lines.join('\n');
+    },
+
   mcp_servers:
     () =>
     async () => {
@@ -2654,5 +2948,265 @@ export const TOOL_EXECUTOR_BUILDERS: Record<string, ToolExecutorBuilder> = {
       } catch (e) {
         throw new Error(`preview_csv: ${(e as Error).message}`);
       }
+    },
+
+  /* ------------------------------ url / html ----------------------------- */
+
+  url_parse:
+    () =>
+    async (args) => {
+      const url = asString(args.url).trim();
+      if (!url) throw new Error('url_parse: "url" is required');
+      try {
+        const p = parseUrlParts(url);
+        return [
+          `scheme: ${p.scheme}`,
+          `host: ${p.host}`,
+          `port: ${p.port ?? '(default)'}`,
+          `path: ${p.path}`,
+          `query: ${p.query ?? '(none)'}`,
+          `fragment: ${p.fragment ?? '(none)'}`,
+          `user: ${p.user ?? '(none)'}`,
+        ].join('\n');
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  url_encode:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('url_encode: "text" is required');
+      return encodeURIComponent(text);
+    },
+
+  url_decode:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('url_decode: "text" is required');
+      try {
+        return decodeURIComponent(text.replace(/\+/g, ' '));
+      } catch {
+        throw new Error('url_decode: invalid percent-encoding');
+      }
+    },
+
+  html_to_text:
+    () =>
+    async (args) => {
+      const html = asString(args.html);
+      if (!html) throw new Error('html_to_text: "html" is required');
+      if (html.length > 500_000) throw new Error('html_to_text: input too long (≤500k chars)');
+      const out = htmlToText(html);
+      return out.length > 20000 ? `${out.slice(0, 20000)}\n[ducky: capped at 20000 chars]` : out || '(no readable text)';
+    },
+
+  html_links:
+    () =>
+    async (args) => {
+      const html = asString(args.html);
+      if (!html) throw new Error('html_links: "html" is required');
+      if (html.length > 500_000) throw new Error('html_links: input too long (≤500k chars)');
+      const links = htmlLinks(html);
+      if (!links.length) return 'No links found.';
+      return links.map((l, i) => `${i + 1}. ${l.text}\n   ${l.href}`).join('\n');
+    },
+
+  /* -------------------------------- markdown ------------------------------ */
+
+  md_toc:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('md_toc: "text" is required');
+      const toc = markdownToc(text);
+      if (!toc.length) return 'No headings found.';
+      return toc.map((h) => `${'  '.repeat(h.level - 1)}- ${h.text} (#${h.anchor})`).join('\n');
+    },
+
+  md_links:
+    () =>
+    async (args) => {
+      const text = asString(args.text);
+      if (!text) throw new Error('md_links: "text" is required');
+      const links = markdownLinks(text);
+      if (!links.length) return 'No links found.';
+      return links.map((l, i) => `${i + 1}. ${l.text}\n   ${l.href}`).join('\n');
+    },
+
+  /* --------------------------------- color -------------------------------- */
+
+  color_convert:
+    () =>
+    async (args) => {
+      const hex = asString(args.hex).trim();
+      if (!hex) throw new Error('color_convert: "hex" is required');
+      try {
+        const c = colorConvert(hex);
+        return `${c.hex}\n${c.rgb}\n${c.hsl}`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  color_contrast:
+    () =>
+    async (args) => {
+      try {
+        const c = colorContrast(asString(args.a), asString(args.b));
+        return `${c.ratio}:1 — AA ${c.aa ? 'PASS' : 'FAIL'} · AAA ${c.aaa ? 'PASS' : 'FAIL'}`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  color_palette:
+    () =>
+    async (args) => {
+      const hex = asString(args.hex).trim();
+      if (!hex) throw new Error('color_palette: "hex" is required');
+      try {
+        const p = colorPalette(hex);
+        return `base: ${p.base}\ncomplementary: ${p.complementary}\nanalogous: ${p.analogous[0]}, ${p.analogous[1]}`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  /* -------------------------------- datetime ------------------------------ */
+
+  date_add:
+    () =>
+    async (args) => {
+      const date = asString(args.date).trim();
+      const amount = asNumber(args.amount);
+      const unit = asString(args.unit).trim();
+      if (!date || amount === undefined || !unit) throw new Error('date_add: "date", "amount" and "unit" are required');
+      try {
+        return dateAdd(date, amount, unit);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  date_diff:
+    () =>
+    async (args) => {
+      const a = asString(args.a).trim();
+      const b = asString(args.b).trim();
+      if (!a || !b) throw new Error('date_diff: "a" and "b" are required');
+      try {
+        return dateDiff(a, b);
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  /* ---------------------------------- rss --------------------------------- */
+
+  rss_read:
+    (ctx) =>
+    async (args) => {
+      const url = asString(args.url).trim();
+      if (!/^https?:\/\//i.test(url)) throw new Error('rss_read: "url" must be an absolute http(s) URL');
+      const max = Math.min(30, Math.max(1, Math.round(asNumber(args.max) ?? 10)));
+      let xml: string;
+      try {
+        xml = await ctx.webFetch(url);
+      } catch (e) {
+        throw new Error(`rss_read: fetch failed — ${(e as Error).message}`);
+      }
+      const items = parseRssItems(xml, max);
+      if (!items.length) return 'No feed items found (is this really RSS/Atom?).';
+      return items
+        .map((it, i) => `${i + 1}. ${it.title}${it.date ? ` (${it.date})` : ''}${it.link ? `\n   ${it.link}` : ''}`)
+        .join('\n');
+    },
+
+  /* ------------------------------ snippets -------------------------------- */
+
+  snippet_save:
+    () =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('snippet_save: "name" is required');
+      try {
+        const e = saveSnippet(name, asString(args.content));
+        return `Snippet "${e.name}" saved (${e.content.length} chars).`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  snippet_get:
+    () =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('snippet_get: "name" is required');
+      const s = getSnippet(name);
+      if (!s) throw new Error(`snippet_get: no snippet named "${name}" (see snippet_list)`);
+      return s.content;
+    },
+
+  snippet_list:
+    () =>
+    async () => {
+      const items = listSnippets();
+      if (!items.length) return 'Snippet library is empty.';
+      return items.map((s) => `${s.name} · ${s.content.length} chars`).join('\n');
+    },
+
+  snippet_delete:
+    () =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('snippet_delete: "name" is required');
+      if (!deleteSnippet(name)) throw new Error(`snippet_delete: no snippet named "${name}"`);
+      return 'Snippet deleted.';
+    },
+
+  /* ------------------------------ bookmarks ------------------------------- */
+
+  bookmark_save:
+    () =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('bookmark_save: "name" is required');
+      try {
+        const b = saveBookmark(name, asString(args.url));
+        return `Bookmarked "${b.name}" → ${b.url}`;
+      } catch (e) {
+        throw new Error(`${(e as Error).message}`);
+      }
+    },
+
+  bookmark_list:
+    () =>
+    async () => {
+      const items = listBookmarks();
+      if (!items.length) return 'Bookmark shelf is empty.';
+      return items.map((b) => `${b.name}\n  ${b.url}`).join('\n');
+    },
+
+  bookmark_open:
+    () =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('bookmark_open: "name" is required');
+      const b = getBookmark(name);
+      if (!b) throw new Error(`bookmark_open: no bookmark named "${name}" (see bookmark_list)`);
+      const tab = openTab(b.url);
+      return `Opened "${b.name}" in the browser panel (tab ${tab.id.slice(0, 8)}). Use browser_snapshot to read it.`;
+    },
+
+  bookmark_delete:
+    () =>
+    async (args) => {
+      const name = asString(args.name).trim();
+      if (!name) throw new Error('bookmark_delete: "name" is required');
+      if (!deleteBookmark(name)) throw new Error(`bookmark_delete: no bookmark named "${name}"`);
+      return 'Bookmark deleted.';
     },
 };

@@ -181,3 +181,85 @@ export function renderMcpForPrompt(): string {
   if (!servers.length) return "";
   return servers.map((s) => `- ${s.name}: ${s.url} (mcp_list, then mcp_call with server "${s.name}")`).join("\n");
 }
+
+/* ------------------------- PC scan (auto-connect) ------------------------ */
+
+const CANDIDATES_KEY = "ducky-mcp-candidates-v1";
+
+/**
+ * Candidate bridge URLs to probe on THIS PC. Defaults are documented
+ * EXAMPLES of where local MCP bridges usually listen — edit the list to
+ * match your actual bridges (Blender, Roblox Studio, browsers…).
+ */
+const DEFAULT_CANDIDATES = [
+  "http://127.0.0.1:8000/mcp",
+  "http://127.0.0.1:8080/mcp",
+  "http://127.0.0.1:9000/mcp",
+  "http://127.0.0.1:9876/mcp",
+];
+
+export function listScanCandidates(): string[] {
+  if (!hasLocalStorage()) return [...DEFAULT_CANDIDATES];
+  try {
+    const raw = localStorage.getItem(CANDIDATES_KEY);
+    if (!raw) return [...DEFAULT_CANDIDATES];
+    const arr = JSON.parse(raw) as string[];
+    return Array.isArray(arr) ? arr.filter((u) => typeof u === "string") : [...DEFAULT_CANDIDATES];
+  } catch {
+    return [...DEFAULT_CANDIDATES];
+  }
+}
+
+export function setScanCandidates(urls: string[]): void {
+  const clean = urls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u)).slice(0, 20);
+  if (!hasLocalStorage()) return;
+  try {
+    localStorage.setItem(CANDIDATES_KEY, JSON.stringify(clean));
+  } catch {
+    // quota — scan just uses the passed list this once
+  }
+}
+
+export interface McpScanHit {
+  url: string;
+  tools: number;
+  alreadyRegistered: boolean;
+}
+
+/**
+ * Probe every candidate URL with a real tools/list handshake (2.5s each,
+ * all in parallel). Returns reachable bridges. Never throws.
+ */
+export async function scanLocalMcp(candidates?: string[]): Promise<{ hits: McpScanHit[]; errors: string[] }> {
+  const urls = candidates ?? listScanCandidates();
+  const registered = new Set(listMcpServers().map((s) => s.url));
+  const hits: McpScanHit[] = [];
+  const errors: string[] = [];
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+          signal: AbortSignal.timeout(2500),
+        });
+        if (!res.ok) {
+          errors.push(`${url}: HTTP ${res.status}`);
+          return;
+        }
+        const parsed = parseRpcPayload(await res.text());
+        if (parsed.error) {
+          errors.push(`${url}: ${parsed.error.message ?? "RPC error"}`);
+          return;
+        }
+        const tools = Array.isArray(parsed.result?.tools) ? parsed.result.tools.length : 0;
+        hits.push({ url, tools, alreadyRegistered: registered.has(url) });
+      } catch (e) {
+        errors.push(`${url}: ${(e as Error).message}`);
+      }
+    }),
+  );
+  hits.sort((a, b) => a.url.localeCompare(b.url));
+  return { hits, errors };
+}

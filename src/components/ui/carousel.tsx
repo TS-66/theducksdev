@@ -90,16 +90,29 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api || !setApi) return
-    setApi(api)
+    let live = true
+    const t = setTimeout(() => {
+      if (live) setApi(api)
+    }, 0)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
   }, [api, setApi])
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
+    // Initial sync deferred past commit; live updates stay event-driven.
+    let live = true
+    const t = setTimeout(() => {
+      if (live) onSelect(api)
+    }, 0)
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 
     return () => {
+      live = false
+      clearTimeout(t)
       api?.off("select", onSelect)
     }
   }, [api, onSelect])

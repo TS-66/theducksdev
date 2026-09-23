@@ -172,10 +172,10 @@ const runEnv = async (name, fn) => {
 
 /* ------------------------------ registry checks --------------------------- */
 
-await run("registry: counts (84 tools, 28 plugins)", async () => {
+await run("registry: counts (106 tools, 36 plugins)", async () => {
   const defs = buildToolDefinitions();
-  assert(defs.length >= 84, `only ${defs.length} tools`);
-  assert(PLUGINS.length >= 28, `only ${PLUGINS.length} plugins`);
+  assert(defs.length >= 106, `only ${defs.length} tools`);
+  assert(PLUGINS.length >= 36, `only ${PLUGINS.length} plugins`);
 });
 
 await run("registry: every tool has an executor (except loop special-cases)", async () => {
@@ -813,6 +813,131 @@ await run("registry: every executor has a schema", async () => {
       globalThis.fetch = realFetch;
       pc.clearPcConfig();
     }
+  });
+}
+
+/* ------------------------- url/html/md/color/date ------------------------ */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+
+  await run("url parse/encode/decode", async () => {
+    const p = await ex("url_parse")({ url: "https://user@h.com:8080/a/b?x=1#frag" });
+    assert(p.includes("host: h.com") && p.includes("port: 8080") && p.includes("query: x=1"), p);
+    await expectThrow(() => ex("url_parse")({ url: "/relative" }), "relative");
+    assert((await ex("url_encode")({ text: "a b&c" })) === "a%20b%26c", "encode");
+    assert((await ex("url_decode")({ text: "a%20b%26c" })) === "a b&c", "decode");
+    await expectThrow(() => ex("url_decode")({ text: "%zz" }), "bad pct");
+  });
+  await run("html strip + links", async () => {
+    const t = await ex("html_to_text")({ html: "<html><head><style>x{}</style><script>1</script></head><body><h1>Hi &amp; bye</h1><p>ok</p></body></html>" });
+    assert(t.includes("Hi & bye") && t.includes("ok") && !t.includes("script"), t);
+    const l = await ex("html_links")({ html: '<a href="https://a.com">A</a><a href=\'/b\'>B</a>' });
+    assert(l.includes("https://a.com") && l.includes("/b"), l);
+    assert((await ex("html_links")({ html: "<p>none</p>" })) === "No links found.", "empty");
+  });
+  await run("markdown toc + links", async () => {
+    const toc = await ex("md_toc")({ text: "# Title\n## Sub [x](https://x.com)\n### Deep" });
+    assert(toc.includes("- Title") && toc.includes("  - Sub") && toc.includes("#deep"), toc);
+    const l = await ex("md_links")({ text: "see [A](https://a.com) and https://b.com twice https://b.com" });
+    assert(l.includes("https://a.com") && l.includes("https://b.com"), l);
+  });
+  await run("color convert/contrast/palette", async () => {
+    const c = await ex("color_convert")({ hex: "#fdc00a" });
+    assert(c.includes("rgb(253, 192, 10)") && c.includes("hsl("), c);
+    await expectThrow(() => ex("color_convert")({ hex: "zzz" }), "bad hex");
+    const k = await ex("color_contrast")({ a: "#000000", b: "#ffffff" });
+    assert(k.startsWith("21:1") && k.includes("AA PASS"), k);
+    const p = await ex("color_palette")({ hex: "#ff0000" });
+    assert(p.includes("complementary: #00ffff"), p);
+  });
+  await run("date add/diff", async () => {
+    assert((await ex("date_add")({ date: "2026-09-23", amount: 7, unit: "days" })).startsWith("2026-09-30"), "add");
+    assert((await ex("date_diff")({ a: "2026-09-23", b: "2026-09-25" })).startsWith("2d 0h 0m"), "diff");
+    await expectThrow(() => ex("date_add")({ date: "nope", amount: 1, unit: "days" }), "bad date");
+    await expectThrow(() => ex("date_add")({ date: "2026-09-23", amount: 1, unit: "years" }), "bad unit");
+  });
+}
+
+/* --------------------------- rss/snippets/marks -------------------------- */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+
+  await run("rss parse + fetch stub", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () =>
+      new Response(
+        `<rss><channel><item><title>T1</title><link>https://t1.com</link><pubDate>Mon</pubDate></item><item><title>T2</title><link>https://t2.com</link></item></channel></rss>`,
+        { status: 200 },
+      );
+    // rss_read uses ctx.webFetch (stub returns FETCHED text, not XML) — test validation + parser direct
+    await expectThrow(() => ex("rss_read")({ url: "notaurl" }), "bad url");
+    globalThis.fetch = realFetch;
+    const extra = await import(`${LIB}/tools-extra.${EXT}`);
+    const items = extra.parseRssItems(
+      `<rss><channel><item><title>T1</title><link>https://t1.com</link><pubDate>Mon</pubDate></item><entry><title>E1</title><link href="https://e1.com"/><published>2026</published></entry></channel></rss>`,
+      5,
+    );
+    assert(items.length === 2 && items[0].title === "T1" && items[1].link === "https://e1.com", JSON.stringify(items));
+  });
+  await run("snippets roundtrip", async () => {
+    await ex("snippet_save")({ name: "Loop", content: "for(;;){}" });
+    assert((await ex("snippet_get")({ name: "loop" })) === "for(;;){}", "get");
+    assert((await ex("snippet_list")({})).includes("loop"), "list");
+    assert((await ex("snippet_delete")({ name: "loop" })).includes("deleted"), "del");
+    await expectThrow(() => ex("snippet_get")({ name: "loop" }), "gone");
+    await expectThrow(() => ex("snippet_save")({ name: "x", content: "" }), "empty");
+  });
+  await run("bookmarks roundtrip + open", async () => {
+    const btabs = await import(`${LIB}/browser-tabs.${EXT}`);
+    btabs.__resetTabs();
+    await ex("bookmark_save")({ name: "Ex", url: "https://example.com" });
+    assert((await ex("bookmark_list")({})).includes("example.com"), "list");
+    const o = await ex("bookmark_open")({ name: "ex" });
+    assert(o.includes("browser panel") && btabs.listTabs().length === 1, o);
+    assert((await ex("bookmark_delete")({ name: "ex" })).includes("deleted"), "del");
+    await expectThrow(() => ex("bookmark_save")({ name: "x", url: "ftp://x" }), "bad scheme");
+    btabs.__resetTabs();
+  });
+}
+
+/* ------------------------------ mcp scan --------------------------------- */
+
+{
+  const { ctx } = makeCtx();
+  const ex = (n) => TOOL_EXECUTOR_BUILDERS[n](ctx);
+  await run("mcp_scan finds stubbed bridge", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      if (String(url).includes("good-bridge")) {
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "a" }, { name: "b" }] } }), { status: 200 });
+      }
+      throw new Error("refused");
+    };
+    try {
+      const mcp = await import(`${LIB}/mcp.${EXT}`);
+      const { hits } = await mcp.scanLocalMcp(["http://good-bridge/mcp", "http://dead:9/mcp"]);
+      assert(hits.length === 1 && hits[0].tools === 2, JSON.stringify(hits));
+      const out = await ex("mcp_scan")({});
+      assert(typeof out === "string" && out.includes("Settings"), out.slice(0, 80));
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+  await run("profiles save/list/mask/delete", async () => {
+    const mod = await import(`${LIB}/profiles.${EXT}`);
+    const p = mod.saveProfile("Work", "https://api.example.com/v1", "sk-abcdefgh12345678", "gpt-x");
+    assert(p.name === "Work", "save");
+    assert(mod.listProfiles().some((x) => x.id === p.id), "listed");
+    assert(mod.maskKeyHint("sk-abcdefgh12345678") === "sk-…5678", mod.maskKeyHint("sk-abcdefgh12345678"));
+    assert(mod.maskKeyHint("") === "no key", "empty hint");
+    mod.recordProfileTest(p.id, true, "live");
+    assert(mod.listProfiles().find((x) => x.id === p.id)?.lastTest?.ok === true, "test recorded");
+    assert(mod.deleteProfile(p.id.slice(0, 8)) === true, "delete");
+    assert(mod.deleteProfile("zzz") === false, "bad delete");
   });
 }
 
