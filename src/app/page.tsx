@@ -915,9 +915,19 @@ export default function DuckyCoderPage() {
                           argsPreview: approvalRequest.argsPreview,
                           reason: approvalRequest.reason,
                         }}
-                        onRespond={(ok) =>
-                          ok ? agent.respondApproval(true) : agent.respondApproval(false)
-                        }
+                        onRespond={(ok, feedback) => {
+                          if (ok) {
+                            agent.respondApproval(true);
+                            return;
+                          }
+                          agent.respondApproval(false);
+                          if (feedback) {
+                            setInput(feedback);
+                            toast.info("Feedback staged", {
+                              description: "Denied. Press Enter to send the feedback as your next message.",
+                            });
+                          }
+                        }}
                         onAlwaysAllow={() => {
                           useDuckyStore.getState().updateSettings({ policy: "auto" });
                           toast.success("Permission mode → Edit automatically", {

@@ -186,27 +186,38 @@ export function CommandPalette({
 
         <CommandSeparator />
 
-        {/* ── slash commands ───────────────────────────────────────────── */}
-        <CommandGroup heading={<span className="font-mono text-[10px] uppercase tracking-widest">commands</span>}>
-          {SLASH_COMMANDS.map((c) => (
-            <CommandItem
-              key={c.cmd}
-              value={`${c.cmd} ${c.desc}`}
-              onSelect={() => runSlash(c.cmd, c.desc)}
+        {/* ── slash commands, grouped by section ─────────────────────────── */}
+        {(
+          ["session", "workspace", "mode", "model", "tune", "memory", "tools", "help"] as const
+        ).map((group) => {
+          const items = SLASH_COMMANDS.filter((c) => c.group === group);
+          if (!items.length) return null;
+          return (
+            <CommandGroup
+              key={group}
+              heading={<span className="font-mono text-[10px] uppercase tracking-widest">{group}</span>}
             >
-              <Terminal className="size-4 shrink-0 text-violet-400" aria-hidden />
-              <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold">
-                {c.cmd}
-                <span className="ml-2 hidden truncate font-sans text-xs font-normal text-muted-foreground sm:inline">
-                  {c.desc}
-                </span>
-              </span>
-              {c.cmd.includes("<") && (
-                <CommandShortcut className="hidden sm:inline">stage →</CommandShortcut>
-              )}
-            </CommandItem>
-          ))}
-        </CommandGroup>
+              {items.map((c) => (
+                <CommandItem
+                  key={c.cmd}
+                  value={`${c.cmd} ${c.desc}`}
+                  onSelect={() => runSlash(c.cmd, c.desc)}
+                >
+                  <Terminal className="size-4 shrink-0 text-violet-400" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold">
+                    {c.cmd}
+                    <span className="ml-2 hidden truncate font-sans text-xs font-normal text-muted-foreground sm:inline">
+                      {c.desc}
+                    </span>
+                  </span>
+                  {c.cmd.includes("<") && (
+                    <CommandShortcut className="hidden sm:inline">stage →</CommandShortcut>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          );
+        })}
 
         {/* ── agent tools ──────────────────────────────────────────────── */}
         <CommandSeparator />
