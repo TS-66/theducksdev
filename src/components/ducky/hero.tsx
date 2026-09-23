@@ -8,13 +8,10 @@ import {
   HardDrive,
   History,
   MessageCircleQuestion,
-  Megaphone,
   Presentation,
   ScrollText,
   SquareTerminal,
-  FilePenLine,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface HeroProps {
   onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
@@ -25,66 +22,9 @@ interface HeroProps {
   projectFileCount?: number;
   /** open the create-project dialog */
   onNewProject?: () => void;
-  /** one-click sample repo project */
-  onUseSample?: () => void;
   /** connect a real local folder (File System Access API picker) */
   onConnectDisk?: () => void;
 }
-
-/* bottom feature cards — the first card adapts to the project state */
-interface HeroCard {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  prompt?: string;
-  action?: "new-project" | "use-sample";
-  planMode?: boolean;
-  violetTint?: boolean;
-}
-
-const CARDS_WITH_FILES: HeroCard[] = [
-  {
-    icon: <FilePenLine className="size-3.5 text-[#FF7A1A]" aria-hidden />,
-    title: "Live edit + diff",
-    desc: "Ask for a change and watch the diff land.",
-    prompt: "Change the default greeting to Howdy",
-  },
-  {
-    icon: <History className="size-3.5 text-violet-400" aria-hidden />,
-    title: "Plan mode + approval",
-    desc: "Research first — exit_plan_mode asks for your sign-off.",
-    prompt: "Plan a refactor of this project with clear phases",
-    planMode: true,
-    violetTint: true,
-  },
-  {
-    icon: <History className="size-3.5 text-teal-400" aria-hidden />,
-    title: "Plan with todos",
-    desc: "Write a checklist for the refactor and follow the live cards.",
-    prompt: "Write a checklist for the refactor",
-  },
-];
-
-const CARDS_EMPTY: HeroCard[] = [
-  {
-    icon: <FolderPlus className="size-3.5 text-[#FF7A1A]" aria-hidden />,
-    title: "Bring your own project",
-    desc: "Import a folder from disk — your files, your structure, sandboxed.",
-    action: "new-project",
-  },
-  {
-    icon: <FilePenLine className="size-3.5 text-[#FF7A1A]" aria-hidden />,
-    title: "Start from the sample repo",
-    desc: "greeting-service: 7 TypeScript files with tests, ready to edit.",
-    action: "use-sample",
-  },
-  {
-    icon: <History className="size-3.5 text-teal-400" aria-hidden />,
-    title: "Plan with todos",
-    desc: "Write a checklist for a refactor and follow the live cards.",
-    prompt: "Write a checklist for a refactor",
-  },
-];
 
 function greetingForHour(h: number): string {
   if (h >= 5 && h < 11) return "Morning, fresh start";
@@ -100,7 +40,6 @@ export function Hero({
   projectName = null,
   projectFileCount = 0,
   onNewProject,
-  onUseSample,
   onConnectDisk,
 }: HeroProps) {
   // client-only greeting: computed lazily on mount state (no render-phase effect)
@@ -261,15 +200,6 @@ export function Hero({
         ))}
       </div>
 
-      {/* announcement line */}
-      <div className="relative z-10 mt-6 flex max-w-xl items-start gap-2 px-6 text-left">
-        <Megaphone className="mt-0.5 size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          New for explorers: paste an image straight into chat and ask
-          &ldquo;describe the image&rdquo; — vision analysis runs free while in beta.
-        </p>
-      </div>
-
       {/* jump back in */}
       {recent.length > 0 && (
         <div className="relative z-10 mt-6 w-full max-w-3xl px-4">
@@ -297,41 +227,6 @@ export function Hero({
         </div>
       )}
 
-      {/* bottom feature cards */}
-      <div className="relative z-10 mt-3 grid w-full max-w-3xl grid-cols-1 gap-2 px-4 sm:grid-cols-3">
-        {(hasFiles ? CARDS_WITH_FILES : CARDS_EMPTY).map((c) => (
-          <button
-            key={c.title}
-            type="button"
-            onClick={() => {
-              if (c.action === "new-project") {
-                onNewProject?.();
-                return;
-              }
-              if (c.action === "use-sample") {
-                onUseSample?.();
-                return;
-              }
-              if (c.prompt) onPick(c.prompt, c.planMode ? { planMode: true } : undefined);
-            }}
-            className={cn(
-              "ducky-glass group rounded-2xl p-4 text-left transition-all duration-200",
-              "hover:-translate-y-1 hover:shadow-[0_20px_48px_-16px_rgba(253,192,10,0.35)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              c.violetTint && "hover:shadow-[0_20px_48px_-16px_rgba(139,92,246,0.4)]",
-            )}
-          >
-            <span className="flex items-center gap-1.5">
-              {c.icon}
-              <span className="truncate text-[13px] font-medium group-hover:text-foreground">
-                {c.title}
-              </span>
-            </span>
-            <span className="mt-1 block text-xs leading-snug text-muted-foreground">
-              {c.desc}
-            </span>
-          </button>
-        ))}
-      </div>
     </motion.div>
   );
 }

@@ -598,26 +598,6 @@ export default function DuckyCoderPage() {
     [doSend],
   );
 
-  /** one-click sample project — the greeting-service repo, only when asked for */
-  const useSampleProject = React.useCallback(() => {
-    const st = useDuckyStore.getState();
-    const existing = st.projects.find((p) => p.name === "greeting-service");
-    if (existing) {
-      st.selectProject(existing.id);
-      toast.info("Sample project selected", {
-        description: "greeting-service already exists — new tasks start from it.",
-      });
-      return;
-    }
-    void import("@/lib/ducky/workspace-seed").then(({ SEED_WORKSPACE }) => {
-      const st2 = useDuckyStore.getState();
-      st2.createProject("greeting-service", { ...SEED_WORKSPACE });
-      toast.success("Sample project created", {
-        description: `greeting-service · ${Object.keys(SEED_WORKSPACE).length} files — new tasks start from it.`,
-      });
-    });
-  }, []);
-
   // Derived tabs (no setState-in-effect): file needs a preview path,
   // browser needs at least one open tab — otherwise we render chat.
   const browserRev = React.useSyncExternalStore(subscribeTabs, getTabsRevision, getTabsRevision);
@@ -882,7 +862,6 @@ export default function DuckyCoderPage() {
                     projectName: activeProject?.name ?? null,
                     projectFileCount: activeProject ? Object.keys(activeProject.files).length : 0,
                     onNewProject: () => setNewProjectOpen(true),
-                    onUseSample: useSampleProject,
                     onConnectDisk: () => void handleConnectDisk(),
                   }}
                   composerSlot={
