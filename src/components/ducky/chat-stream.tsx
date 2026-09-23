@@ -82,13 +82,14 @@ export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea ref={rootRef} className="min-h-0 flex-1">
-        <div className="mx-auto max-w-[46rem] space-y-5 px-4 py-8 md:px-6">
-          {visible.map((m) => (
+        <div className="mx-auto max-w-[46rem] space-y-4 px-4 py-8 md:px-6">
+          {visible.map((m, i) => (
             <MessageItem
               key={m.id}
               message={m}
               toolResults={toolResults}
               sessionRunning={sessionRunning}
+              index={i}
             />
           ))}
           <div aria-hidden className="h-1" />

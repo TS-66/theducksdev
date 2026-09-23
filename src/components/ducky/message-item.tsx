@@ -77,17 +77,52 @@ function ReasoningCard({ text, streaming }: { text: string; streaming: boolean }
   );
 }
 
+/* ── ZCode trajectory chrome (Apache-2.0, adapted): mono uppercase role ──
+ * labels in role colors, bordered INPUT/OUTPUT sections with title bars. */
+
+function RoleLabel({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <span
+      className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
+      style={{ color, opacity: 0.8 }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionTitle({ color, children, right }: { color?: string; children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="flex h-8 items-center gap-2 bg-white/[0.03] px-3">
+      <span
+        className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+        style={color ? { color, opacity: 0.8 } : undefined}
+      >
+        {children}
+      </span>
+      {right && <span className="ml-auto flex items-center gap-1.5">{right}</span>}
+    </div>
+  );
+}
+
+function clockOf(t: number): string {
+  return new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 interface MessageItemProps {
   message: ChatMessage;
   /** role=tool messages keyed by tool_call_id for pairing */
   toolResults: Map<string, ChatMessage>;
   /** true while a run is live (drives caret + inferred tool-running states) */
   sessionRunning: boolean;
+  /** 0-based position in the visible transcript (renders as 01, 02, …) */
+  index?: number;
 }
 
-export function MessageItem({ message: m, toolResults, sessionRunning }: MessageItemProps) {
+export function MessageItem({ message: m, toolResults, sessionRunning, index = 0 }: MessageItemProps) {
   // assistant + shared copy state (hooks must run before the early return)
   const [copied, setCopied] = React.useState(false);
+  const num = String(index + 1).padStart(2, "0");
 
   if (m.role === "user") {
     return (
@@ -95,14 +130,15 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className="flex justify-end"
       >
-        <div className="ducky-v3-bubble-user max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5">
-          <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed">
+        <div className="flex items-center gap-2">
+          <RoleLabel color="var(--traj-user)">{num} · user</RoleLabel>
+          <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">{clockOf(m.createdAt)}</span>
+        </div>
+        <div className="mt-1.5 overflow-hidden rounded-lg border border-white/[0.08]">
+          <SectionTitle color="var(--traj-user)">input</SectionTitle>
+          <p className="whitespace-pre-wrap break-words border-t border-white/[0.06] px-3 py-2 text-[14px] leading-relaxed">
             {m.content}
-          </p>
-          <p className="mt-1 text-right font-mono text-[9px] text-muted-foreground/60">
-            {new Date(m.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
       </motion.div>
@@ -119,26 +155,24 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
     }
   };
 
+  const prompt = m.meta?.promptTokens ?? 0;
+  const completion = m.meta?.completionTokens ?? 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="group/msg flex gap-2.5"
+      className="group/msg"
     >
-      <img
-        src="/ducky-mark.png"
-        alt=""
-        aria-hidden
-        className="mt-0.5 size-7 shrink-0 rounded-lg border border-white/10 bg-black"
-      />
-      <div className="ducky-v3-assistant min-w-0 flex-1 rounded-2xl rounded-tl-md px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
-        <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-400" />
-          ducky
-        </span>
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
+        <RoleLabel color="var(--traj-assistant)">{num} · assistant</RoleLabel>
+        {m.meta?.model && (
+          <span className="truncate font-mono text-[10px] text-muted-foreground/70">
+            {modelDisplayName(m.meta.model)}
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-1.5">
           <UsageChip message={m} />
           {m.status !== "streaming" && m.content.trim() && (
             <button
@@ -151,30 +185,45 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
             </button>
           )}
           <Stamp t={m.createdAt} />
-        </div>
+        </span>
       </div>
 
-      <div className="-mt-0.5 space-y-2.5">
+      <div className="mt-1.5 space-y-2">
         {Boolean(m.reasoning?.trim()) && m.reasoning && (
           <ReasoningCard text={m.reasoning} streaming={m.status === "streaming"} />
         )}
 
-        {m.content.length > 0 ? (
-          <>
-            <MarkdownBody content={m.content} />
-            {m.status === "streaming" && (
-              <span aria-hidden className="ducky-caret font-mono text-primary">
-                ▊
-              </span>
-            )}
-          </>
-        ) : (
-          m.status === "streaming" &&
-          !m.reasoning && (
-            <span aria-hidden className="ducky-caret font-mono text-primary">
-              ▊
-            </span>
-          )
+        {(m.content.length > 0 || m.status === "streaming") && (
+          <div className="overflow-hidden rounded-lg border border-white/[0.08]">
+            <SectionTitle
+              color="var(--traj-assistant)"
+              right={
+                (prompt > 0 || completion > 0) ? (
+                  <span className="font-mono text-[10px] text-muted-foreground/70">
+                    IN {fmtK(prompt)} · OUT {fmtK(completion)}
+                  </span>
+                ) : undefined
+              }
+            >
+              response{m.status === "streaming" ? " · streaming" : ""}
+            </SectionTitle>
+            <div className="border-t border-white/[0.06] px-3 py-2">
+              {m.content.length > 0 ? (
+                <>
+                  <MarkdownBody content={m.content} />
+                  {m.status === "streaming" && (
+                    <span aria-hidden className="ducky-caret font-mono text-primary">
+                      ▊
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span aria-hidden className="ducky-caret font-mono text-primary">
+                  ▊
+                </span>
+              )}
+            </div>
+          </div>
         )}
 
         {m.status === "error" && (
@@ -192,7 +241,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         )}
 
         {Boolean(m.toolCalls?.length) && (
-          <div className="space-y-1.5 pt-1">
+          <div className="space-y-2 pt-0.5">
             {(m.toolCalls ?? []).map((call) => (
               <ToolCallCard
                 key={call.id}
@@ -203,7 +252,6 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
             ))}
           </div>
         )}
-      </div>
       </div>
     </motion.div>
   );

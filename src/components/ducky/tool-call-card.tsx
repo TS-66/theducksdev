@@ -49,7 +49,6 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
   const name = call.function.name;
   const summary = summarizeArgs(call.function.arguments);
   const meta = getToolMeta(name);
-  const Icon = meta.icon;
   const isEdit = name === "edit_file";
   const editArgs = React.useMemo(
     () => (isEdit ? parseEditArgs(call.function.arguments) : null),
@@ -69,37 +68,29 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
         setOpen(v);
         if (!v) setDismissed(true);
       }}
-      className="min-w-0"
+      className="min-w-0 overflow-hidden rounded-lg border border-white/[0.08]"
     >
       <div
         className={cn(
-          "overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.02] text-xs transition-all",
-          state === "running" && cn("border-l-2 shadow-sm", meta.accent),
+          "text-xs transition-all",
+          state === "running" && cn("border-l-2", meta.accent),
         )}
       >
         <CollapsibleTrigger
           aria-expanded={open}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="sticky top-0 z-10 flex w-full items-center gap-2 bg-[#202020]/95 px-3 py-2 text-left backdrop-blur transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <span
-            aria-hidden
-            className={cn("flex size-6 shrink-0 items-center justify-center rounded-md bg-white/[0.04]", state === "running" && "ducky-glow-breathe")}
-            data-state={state}
-          >
-            <Icon
-              aria-hidden
-              className={cn(
-                "size-3.5",
-                meta.tint,
-                state === "running" && "ducky-spin-slow",
-              )}
-            />
-          </span>
           <span
             aria-hidden
             className={cn("size-1.5 shrink-0 rounded-full", dot)}
             data-state={state}
           />
+          <span
+            className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: "var(--traj-tool-call)", opacity: 0.8 }}
+          >
+            tool
+          </span>
           <span className="shrink-0 font-mono font-semibold">{name}</span>
           <span className="hidden rounded bg-muted/70 px-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground sm:inline">
             {meta.label}
@@ -120,40 +111,48 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="border-t px-2.5 py-2">
+          <div className="space-y-2 p-2">
             {editArgs ? (
-              <div className="mb-2">
-                <DiffView oldStr={editArgs.oldStr} newStr={editArgs.newStr} />
+              <div className="overflow-hidden rounded-lg border border-white/[0.08]">
+                <div className="flex h-8 items-center bg-white/[0.03] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground" style={{ color: "var(--traj-tool-call)", opacity: 0.8 }}>
+                  tool input · diff
+                </div>
+                <div className="border-t border-white/[0.06] p-2">
+                  <DiffView oldStr={editArgs.oldStr} newStr={editArgs.newStr} />
+                </div>
               </div>
             ) : (
-              <>
-                <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                  args
+              <div className="overflow-hidden rounded-lg border border-white/[0.08]">
+                <div className="flex h-8 items-center bg-white/[0.03] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground" style={{ color: "var(--traj-tool-call)", opacity: 0.8 }}>
+                  tool input
                 </div>
-                <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/60 p-2 font-mono text-[11px] leading-relaxed">
+                <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all border-t border-white/[0.06] p-2 font-mono text-[11px] leading-relaxed">
                   {prettyJson(call.function.arguments)}
                 </pre>
-              </>
+              </div>
             )}
 
             {result ? (
-              <div className="mt-2">
-                <div
-                  className={cn(
-                    "font-mono text-[10px] uppercase tracking-wide",
-                    state === "err" ? "text-destructive" : "text-muted-foreground",
-                  )}
-                >
-                  ⎯ output ⎯{" "}
+              <div className="overflow-hidden rounded-lg border border-white/[0.08]">
+                <div className="flex h-8 items-center gap-2 bg-white/[0.03] px-3">
+                  <span
+                    className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
+                    style={{ color: "var(--traj-tool-result)", opacity: 0.8 }}
+                  >
+                    tool output
+                  </span>
                   {result.durationMs != null && (
-                    <span className="ml-1 normal-case">
-                      · {(result.durationMs / 1000).toFixed(2)}s
+                    <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                      {(result.durationMs / 1000).toFixed(2)}s
                     </span>
+                  )}
+                  {state === "err" && (
+                    <span className="font-mono text-[10px] uppercase text-destructive">error</span>
                   )}
                 </div>
                 <pre
                   className={cn(
-                    "mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded border border-border/60 bg-card p-2 font-mono text-[11px] leading-relaxed",
+                    "max-h-72 overflow-auto whitespace-pre-wrap break-words border-t border-white/[0.06] p-2 font-mono text-[11px] leading-relaxed",
                     outputTone,
                   )}
                 >
