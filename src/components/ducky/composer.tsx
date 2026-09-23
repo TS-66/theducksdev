@@ -36,9 +36,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { modelDisplayName } from "@/lib/ducky/models";
+import { listProfiles, maskKeyHint, type ModelProfile } from "@/lib/ducky/profiles";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { fileToPastedImage } from "@/lib/ducky/images";
-import { ProjectPickerRow } from "@/components/ducky/project-picker";
 import type { PermissionPolicy } from "@/lib/ducky/types";
 
 export const SLASH_COMMANDS = [
@@ -163,8 +163,6 @@ interface ComposerProps {
   hasSession: boolean;
   /** "docked" = bottom bar surface · "hero" = centered zcode-style surface */
   variant?: "docked" | "hero";
-  /** open the create-project dialog (hero picker hands off to it) */
-  onNewProject?: () => void;
 }
 
 const POLICY_META: Record<
@@ -188,6 +186,116 @@ const POLICY_META: Record<
   },
 };
 
+/**
+ * ZCode ModelConfigSelect pattern (Apache-2.0, adapted): provider-grouped
+ * submenu — active connection first, then saved profiles grouped by endpoint
+ * provider with status dots, key hints, and a settings footer.
+ */
+function providerOf(baseUrl: string): string {
+  const h = (() => {
+    try {
+      return new URL(baseUrl).hostname.toLowerCase();
+    } catch {
+      return baseUrl.trim().toLowerCase();
+    }
+  })();
+  if (h.includes("openai")) return "OpenAI";
+  if (h.includes("anthropic")) return "Anthropic";
+  if (h.includes("nvidia")) return "NVIDIA";
+  if (h.includes("groq")) return "Groq";
+  if (h.includes("together")) return "Together";
+  if (h.includes("openrouter")) return "OpenRouter";
+  if (h.includes("deepseek")) return "DeepSeek";
+  if (h.includes("mistral")) return "Mistral";
+  if (h.includes("cohere")) return "Cohere";
+  if (h.includes("azure")) return "Azure";
+  if (h.includes("localhost") || h.includes("127.0.0.1") || h === "") return h === "" ? "Custom" : "Local";
+  return h || "Custom";
+}
+
+function ModelMenu({ onDone }: { onDone: () => void }) {
+  const baseUrl = useDuckyStore((s) => s.settings.baseUrl);
+  const apiKey = useDuckyStore((s) => s.settings.apiKey);
+  const model = useDuckyStore((s) => s.settings.model);
+  const [profiles] = React.useState<ModelProfile[]>(() => listProfiles());
+
+  const groups = React.useMemo(() => {
+    const buckets: Record<string, ModelProfile[]> = {};
+    for (const p of profiles) {
+      const g = providerOf(p.baseUrl);
+      (buckets[g] ??= []).push(p);
+    }
+    return Object.entries(buckets).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [profiles]);
+
+  const isActive = (b: string, k: string, m: string) =>
+    b.trim() === baseUrl.trim() && k.trim() === apiKey.trim() && m.trim() === model.trim();
+
+  const switchTo = (b: string, k: string, m: string, label: string) => {
+    useDuckyStore.getState().updateSettings({ baseUrl: b, apiKey: k, model: m });
+    toast.success(`Model → ${modelDisplayName(m)}`, { description: label });
+    onDone();
+  };
+
+  return (
+    <div>
+      <p className="px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+        active connection
+      </p>
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <Cpu className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-mono text-xs font-semibold">{modelDisplayName(model)}</span>
+          <span className="block truncate text-[10px] text-muted-foreground">
+            {providerOf(baseUrl)} · key {maskKeyHint(apiKey)}
+          </span>
+        </span>
+        <Check className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
+      </button>
+      {groups.map(([provider, items]) => (
+        <div key={provider}>
+          <p className="px-2 pb-0.5 pt-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+            {provider}
+          </p>
+          {items.map((p) => {
+            const active = isActive(p.baseUrl, p.apiKey, p.model);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => switchTo(p.baseUrl, p.apiKey, p.model, `${p.name} · ${providerOf(p.baseUrl)}`)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <span
+                  aria-hidden
+                  title={p.lastTest ? (p.lastTest.ok ? `last test ok: ${p.lastTest.message}` : `last test failed: ${p.lastTest.message}`) : "never tested"}
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    !p.lastTest ? "bg-muted-foreground/40" : p.lastTest.ok ? "bg-emerald-400" : "bg-red-400",
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium">{p.name}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    {modelDisplayName(p.model)} · {maskKeyHint(p.apiKey)}
+                  </span>
+                </span>
+                {active && <Check className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+      <p className="px-2 pb-1 pt-2 text-[10px] leading-relaxed text-muted-foreground">
+        Full keys, discovery &amp; tests live in Settings → Connections.
+      </p>
+    </div>
+  );
+}
+
 export function Composer({
   value,
   onChange,
@@ -197,10 +305,10 @@ export function Composer({
   locked,
   hasSession,
   variant = "docked",
-  onNewProject,
 }: ComposerProps) {
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [modelOpen, setModelOpen] = React.useState(false);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const policy = useDuckyStore((s) => s.settings.policy);
   const model = useDuckyStore((s) => s.settings.model);
@@ -307,10 +415,7 @@ export function Composer({
             className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A1A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
           />
 
-          {/* workspace row — real project picker (list / create / rename / delete) */}
-          <ProjectPickerRow onNewProject={onNewProject ?? (() => {})} />
-
-          {/* textarea */}
+          {/* textarea (workspace lives in the hero pill above — ZCode chrome) */}
           <Textarea
             ref={taRef}
             value={value}
@@ -379,8 +484,8 @@ export function Composer({
             </DropdownMenu>
 
             <div className="ml-auto flex items-center gap-1.5">
-              {/* single-model selector */}
-              <Popover>
+              {/* provider-grouped model selector (ZCode ModelConfigSelect pattern) */}
+              <Popover open={modelOpen} onOpenChange={setModelOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"
@@ -392,20 +497,8 @@ export function Composer({
                     <ChevronDown className="size-3" aria-hidden />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-60 p-1.5">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <Cpu className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-xs font-semibold">{modelDisplayName(model)}</span>
-                      <span className="block text-[10px] text-muted-foreground">
-                        your model — set it in Settings → Connections
-                      </span>
-                    </span>
-                    <Check className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
-                  </button>
+                <PopoverContent align="end" className="custom-scrollbar max-h-80 w-72 overflow-y-auto p-1.5">
+                  <ModelMenu onDone={() => setModelOpen(false)} />
                 </PopoverContent>
               </Popover>
 

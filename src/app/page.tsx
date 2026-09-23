@@ -950,7 +950,6 @@ export default function DuckyCoderPage() {
                       running={agent.running}
                       locked={Boolean(agent.pendingApproval)}
                       hasSession={Boolean(activeSessionId)}
-                      onNewProject={() => setNewProjectOpen(true)}
                     />
                   }
                 />
