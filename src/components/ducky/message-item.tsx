@@ -19,6 +19,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, TodoItem } from "@/lib/ducky/types";
+import {
+  trajectoryRoleTextClass,
+  type TrajectoryVisualRole,
+} from "@/lib/ducky/zcode-vendor/trajectory-role-styles";
 import { modelDisplayName } from "@/lib/ducky/models";
 import { fmtK } from "./format";
 import { MarkdownBody } from "./markdown-body";
@@ -77,26 +81,31 @@ function ReasoningCard({ text, streaming }: { text: string; streaming: boolean }
   );
 }
 
-/* ── ZCode trajectory chrome (Apache-2.0, adapted): mono uppercase role ──
- * labels in role colors, bordered INPUT/OUTPUT sections with title bars. */
+/* ── ZCode trajectory chrome: mono uppercase role labels + bordered ──
+ * INPUT/OUTPUT sections with title bars. Role colors come from ZCode's
+ * vendored role-style module (not hardcoded here). */
 
-function RoleLabel({ color, children }: { color: string; children: React.ReactNode }) {
+function RoleLabel({ role, children }: { role: TrajectoryVisualRole; children: React.ReactNode }) {
   return (
     <span
-      className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
-      style={{ color, opacity: 0.8 }}
+      className={cn(
+        "font-mono text-[10px] font-semibold uppercase tracking-[0.14em]",
+        trajectoryRoleTextClass(role),
+      )}
     >
       {children}
     </span>
   );
 }
 
-function SectionTitle({ color, children, right }: { color?: string; children: React.ReactNode; right?: React.ReactNode }) {
+function SectionTitle({ role, children, right }: { role: TrajectoryVisualRole; children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="flex h-8 items-center gap-2 bg-white/[0.03] px-3">
       <span
-        className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
-        style={color ? { color, opacity: 0.8 } : undefined}
+        className={cn(
+          "font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground",
+          trajectoryRoleTextClass(role),
+        )}
       >
         {children}
       </span>
@@ -132,11 +141,11 @@ export function MessageItem({ message: m, toolResults, sessionRunning, index = 0
         transition={{ duration: 0.22, ease: "easeOut" }}
       >
         <div className="flex items-center gap-2">
-          <RoleLabel color="var(--traj-user)">{num} · user</RoleLabel>
+          <RoleLabel role="user">{num} · user</RoleLabel>
           <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">{clockOf(m.createdAt)}</span>
         </div>
         <div className="mt-1.5 overflow-hidden rounded-lg border border-white/[0.08]">
-          <SectionTitle color="var(--traj-user)">input</SectionTitle>
+          <SectionTitle role="user">input</SectionTitle>
           <p className="whitespace-pre-wrap break-words border-t border-white/[0.06] px-3 py-2 text-[14px] leading-relaxed">
             {m.content}
           </p>
@@ -166,7 +175,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning, index = 0
       className="group/msg"
     >
       <div className="flex items-center gap-2">
-        <RoleLabel color="var(--traj-assistant)">{num} · assistant</RoleLabel>
+        <RoleLabel role="assistant">{num} · assistant</RoleLabel>
         {m.meta?.model && (
           <span className="truncate font-mono text-[10px] text-muted-foreground/70">
             {modelDisplayName(m.meta.model)}
@@ -196,7 +205,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning, index = 0
         {(m.content.length > 0 || m.status === "streaming") && (
           <div className="overflow-hidden rounded-lg border border-white/[0.08]">
             <SectionTitle
-              color="var(--traj-assistant)"
+              role="assistant"
               right={
                 (prompt > 0 || completion > 0) ? (
                   <span className="font-mono text-[10px] text-muted-foreground/70">

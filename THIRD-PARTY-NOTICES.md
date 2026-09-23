@@ -32,5 +32,15 @@ which is licensed Apache-2.0, © Z.ai:
   mutating route split, accessibility/screenRecording permission status)
   behind `src/lib/ducky/pc.ts` — our bridge protocol itself is original.
 
-No ZCode source files are vendored here; all implementations are original.
+Two files are vendored VERBATIM from ZCode (only a notice header added),
+each carrying its Apache-2.0 attribution inline:
+- `src/lib/ducky/zcode-vendor/trajectory-role-styles.ts`
+  (upstream `packages/ui/src/ModelTrajectoryRoleStyles.ts`) — role label
+  classes consumed by the transcript (`message-item.tsx`, `tool-call-card.tsx`);
+- `src/lib/ducky/zcode-vendor/trajectory-format.ts`
+  (upstream `packages/ui/src/ModelTrajectoryFormat.ts`) — duration/clock
+  formatters consumed by `tool-call-card.tsx`.
+
+No other ZCode source files are vendored here; all other implementations
+are original.
 If you reuse Ducky code that derives from these ideas, keep this notice.

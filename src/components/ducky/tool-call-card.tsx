@@ -5,6 +5,8 @@ import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, ToolCallData } from "@/lib/ducky/types";
+import { trajectoryRoleTextClass } from "@/lib/ducky/zcode-vendor/trajectory-role-styles";
+import { formatTrajectoryDuration } from "@/lib/ducky/zcode-vendor/trajectory-format";
 import { summarizeArgs, truncate } from "./format";
 import { getToolMeta } from "./tool-meta";
 import { DiffView, parseEditArgs } from "./diff-view";
@@ -86,8 +88,10 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
             data-state={state}
           />
           <span
-            className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
-            style={{ color: "var(--traj-tool-call)", opacity: 0.8 }}
+            className={cn(
+              "shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em]",
+              trajectoryRoleTextClass("tool-call"),
+            )}
           >
             tool
           </span>
@@ -100,7 +104,7 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
           </span>
           {result?.durationMs != null && (
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              {(result.durationMs / 1000).toFixed(2)}s
+              {formatTrajectoryDuration(result.durationMs)}
             </span>
           )}
           <ChevronDown
@@ -114,7 +118,7 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
           <div className="space-y-2 p-2">
             {editArgs ? (
               <div className="overflow-hidden rounded-lg border border-white/[0.08]">
-                <div className="flex h-8 items-center bg-white/[0.03] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground" style={{ color: "var(--traj-tool-call)", opacity: 0.8 }}>
+                <div className={cn("flex h-8 items-center bg-white/[0.03] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground", trajectoryRoleTextClass("tool-call"))}>
                   tool input · diff
                 </div>
                 <div className="border-t border-white/[0.06] p-2">
@@ -123,7 +127,7 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-white/[0.08]">
-                <div className="flex h-8 items-center bg-white/[0.03] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground" style={{ color: "var(--traj-tool-call)", opacity: 0.8 }}>
+                <div className={cn("flex h-8 items-center bg-white/[0.03] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground", trajectoryRoleTextClass("tool-call"))}>
                   tool input
                 </div>
                 <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all border-t border-white/[0.06] p-2 font-mono text-[11px] leading-relaxed">
@@ -136,14 +140,13 @@ export function ToolCallCard({ call, result, running }: ToolCallCardProps) {
               <div className="overflow-hidden rounded-lg border border-white/[0.08]">
                 <div className="flex h-8 items-center gap-2 bg-white/[0.03] px-3">
                   <span
-                    className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
-                    style={{ color: "var(--traj-tool-result)", opacity: 0.8 }}
+                    className={cn("font-mono text-[10px] font-semibold uppercase tracking-[0.14em]", trajectoryRoleTextClass("tool-result"))}
                   >
                     tool output
                   </span>
                   {result.durationMs != null && (
                     <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-                      {(result.durationMs / 1000).toFixed(2)}s
+                      {formatTrajectoryDuration(result.durationMs)}
                     </span>
                   )}
                   {state === "err" && (
