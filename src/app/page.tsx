@@ -53,6 +53,24 @@ import type { PermissionPolicy } from "@/lib/ducky/types";
 
 const KNOWN_POLICIES = ["readonly", "ask", "auto"] as const;
 
+/**
+ * Expand `@path` mentions against the active session workspace: matched
+ * paths inline the file content as a fenced context block (truncated at
+ * 6KB); unknown @tokens pass through untouched.
+ */
+function expandMentions(text: string): string {
+  const st = useDuckyStore.getState();
+  const session = st.sessions.find((s) => s.id === st.activeSessionId) ?? null;
+  const ws = session?.workspace;
+  if (!ws || Object.keys(ws).length === 0) return text;
+  return text.replace(/(^|\s)@([^\s@`]+)/g, (full, pre: string, p: string) => {
+    const content = ws[p];
+    if (typeof content !== "string") return full;
+    const body = content.length > 6000 ? `${content.slice(0, 6000)}\n…(truncated)` : content;
+    return `${pre}@${p}:\n\`\`\`\n${body}\n\`\`\``;
+  });
+}
+
 function SideFootButton({
   label,
   onClick,
@@ -567,7 +585,7 @@ export default function DuckyCoderPage() {
         executeCommand(t);
         return;
       }
-      await agentSend(t);
+      await agentSend(expandMentions(t));
     },
     [agentSend, executeCommand],
   );

@@ -3,6 +3,8 @@
 import * as React from "react";
 import {
   Activity,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   FilePlus2,
@@ -55,7 +57,7 @@ import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { downloadSessionMarkdown } from "@/lib/ducky/export-md";
 import type { Session } from "@/lib/ducky/types";
-import { relTime } from "./format";
+import { fmtK, relTime } from "./format";
 import { FileTree } from "./file-tree";
 
 interface SidebarProps {
@@ -105,6 +107,19 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
   const [projectFilter, setProjectFilter] = React.useState<string | null>(null);
   const [newFileOpen, setNewFileOpen] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
+  /* ZCode-inspired collapsible day groups: all open except "earlier". */
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(
+    () => new Set(["earlier"]),
+  );
+
+  const toggleGroup = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
   const dragDepth = React.useRef(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -169,6 +184,11 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
   }, [sorted]);
 
   const active = sessions.find((s) => s.id === activeSessionId) ?? null;
+
+  /* Footer usage summary — derived from the active session only, no new store fields. */
+  const usageTokens = (active?.stats.promptTokens ?? 0) + (active?.stats.completionTokens ?? 0);
+  const usageCalls = active?.stats.toolCalls ?? 0;
+  const usageFiles = active ? Object.keys(active.workspace).length : 0;
 
   const newTask = () => {
     useDuckyStore.getState().newSession();
@@ -352,34 +372,67 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
             {query ? `No sessions match “${query}”.` : (<>No sessions yet.<br />Press ⌘K or hit “New task”.</>)}
           </p>
         )}
-        {groups.map((g) => (
-          <div key={g.label} role="group" aria-label={`${g.label} sessions`}>
-            <p
-              className={cn(
-                "sticky top-0 z-10 bg-background/95 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60 backdrop-blur-sm",
-                g.label === "pinned ★" && "text-amber-400/80",
-              )}
-            >
-              {g.label}
-              <span className="ml-1.5 text-muted-foreground/40">{g.items.length}</span>
-            </p>
-            {g.items.map((s) => (
-              <SessionRow
-                key={s.id}
-                session={s}
-                active={s.id === activeSessionId}
-                onSelect={() => {
-                  useDuckyStore.getState().selectSession(s.id);
-                  onAfterSelect?.();
-                }}
-              />
-            ))}
-          </div>
-        ))}
+        {groups.map((g) => {
+          const isCollapsed = collapsedGroups.has(g.label);
+          return (
+            <div key={g.label} role="group" aria-label={`${g.label} sessions`}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(g.label)}
+                aria-expanded={!isCollapsed}
+                aria-label={`${g.label} — ${g.items.length} session${g.items.length === 1 ? "" : "s"}`}
+                className={cn(
+                  "sticky top-0 z-10 flex w-full items-center gap-1 bg-background/95 px-2 py-1 text-left font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60 backdrop-blur-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  g.label === "pinned ★" && "text-amber-400/80 hover:text-amber-300",
+                )}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="size-3 shrink-0" aria-hidden />
+                ) : (
+                  <ChevronDown className="size-3 shrink-0" aria-hidden />
+                )}
+                <span className="min-w-0 flex-1 truncate">{g.label}</span>
+                <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-px text-[9px] leading-tight text-muted-foreground/70">
+                  {g.items.length}
+                </span>
+              </button>
+              {!isCollapsed &&
+                g.items.map((s) => (
+                  <SessionRow
+                    key={s.id}
+                    session={s}
+                    active={s.id === activeSessionId}
+                    onSelect={() => {
+                      useDuckyStore.getState().selectSession(s.id);
+                      onAfterSelect?.();
+                    }}
+                  />
+                ))}
+            </div>
+          );
+        })}
       </nav>
 
+      {/* Usage summary — quiet mono stats for the active session */}
+      <div
+        className="border-t border-white/10 px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60"
+        aria-label="Active session usage"
+      >
+        {active ? (
+          <p
+            className="truncate"
+            title={`${usageTokens} tokens · ${usageCalls} tool calls · ${usageFiles} files`}
+          >
+            {fmtK(usageTokens)} tok · {usageCalls} {usageCalls === 1 ? "call" : "calls"} ·{" "}
+            {usageFiles} {usageFiles === 1 ? "file" : "files"}
+          </p>
+        ) : (
+          <p className="truncate">no active session</p>
+        )}
+      </div>
+
       {/* Workspace block */}
-      <div className="border-t p-2">
+      <div className="p-2">
         <div className="mb-1 flex items-center gap-1.5 px-1">
           <FolderTree className="size-3.5 text-muted-foreground" aria-hidden />
           <h3 className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

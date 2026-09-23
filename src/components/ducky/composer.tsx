@@ -3,12 +3,12 @@
 import * as React from "react";
 import {
   ArrowUp,
+  AtSign,
   Check,
   ChevronDown,
   CornerDownLeft,
   Cpu,
   Eye,
-  FolderGit2,
   Hand,
   ImagePlus,
   Map,
@@ -296,6 +296,58 @@ function ModelMenu({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * ZCode @-mention pattern (Apache-2.0, adapted): pick a workspace file to
+ * reference — inserts `@path`; the send pipeline expands it to the file's
+ * content so the model sees exactly what you pointed at.
+ */
+function MentionPicker({ onPick }: { onPick: (path: string) => void }) {
+  const session = useDuckyStore((s) => s.sessions.find((x) => x.id === s.activeSessionId) ?? null);
+  const [query, setQuery] = React.useState("");
+  const files = React.useMemo(() => Object.keys(session?.workspace ?? {}).sort(), [session]);
+  const hits = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (q ? files.filter((f) => f.toLowerCase().includes(q)) : files).slice(0, 30);
+  }, [files, query]);
+
+  return (
+    <div>
+      <div className="px-1 pb-1.5">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filter files…"
+          aria-label="Filter workspace files"
+          className="h-8 w-full rounded-md border border-white/10 bg-transparent px-2 text-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+      </div>
+      {hits.length === 0 ? (
+        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+          {files.length === 0 ? "Workspace is empty — no files to mention yet." : `No files match “${query}”.`}
+        </p>
+      ) : (
+        <ul className="custom-scrollbar max-h-56 overflow-y-auto">
+          {hits.map((f) => (
+            <li key={f}>
+              <button
+                type="button"
+                onClick={() => onPick(f)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left font-mono text-xs transition-colors hover:bg-accent"
+              >
+                <AtSign className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{f}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="px-2 pb-1 pt-1.5 font-mono text-[10px] leading-relaxed text-muted-foreground/70">
+        @path inlines the file at send time
+      </p>
+    </div>
+  );
+}
+
 export function Composer({
   value,
   onChange,
@@ -309,6 +361,8 @@ export function Composer({
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [modelOpen, setModelOpen] = React.useState(false);
+  const [mentionOpen, setMentionOpen] = React.useState(false);
+  const [slashOpen, setSlashOpen] = React.useState(false);
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const policy = useDuckyStore((s) => s.settings.policy);
   const model = useDuckyStore((s) => s.settings.model);
@@ -371,6 +425,31 @@ export function Composer({
 
   const canSend = Boolean(value.trim()) && !running && !locked && (!disabledSurface || hero);
 
+  /** insert `@path ` at the caret (mention picker + @ key parity) */
+  const insertMention = React.useCallback(
+    (path: string) => {
+      const token = `@${path} `;
+      const el = taRef.current;
+      if (!el) {
+        onChange(value ? `${value.replace(/\s+$/, "")} ${token}` : token);
+        return;
+      }
+      const s = el.selectionStart ?? value.length;
+      const next = `${value.slice(0, s)}${token}${value.slice(s)}`;
+      onChange(next);
+      const caret = s + token.length;
+      requestAnimationFrame(() => {
+        el.focus();
+        try {
+          el.selectionStart = el.selectionEnd = caret;
+        } catch {
+          // noop
+        }
+      });
+    },
+    [onChange, value],
+  );
+
   const trySend = () => {
     if (!canSend) return;
     if (hero && !hasSession) ensureSession();
@@ -419,7 +498,10 @@ export function Composer({
           <Textarea
             ref={taRef}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              onChange(e.target.value);
+              if (e.target.value.endsWith("@") && !mentionOpen) setMentionOpen(true);
+            }}
             onKeyDown={onKeyDown}
             onPaste={onPaste}
             placeholder="Ask Ducky anything, @ to add context, / for commands"
@@ -445,6 +527,75 @@ export function Composer({
               </TooltipTrigger>
               <TooltipContent side="bottom">Attach an image — saved into the workspace</TooltipContent>
             </Tooltip>
+
+            {/* @ file mentions */}
+            <Popover open={mentionOpen} onOpenChange={setMentionOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Mention a workspace file"
+                      className="size-8 rounded-full font-mono text-muted-foreground hover:text-foreground"
+                    >
+                      <AtSign className="size-4" />
+                    </Button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Mention a file — inlined at send</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="start" className="w-72 p-1.5">
+                <MentionPicker
+                  onPick={(p) => {
+                    insertMention(p);
+                    setMentionOpen(false);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* / slash commands */}
+            <Popover open={slashOpen} onOpenChange={setSlashOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Slash commands"
+                      className="size-8 rounded-full font-mono text-muted-foreground hover:text-foreground"
+                    >
+                      <SlashSquare className="size-4" />
+                    </Button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Commands — staged into the box</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="start" className="custom-scrollbar max-h-72 w-80 overflow-y-auto p-1.5">
+                <p className="px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/70">
+                  commands
+                </p>
+                {SLASH_COMMANDS.map((c) => (
+                  <button
+                    key={c.cmd}
+                    type="button"
+                    onClick={() => {
+                      onChange(`${c.cmd.split(" ")[0]} `);
+                      toast.info("Command staged", {
+                        description: `${c.cmd} — press Enter to run${c.cmd.includes("<") ? " (add an argument)" : ""}.`,
+                      });
+                      setSlashOpen(false);
+                      taRef.current?.focus();
+                    }}
+                    className="flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <span className="font-mono text-xs font-semibold">{c.cmd}</span>
+                    <span className="text-[11px] text-muted-foreground">{c.desc}</span>
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
 
             {/* permission policy dropdown */}
             <DropdownMenu>
