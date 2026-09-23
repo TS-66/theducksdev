@@ -264,14 +264,11 @@
 /* ───────────────────── Ducky IDE shell (zcode-grade) ─────────────────── */
 
 .ducky-ide-shell {
-  background:
-    radial-gradient(1200px 400px at 50% -10%, color-mix(in oklab, #FF7A1A 7%, transparent), transparent 70%),
-    var(--background);
+  background: var(--background);
 }
 
 .ducky-ide-shell aside {
-  background: color-mix(in oklab, var(--card) 55%, transparent);
-  backdrop-filter: blur(8px);
+  background: transparent;
 }
 
 .ducky-composer-dock {
@@ -345,30 +342,21 @@
 }
 
 .ducky-glass {
-  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 88%, white 2%), color-mix(in oklab, var(--card) 94%, transparent));
-  border: 1px solid color-mix(in oklab, white 9%, transparent);
-  box-shadow:
-    0 1px 0 0 color-mix(in oklab, white 6%, transparent) inset,
-    0 24px 64px -32px rgb(0 0 0 / 0.7);
-  backdrop-filter: blur(14px);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.7);
 }
 
 .ducky-send {
-  background: linear-gradient(180deg, #ffa04d, #f96a0a);
+  background: #ff7a1a;
   color: #1c0e02;
-  box-shadow:
-    0 1px 0 0 rgb(255 255 255 / 0.45) inset,
-    0 8px 24px -8px rgb(255 122 26 / 0.55);
-  transition: transform 120ms ease, box-shadow 160ms ease, filter 160ms ease;
+  transition: filter 120ms ease;
 }
 .ducky-send:hover:not(:disabled) {
-  filter: brightness(1.06);
-  box-shadow:
-    0 1px 0 0 rgb(255 255 255 / 0.5) inset,
-    0 10px 32px -8px rgb(255 122 26 / 0.7);
+  filter: brightness(1.08);
 }
 .ducky-send:active:not(:disabled) {
-  transform: scale(0.94);
+  filter: brightness(0.96);
 }
 .ducky-send:disabled {
   opacity: 0.45;
@@ -418,11 +406,7 @@
 /* ─────────────────── Pond OS v3 (brand-new UI) ─────────────────── */
 
 .ducky-v3-app {
-  background:
-    radial-gradient(1000px 380px at 50% -8%, rgba(255, 122, 26, 0.1), transparent 70%),
-    radial-gradient(700px 500px at 8% 110%, rgba(45, 212, 191, 0.06), transparent 65%),
-    radial-gradient(700px 500px at 95% 100%, rgba(139, 92, 246, 0.08), transparent 65%),
-    #161616;
+  background: #161616;
 }
 
 .ducky-v3-rail {
@@ -431,58 +415,39 @@
 }
 
 .ducky-v3-side {
-  background: rgba(22, 22, 22, 0.85) !important;
-  backdrop-filter: blur(14px);
+  background: transparent !important;
 }
 
 .ducky-v3-topbar {
-  background: rgba(22, 22, 22, 0.8);
-  backdrop-filter: blur(12px);
+  background: #161616;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .ducky-v3-headline {
-  background: linear-gradient(180deg, #fff 20%, #ffd9b3 55%, #ff7a1a 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  letter-spacing: -0.035em;
+  color: var(--foreground);
+  letter-spacing: -0.02em;
 }
 
 .ducky-v3-logo-ring {
-  box-shadow:
-    0 0 0 1px rgba(255, 122, 26, 0.35),
-    0 0 44px -6px rgba(255, 122, 26, 0.55),
-    0 18px 50px -18px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.8);
 }
 
 .ducky-v3-composer {
-  background: linear-gradient(180deg, rgba(43, 43, 43, 0.95), rgba(32, 32, 32, 0.96));
+  background: #202020;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
-    0 24px 70px -28px rgba(0, 0, 0, 0.85),
-    0 0 0 1px rgba(255, 122, 26, 0.06);
-  backdrop-filter: blur(16px);
 }
 .ducky-v3-composer:focus-within {
-  border-color: rgba(255, 122, 26, 0.5);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
-    0 0 0 4px rgba(255, 122, 26, 0.12),
-    0 24px 70px -24px rgba(255, 122, 26, 0.35);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .ducky-v3-action-card {
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 .ducky-v3-action-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 122, 26, 0.45);
-  background: rgba(255, 122, 26, 0.06);
-  box-shadow: 0 16px 40px -18px rgba(255, 122, 26, 0.45);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .ducky-v3-newtask {

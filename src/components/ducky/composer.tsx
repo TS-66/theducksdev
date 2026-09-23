@@ -488,12 +488,6 @@ export function Composer({
             "ducky-v3-composer group/composer relative rounded-[20px] transition-all duration-200",
           )}
         >
-          {/* focus glow hairline (top edge) */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A1A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
-          />
-
           {/* textarea (workspace lives in the hero pill above — ZCode chrome) */}
           <Textarea
             ref={taRef}
@@ -707,11 +701,6 @@ export function Composer({
         disabledSurface && "opacity-70",
       )}
     >
-      {/* focus glow hairline (top edge) */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A1A]/70 to-transparent opacity-0 transition-opacity duration-300 group-focus-within/composer:opacity-100"
-      />
       {/* top chip row */}
       <div className="flex items-center gap-1 px-2 pt-1.5">
         {/* model chip — your configured model */}

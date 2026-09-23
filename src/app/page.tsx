@@ -754,10 +754,10 @@ export default function DuckyCoderPage() {
               <img
                 src="/ducky-mark.png"
                 alt="Ducky AI logo"
-                className="ducky-v3-logo-ring size-8 rounded-xl border border-white/10 bg-black"
+                className="size-8 rounded-lg border border-white/10 bg-black"
               />
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="font-pixel truncate text-[12px] leading-none text-foreground">DUCKY</p>
+                <p className="truncate text-[13px] font-bold tracking-tight text-foreground">Ducky AI</p>
                 <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
                   <span
                     aria-hidden
@@ -766,7 +766,7 @@ export default function DuckyCoderPage() {
                       agent.running ? "ducky-pulse-dot bg-amber-400" : "bg-emerald-400",
                     )}
                   />
-                  {agent.running ? "working…" : "pond ready"}
+                  {agent.running ? "working…" : "ready"}
                 </p>
               </div>
               <button

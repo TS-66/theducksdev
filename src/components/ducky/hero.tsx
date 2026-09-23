@@ -278,8 +278,8 @@ export function Hero({
           draggable={false}
           className="ducky-v3-logo-ring size-20 rounded-[22px] bg-black"
         />
-        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#FF7A1A]/40 bg-[#0d1117] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#FF7A1A]">
-          Pond OS · v3
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-[#202020] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          ducky ai · coder
         </span>
       </motion.div>
 
