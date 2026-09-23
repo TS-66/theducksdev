@@ -321,6 +321,21 @@ export const SKILLS: Skill[] = [
       "4. Prefer read-only verification (`pc_windows`, `pc_screen`) before any destructive click; destructive actions need explicit human confirmation in chat.",
     ].join("\n"),
   },
+  {
+    name: "react-perf",
+    triggers: ["react performance", "waterfall", "bundle size", "re-render", "slow render", "next.js perf", "optimize react"],
+    description: "React/Next.js performance rules by impact: waterfalls, bundle, server, re-renders.",
+    body: [
+      "# Skill: react-perf (rules distilled from Vercel's react-best-practices, MIT, via ZCode)",
+      "Apply in priority order — stop when the measured bottleneck is fixed:",
+      "1. WATERFALLS (critical): start promises early/await late; Promise.all independent work; cheap sync checks before awaits; Suspense boundaries to stream.",
+      "2. BUNDLE (critical): import from files, never barrels; next/dynamic heavy components; third-party after hydration; preload on hover/focus.",
+      "3. SERVER (high): React.cache() per-request dedup; parallelize fetches (Promise.all, incl. nested per-item); minimize client-component props; no module-level mutable request state.",
+      "4. RE-RENDERS (medium): derive during render (never setState in effects); primitive effect deps; memoize expensive subtrees; startTransition/deferred values for non-urgent updates; no inline component definitions.",
+      "5. JS (low-medium): early exits; Map/Set lookups; hoist RegExp; combine filter/map passes; idle-callback for non-critical work.",
+      "6. VERIFY: measure before/after with the same method; `npx tsc --noEmit`, eslint, build — perf work that breaks the gate gets reverted.",
+    ].join("\n"),
+  },
 ];
 
 export function getSkill(name: string): Skill | undefined {

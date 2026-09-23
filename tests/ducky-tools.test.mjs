@@ -146,6 +146,8 @@ const extra = await import(`${LIB}/tools-extra.${EXT}`);
 const memory = await import(`${LIB}/memory.${EXT}`);
 const skills = await import(`${LIB}/skills.${EXT}`);
 const btabs = await import(`${LIB}/browser-tabs.${EXT}`);
+const caps = await import(`${LIB}/model-capabilities.${EXT}`);
+const tsearch = await import(`${LIB}/zcode-vendor/tab-search.${EXT}`);
 
 const run = async (name, fn) => {
   try {
@@ -1036,8 +1038,8 @@ await run("tools-extra direct: json path + diff", async () => {
   assert(extra.lineDiff("same\n", "same\n").includes("identical"), "identical");
 });
 
-await run("skills module: 24 playbooks with triggers", async () => {
-  assert(skills.SKILLS.length === 24, `got ${skills.SKILLS.length}`);
+await run("skills module: 25 playbooks with triggers", async () => {
+  assert(skills.SKILLS.length === 25, `got ${skills.SKILLS.length}`);
   assert(skills.getSkill("PLAN")?.name === "plan", "case-insensitive lookup");
   assert(skills.getSkill("mcp-integration")?.name === "mcp-integration", "mcp skill");
   assert(skills.getSkill("local-pc")?.name === "local-pc", "pc skill");
@@ -1048,9 +1050,33 @@ await run("skills module: 24 playbooks with triggers", async () => {
   assert(skills.getSkill("dep-refs")?.name === "dep-refs", "dep-refs skill");
   assert(skills.getSkill("ai-elements")?.name === "ai-elements", "ai-elements skill");
   assert(skills.getSkill("architecture-governance")?.name === "architecture-governance", "arch-gov skill");
+  assert(skills.getSkill("react-perf")?.name === "react-perf", "react-perf skill");
   for (const s of skills.SKILLS) {
     assert(Array.isArray(s.triggers) && s.triggers.length > 0, `${s.name} missing triggers`);
   }
+});
+
+await run("model capabilities: inference + context chips", async () => {
+  assert(caps.inferModelCapabilities("gpt-4o").inputFormat.supportsImage === true, "4o vision");
+  assert(caps.inferModelCapabilities("claude-sonnet-4-5").inputFormat.supportsImage === true, "claude vision");
+  assert(caps.inferModelCapabilities("text-embedding-3-small").supportsToolCall === false, "embedding no tools");
+  assert(caps.inferModelCapabilities("my-custom-7b").inputFormat.supportsImage === false, "unknown id: no vision");
+  assert(caps.formatContextWindow(900) === "900", "sub-K raw");
+  assert(caps.formatContextWindow(128000) === "128K", "128K chip");
+  assert(caps.formatContextWindow(1000000) === "1M", "1M chip");
+  assert(caps.formatContextWindow(1500000) === "1.5M", "1.5M chip");
+  assert(caps.providerOf("https://integrate.api.nvidia.com/v1") === "NVIDIA", "nvidia family");
+});
+
+await run("tab search: weighted rank", async () => {
+  const items = [
+    { id: 1, searchFields: tsearch.buildSearchFields("write file", "edit tool", "tool") },
+    { id: 2, searchFields: tsearch.buildSearchFields("file preview", "open panel", "files") },
+  ];
+  const ranked = tsearch.filterAndRankSearchItems(items, tsearch.normalizeSearchQuery("file"));
+  assert(ranked.length === 2 && ranked[0].id === 2, "title-prefix outranks title-word");
+  assert(tsearch.filterAndRankSearchItems(items, tsearch.normalizeSearchQuery("zzz")).length === 0, "no-match empty");
+  assert(tsearch.filterAndRankSearchItems(items, tsearch.normalizeSearchQuery("")).length === 2, "empty query passthrough");
 });
 
 await run("browser-tabs module: registry", async () => {

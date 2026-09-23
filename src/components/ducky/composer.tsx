@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { modelDisplayName } from "@/lib/ducky/models";
+import { inferModelCapabilities, providerOf, formatContextWindow } from "@/lib/ducky/model-capabilities";
 import { listProfiles, maskKeyHint, type ModelProfile } from "@/lib/ducky/profiles";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { fileToPastedImage } from "@/lib/ducky/images";
@@ -189,32 +190,29 @@ const POLICY_META: Record<
 /**
  * ZCode ModelConfigSelect pattern (Apache-2.0, adapted): provider-grouped
  * submenu — active connection first, then saved profiles grouped by endpoint
- * provider with status dots, key hints, and a settings footer.
+ * provider with status dots, capability badges, key hints, settings footer.
  */
-function providerOf(baseUrl: string): string {
-  const h = (() => {
-    try {
-      return new URL(baseUrl).hostname.toLowerCase();
-    } catch {
-      return baseUrl.trim().toLowerCase();
-    }
-  })();
-  if (h.includes("openai")) return "OpenAI";
-  if (h.includes("anthropic")) return "Anthropic";
-  if (h.includes("nvidia")) return "NVIDIA";
-  if (h.includes("groq")) return "Groq";
-  if (h.includes("together")) return "Together";
-  if (h.includes("openrouter")) return "OpenRouter";
-  if (h.includes("deepseek")) return "DeepSeek";
-  if (h.includes("mistral")) return "Mistral";
-  if (h.includes("cohere")) return "Cohere";
-  if (h.includes("azure")) return "Azure";
-  if (h.includes("localhost") || h.includes("127.0.0.1") || h === "") return h === "" ? "Custom" : "Local";
-  return h || "Custom";
+/** Capability badges (ZCode ModelInputCapabilityBadge pattern): vision eye + context chip. */
+function ModelBadges({ modelId }: { modelId: string }) {
+  const caps = React.useMemo(() => inferModelCapabilities(modelId), [modelId]);
+  if (!caps.inputFormat.supportsImage && caps.contextWindow === undefined) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {caps.inputFormat.supportsImage && (
+        <span title="Vision input supported (inferred from id)" className="flex items-center gap-0.5 rounded border border-sky-500/40 bg-sky-500/10 px-1 py-px font-mono text-[9px] text-sky-400">
+          <Eye className="size-2.5" aria-hidden /> vision
+        </span>
+      )}
+      {caps.contextWindow !== undefined && (
+        <span title={`${caps.contextWindow.toLocaleString()} context window`} className="rounded border border-border/70 px-1 py-px font-mono text-[9px] text-muted-foreground">
+          {formatContextWindow(caps.contextWindow)}
+        </span>
+      )}
+    </span>
+  );
 }
 
-function ModelMenu({ onDone }: { onDone: () => void }) {
-  const baseUrl = useDuckyStore((s) => s.settings.baseUrl);
+function ModelMenu({ onDone }: { onDone: () => void }) {  const baseUrl = useDuckyStore((s) => s.settings.baseUrl);
   const apiKey = useDuckyStore((s) => s.settings.apiKey);
   const model = useDuckyStore((s) => s.settings.model);
   const [profiles] = React.useState<ModelProfile[]>(() => listProfiles());
@@ -248,7 +246,10 @@ function ModelMenu({ onDone }: { onDone: () => void }) {
       >
         <Cpu className="size-3.5 shrink-0 text-[#FF7A1A]" aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-mono text-xs font-semibold">{modelDisplayName(model)}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="truncate font-mono text-xs font-semibold">{modelDisplayName(model)}</span>
+            <ModelBadges modelId={model} />
+          </span>
           <span className="block truncate text-[10px] text-muted-foreground">
             {providerOf(baseUrl)} · key {maskKeyHint(apiKey)}
           </span>
@@ -278,7 +279,10 @@ function ModelMenu({ onDone }: { onDone: () => void }) {
                   )}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium">{p.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium">{p.name}</span>
+                    <ModelBadges modelId={p.model} />
+                  </span>
                   <span className="block truncate font-mono text-[10px] text-muted-foreground">
                     {modelDisplayName(p.model)} · {maskKeyHint(p.apiKey)}
                   </span>

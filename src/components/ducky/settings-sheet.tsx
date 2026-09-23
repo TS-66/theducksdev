@@ -54,6 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useDuckyStore } from "@/lib/ducky/store";
 import { modelDisplayName } from "@/lib/ducky/models";
+import { inferModelCapabilities } from "@/lib/ducky/model-capabilities";
 import { discoverModels, testConnection, type ConnectionTest } from "@/lib/ducky/connection";
 import {
   addMcpServer,
@@ -567,10 +568,13 @@ export function SettingsSheet({ open, onOpenChange, initialTab }: SettingsSheetP
                           key={m}
                           type="button"
                           onClick={() => patch({ model: m })}
-                          title={m}
-                          className="max-w-44 truncate rounded-full border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-[#FF7A1A]/50 hover:text-foreground"
+                          title={`${m}${inferModelCapabilities(m).inputFormat.supportsImage ? " · vision" : ""}`}
+                          className="flex max-w-44 items-center gap-1 truncate rounded-full border px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-[#FF7A1A]/50 hover:text-foreground"
                         >
-                          {m}
+                          {inferModelCapabilities(m).inputFormat.supportsImage && (
+                            <Eye className="size-2.5 shrink-0 text-sky-400" aria-hidden />
+                          )}
+                          <span className="truncate">{m}</span>
                         </button>
                       ))}
                     </div>

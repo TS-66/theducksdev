@@ -28,6 +28,15 @@ which is licensed Apache-2.0, © Z.ai:
   `dep-refs` (symbol reference tracing before deletes),
   `dogfood` (repro-first exploratory QA reports),
   `electron` (remote-debugging-port desktop automation);
+- the `react-perf` playbook distilled from Vercel's `react-best-practices`
+  skill (MIT, via ZCode): waterfall/bundle/server/re-render rules by impact;
+- `src/lib/ducky/zcode-vendor/tab-search.ts`
+  (upstream `packages/ui/src/app-shell/sidePaneTabSearch.ts`) — weighted
+  multi-token search ranking consumed by the activity ledger filter;
+- `src/lib/ducky/model-capabilities.ts` — capability-flag contract adapted
+  from ZCode's model-config schema plus id-heuristic inference, context
+  chips and provider grouping consumed by the composer model menu and the
+  Connections tab (vision badges, discovered-model chips).
 - the computer-use contract shapes (broker error codes, read-only vs
   mutating route split, accessibility/screenRecording permission status)
   behind `src/lib/ducky/pc.ts` — our bridge protocol itself is original.

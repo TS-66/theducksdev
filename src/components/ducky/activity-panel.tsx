@@ -68,6 +68,11 @@ import {
 import type { Session } from "@/lib/ducky/types";
 import { getToolMeta } from "./tool-meta";
 import { DiffView } from "./diff-view";
+import {
+  buildSearchFields,
+  filterAndRankSearchItems,
+  normalizeSearchQuery,
+} from "@/lib/ducky/zcode-vendor/tab-search";
 
 interface ActivityPanelProps {
   open: boolean;
@@ -217,17 +222,21 @@ function LedgerBrowser({
   }, [entries]);
 
   const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return entries.filter((e) => {
-      if (!entryMatchesFilter(e, filter)) return false;
-      if (!q) return true;
-      return (
-        e.title.toLowerCase().includes(q) ||
-        (e.detail ?? "").toLowerCase().includes(q) ||
-        (e.toolName ?? "").toLowerCase().includes(q) ||
-        (e.files ?? []).some((f) => f.toLowerCase().includes(q))
-      );
-    });
+    const inScope = entries.filter((e) => entryMatchesFilter(e, filter));
+    const parts = normalizeSearchQuery(query);
+    if (parts.length === 0) return inScope;
+    // ZCode weighted rank: title-prefix > word-prefix > title > hint > kind.
+    return filterAndRankSearchItems(
+      inScope.map((entry) => ({
+        entry,
+        searchFields: buildSearchFields(
+          entry.title,
+          [entry.detail ?? "", entry.toolName ?? "", ...(entry.files ?? [])].join(" "),
+          entry.kind,
+        ),
+      })),
+      parts,
+    ).map((r) => r.entry);
   }, [entries, filter, query]);
 
   return (
