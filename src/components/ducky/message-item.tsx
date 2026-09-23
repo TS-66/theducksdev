@@ -95,17 +95,15 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className="flex items-start justify-between gap-3"
+        className="border-l-2 pl-4"
+        style={{ borderColor: "var(--traj-user)" }}
       >
-        <div className="ducky-glass min-w-0 flex-1 rounded-2xl px-4 py-3">
-          <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed">
-            <span aria-hidden className="mr-2 select-none font-mono" style={{ color: "var(--traj-user)" }}>
-              ❯
-            </span>
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
             {m.content}
           </p>
+          <Stamp t={m.createdAt} />
         </div>
-        <Stamp t={m.createdAt} />
       </motion.div>
     );
   }
@@ -125,11 +123,13 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="group/msg space-y-1"
+      className="group/msg space-y-1 border-l-2 pl-4"
+      style={{ borderColor: "var(--traj-assistant)" }}
     >
       <div className="flex items-start justify-between gap-3">
-        <span aria-hidden className="select-none font-mono text-sm leading-6" style={{ color: "var(--traj-assistant)" }}>
-          ✦
+        <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: "var(--traj-assistant)" }} />
+          ducky
         </span>
         <div className="flex items-center gap-1.5">
           <UsageChip message={m} />
@@ -147,7 +147,7 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         </div>
       </div>
 
-      <div className="-mt-1 space-y-2.5 pl-6">
+      <div className="-mt-0.5 space-y-2.5">
         {Boolean(m.reasoning?.trim()) && m.reasoning && (
           <ReasoningCard text={m.reasoning} streaming={m.status === "streaming"} />
         )}

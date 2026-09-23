@@ -720,7 +720,7 @@ export default function DuckyCoderPage() {
                 className="size-7 rounded-lg border border-white/10 bg-black shadow-[0_0_16px_-4px_rgba(255,122,26,0.6)]"
               />
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="font-pixel truncate text-[11px] text-foreground">Ducky AI</p>
+                <p className="font-pixel truncate text-[13px] leading-none text-foreground">Ducky AI</p>
                 <p className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
                   <span
                     aria-hidden

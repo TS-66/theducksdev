@@ -134,7 +134,7 @@ export function Hero({
       />
 
       {/* eyebrow + headline */}
-      <p className="ducky-fade-up font-pixel relative mt-12 text-[10px] uppercase text-[#FF7A1A] md:mt-16">
+      <p className="ducky-fade-up font-pixel relative mt-12 text-xs uppercase text-[#FF7A1A] md:mt-16">
         {greeting} · ducky ai
       </p>
       <h1 className="ducky-headline ducky-fade-up t-display relative mt-3 max-w-3xl [animation-delay:80ms]">
