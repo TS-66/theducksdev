@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, ArrowRight, Command, Menu, PanelRight, Puzzle, Settings, SquareTerminal } from "lucide-react";
+import { Command, Menu, PanelRight, Puzzle, Settings, SquareTerminal } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -31,6 +31,7 @@ import {
   IdeFilePreview,
   IdeInspector,
   IdeTabBar,
+  IdeActivityRail,
   type CenterTab,
 } from "@/components/ducky/ide-panels";
 import { BrowserPanel } from "@/components/ducky/browser-panel";
@@ -86,6 +87,7 @@ export default function DuckyCoderPage() {
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const projects = useDuckyStore((s) => s.projects);
   const activeProjectId = useDuckyStore((s) => s.activeProjectId);
+  const topbarModel = useDuckyStore((s) => s.settings.model);
 
   const [input, setInput] = React.useState("");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
@@ -641,7 +643,7 @@ export default function DuckyCoderPage() {
   const previewContent = previewPath ? (activeSession?.workspace[previewPath] ?? "") : "";
 
   return (
-    <div className="ducky-ide-shell flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
+    <div className="ducky-ide-shell ducky-v3-app flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
       {/* mobile mini bar (desktop uses the sidebar for everything) */}
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 lg:hidden">
         <button
@@ -707,21 +709,38 @@ export default function DuckyCoderPage() {
         </div>
       )}
 
-      {/* App body row: sidebar + center + inspector */}
+      {/* App body row: rail + sidebar + center + inspector */}
       <div className="flex min-h-0 flex-1">
+        {/* icon rail — Pond OS v3: VSCode-style strip */}
+        <div className="ducky-v3-rail hidden shrink-0 md:block">
+          <IdeActivityRail
+            leftOpen={leftOpen}
+            onToggleLeft={() => setLeftOpen((v) => !v)}
+            onRail={(v) => {
+              setLeftOpen(true);
+              if (v === "search") setPaletteOpen(true);
+              if (v === "source") setActivityOpen(true);
+              if (v === "plugins") setPluginsOpen(true);
+            }}
+            onOpenPlugins={() => setPluginsOpen(true)}
+            onOpenSettings={() => openSettings()}
+            onOpenPalette={() => setPaletteOpen(true)}
+            onOpenActivity={() => setActivityOpen(true)}
+          />
+        </div>
         {/* desktop sidebar */}
         {leftOpen && (
-          <aside className="hidden w-[320px] shrink-0 flex-col border-r border-white/[0.06] bg-transparent lg:flex">
+          <aside className="ducky-v3-side hidden w-[300px] shrink-0 flex-col border-r border-white/[0.06] lg:flex">
             {/* identity */}
             <div className="flex h-14 shrink-0 items-center gap-2.5 px-4">
               <img
                 src="/ducky-mark.png"
                 alt="Ducky AI logo"
-                className="size-7 rounded-lg border border-white/10 bg-black shadow-[0_0_16px_-4px_rgba(255,122,26,0.6)]"
+                className="ducky-v3-logo-ring size-8 rounded-xl border border-white/10 bg-black"
               />
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="font-pixel truncate text-[13px] leading-none text-foreground">Ducky AI</p>
-                <p className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+                <p className="font-pixel truncate text-[12px] leading-none text-foreground">DUCKY</p>
+                <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
                   <span
                     aria-hidden
                     className={cn(
@@ -729,29 +748,9 @@ export default function DuckyCoderPage() {
                       agent.running ? "ducky-pulse-dot bg-amber-400" : "bg-emerald-400",
                     )}
                   />
-                  {agent.running ? "working" : "ready"}
+                  {agent.running ? "working…" : "pond ready"}
                 </p>
               </div>
-              <span className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  aria-label="Back"
-                  title="Back"
-                  onClick={() => window.history.back()}
-                  className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                >
-                  <ArrowLeft className="size-3.5" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Forward"
-                  title="Forward"
-                  onClick={() => window.history.forward()}
-                  className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                >
-                  <ArrowRight className="size-3.5" aria-hidden />
-                </button>
-              </span>
               <button
                 type="button"
                 aria-label="Hide sidebar (⌘B)"
@@ -761,21 +760,27 @@ export default function DuckyCoderPage() {
                 ✕
               </button>
             </div>
-            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/[0.06] px-3">
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Explorer
-              </span>
-              <span className="truncate font-mono text-[10px] text-muted-foreground/60">
-                {activeProject?.name ?? activeSession?.projectName ?? "no project"}
-              </span>
+            {/* big new-task action */}
+            <div className="shrink-0 px-3 pb-2">
               <button
                 type="button"
-                aria-label="Hide sidebar (⌘B)"
-                onClick={() => setLeftOpen(false)}
-                className="ml-auto rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                onClick={() => {
+                  useDuckyStore.getState().newSession();
+                  toast.success("New task created");
+                }}
+                className="ducky-v3-newtask flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold"
               >
-                ✕
+                <span aria-hidden className="text-base leading-none">+</span> New chat
+                <kbd className="ml-1 rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px] font-medium">⌘K</kbd>
               </button>
+            </div>
+            <div className="flex h-9 shrink-0 items-center gap-2 border-b border-white/[0.06] px-4">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                Workspace
+              </span>
+              <span className="truncate font-mono text-[10px] text-muted-foreground/50">
+                {activeProject?.name ?? activeSession?.projectName ?? "sandbox"}
+              </span>
             </div>
             <div className="min-h-0 flex-1">
               <Sidebar
@@ -844,7 +849,55 @@ export default function DuckyCoderPage() {
         </Sheet>
 
         {/* center column: chat/file + composer (tabs appear only with open files) */}
-        <main className="flex min-w-0 flex-1 flex-col bg-background">
+        <main className="flex min-w-0 flex-1 flex-col bg-transparent">
+          {/* Pond OS v3 topbar: breadcrumb + model + quick actions */}
+          <div className="ducky-v3-topbar flex h-12 shrink-0 items-center gap-2 px-3">
+            {!leftOpen && (
+              <button
+                type="button"
+                aria-label="Show sidebar (⌘B)"
+                onClick={() => setLeftOpen(true)}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              >
+                <Menu className="size-4" aria-hidden />
+              </button>
+            )}
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[13px] font-semibold tracking-tight">
+                {activeSession?.title ?? "New task"}
+              </p>
+              <p className="truncate font-mono text-[10px] text-muted-foreground/70">
+                {activeProject?.name ?? activeSession?.projectName ?? "sandbox"} · {modelDisplayName(topbarModel)} · {messageCount} msgs
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Command palette (⌘P)"
+              onClick={() => setPaletteOpen(true)}
+              className="hidden rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground hover:border-[#FF7A1A]/40 hover:text-foreground sm:block"
+            >
+              ⌘P search
+            </button>
+            <button
+              type="button"
+              aria-label="Toggle terminal"
+              onClick={() => setTerminalOpen((v) => !v)}
+              className={cn(
+                "rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                terminalOpen && "bg-white/[0.07] text-foreground",
+              )}
+            >
+              <SquareTerminal className="size-4" aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label="Settings"
+              onClick={() => openSettings()}
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            >
+              <Settings className="size-4" aria-hidden />
+            </button>
+          </div>
           {(previewPath || browserCount > 0) && (
             <IdeTabBar
             tab={effectiveTab}

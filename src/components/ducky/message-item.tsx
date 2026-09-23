@@ -95,14 +95,15 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className="border-l-2 pl-4"
-        style={{ borderColor: "var(--traj-user)" }}
+        className="flex justify-end"
       >
-        <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+        <div className="ducky-v3-bubble-user max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5">
+          <p className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed">
             {m.content}
           </p>
-          <Stamp t={m.createdAt} />
+          <p className="mt-1 text-right font-mono text-[9px] text-muted-foreground/60">
+            {new Date(m.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+          </p>
         </div>
       </motion.div>
     );
@@ -123,12 +124,18 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="group/msg space-y-1 border-l-2 pl-4"
-      style={{ borderColor: "var(--traj-assistant)" }}
+      className="group/msg flex gap-2.5"
     >
+      <img
+        src="/ducky-mark.png"
+        alt=""
+        aria-hidden
+        className="mt-0.5 size-7 shrink-0 rounded-lg border border-white/10 bg-black"
+      />
+      <div className="ducky-v3-assistant min-w-0 flex-1 rounded-2xl rounded-tl-md px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <span aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: "var(--traj-assistant)" }} />
+          <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-400" />
           ducky
         </span>
         <div className="flex items-center gap-1.5">
@@ -189,13 +196,14 @@ export function MessageItem({ message: m, toolResults, sessionRunning }: Message
             {(m.toolCalls ?? []).map((call) => (
               <ToolCallCard
                 key={call.id}
-                call={call}
                 result={toolResults.get(call.id)}
+                call={call}
                 running={sessionRunning && m.status === "streaming"}
               />
             ))}
           </div>
         )}
+      </div>
       </div>
     </motion.div>
   );

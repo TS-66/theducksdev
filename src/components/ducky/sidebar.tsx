@@ -83,7 +83,7 @@ function NavRow({
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-foreground/80 transition-colors hover:bg-white/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13.5px] text-foreground/75 transition-colors hover:bg-white/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <span className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground">
         {icon}
@@ -234,8 +234,8 @@ export function Sidebar({ onAfterSelect, onPreviewFile, onOpenPalette, onOpenAct
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* primary nav — ZCode-style rows with hints */}
-      <nav aria-label="Primary" className="space-y-0.5 px-2 pb-1 pt-2">
+      {/* primary nav — Pond OS v3 rows */}
+      <nav aria-label="Primary" className="space-y-0.5 px-2 pb-1 pt-1">
         <NavRow
           icon={<Plus className="size-4" aria-hidden />}
           label="New task"
@@ -706,9 +706,9 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex items-center rounded-lg transition-colors",
+        "group relative flex items-center rounded-xl border border-transparent transition-colors",
         active
-          ? "bg-white/[0.07] text-foreground ring-1 ring-white/10"
+          ? "ducky-v3-session-active text-foreground"
           : "hover:bg-white/[0.04] focus-within:bg-white/[0.04]",
       )}
     >

@@ -242,7 +242,7 @@ export function StatusBar({
 
   return (
     <footer
-      className="z-20 flex h-6 shrink-0 items-center justify-between gap-4 border-t border-white/[0.06] bg-black/40 px-3 font-mono text-[10px] text-muted-foreground"
+      className="ducky-v3-topbar z-20 flex h-7 shrink-0 items-center justify-between gap-4 px-3 font-mono text-[10px] text-muted-foreground"
       role="status"
       aria-label="Status bar"
     >

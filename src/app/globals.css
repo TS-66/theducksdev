@@ -85,23 +85,23 @@
 }
 
 .dark {
-  --background: #161616;
+  --background: #07090d;
   --foreground: #f4f4f5;
-  --card: #2b2b2b;
+  --card: #10141b;
   --card-foreground: #f4f4f5;
-  --popover: #2b2b2b;
+  --popover: #10141b;
   --popover-foreground: #f4f4f5;
   --primary: #ff7a1a;
   --primary-foreground: #1c0e02;
-  --secondary: #202020;
+  --secondary: #151a23;
   --secondary-foreground: #f4f4f5;
-  --muted: #202020;
+  --muted: #151a23;
   --muted-foreground: #a1a1aa;
-  --accent: #26262b;
+  --accent: #1b212c;
   --accent-foreground: #f4f4f5;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: rgb(255 255 255 / 0.1);
-  --input: rgb(255 255 255 / 0.12);
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.1);
   --ring: #ff7a1a;
   /* trajectory role colors (ZCode Zai Dark): user blue, assistant teal,
      reasoning violet, tool-call amber, tool-result sky */
@@ -412,6 +412,106 @@
 }
 .ducky-glow-breathe {
   animation: ducky-glow-breathe 3.2s ease-in-out infinite;
+}
+
+/* ─────────────────── Pond OS v3 (brand-new UI) ─────────────────── */
+
+.ducky-v3-app {
+  background:
+    radial-gradient(1000px 380px at 50% -8%, rgba(255, 122, 26, 0.12), transparent 70%),
+    radial-gradient(700px 500px at 8% 110%, rgba(45, 212, 191, 0.07), transparent 65%),
+    radial-gradient(700px 500px at 95% 100%, rgba(139, 92, 246, 0.09), transparent 65%),
+    #07090d;
+}
+
+.ducky-v3-rail {
+  background: rgba(255, 255, 255, 0.015);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ducky-v3-side {
+  background: rgba(13, 17, 23, 0.72) !important;
+  backdrop-filter: blur(14px);
+}
+
+.ducky-v3-topbar {
+  background: rgba(7, 9, 13, 0.7);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ducky-v3-headline {
+  background: linear-gradient(180deg, #fff 20%, #ffd9b3 55%, #ff7a1a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.035em;
+}
+
+.ducky-v3-logo-ring {
+  box-shadow:
+    0 0 0 1px rgba(255, 122, 26, 0.35),
+    0 0 44px -6px rgba(255, 122, 26, 0.55),
+    0 18px 50px -18px rgba(0, 0, 0, 0.8);
+}
+
+.ducky-v3-composer {
+  background: linear-gradient(180deg, rgba(26, 32, 42, 0.95), rgba(13, 17, 23, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+    0 24px 70px -28px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 122, 26, 0.06);
+  backdrop-filter: blur(16px);
+}
+.ducky-v3-composer:focus-within {
+  border-color: rgba(255, 122, 26, 0.5);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 0 4px rgba(255, 122, 26, 0.12),
+    0 24px 70px -24px rgba(255, 122, 26, 0.35);
+}
+
+.ducky-v3-action-card {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.ducky-v3-action-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 122, 26, 0.45);
+  background: rgba(255, 122, 26, 0.06);
+  box-shadow: 0 16px 40px -18px rgba(255, 122, 26, 0.45);
+}
+
+.ducky-v3-newtask {
+  background: linear-gradient(180deg, #ffa04d, #f96a0a);
+  color: #1c0e02;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.45) inset,
+    0 10px 28px -10px rgba(255, 122, 26, 0.6);
+  transition: filter 150ms ease, transform 120ms ease;
+}
+.ducky-v3-newtask:hover {
+  filter: brightness(1.07);
+}
+.ducky-v3-newtask:active {
+  transform: scale(0.98);
+}
+
+.ducky-v3-bubble-user {
+  background: linear-gradient(180deg, rgba(255, 122, 26, 0.16), rgba(255, 122, 26, 0.08));
+  border: 1px solid rgba(255, 122, 26, 0.28);
+}
+
+.ducky-v3-assistant {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ducky-v3-session-active {
+  background: rgba(255, 122, 26, 0.1) !important;
+  border: 1px solid rgba(255, 122, 26, 0.3) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

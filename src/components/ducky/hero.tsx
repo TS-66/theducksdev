@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { useDuckyStore } from "@/lib/ducky/store";
 import {
+  ArrowUpRight,
   FolderPlus,
   HardDrive,
   History,
@@ -15,23 +16,19 @@ import {
 
 interface HeroProps {
   onPick: (prompt: string, opts?: { planMode?: boolean }) => void;
-  /** centered zcode-style composer slot (rendered by the page) */
   children?: React.ReactNode;
-  /** active project, when one exists (drives the adaptive suggestions) */
   projectName?: string | null;
   projectFileCount?: number;
-  /** open the create-project dialog */
   onNewProject?: () => void;
-  /** connect a real local folder (File System Access API picker) */
   onConnectDisk?: () => void;
 }
 
 function greetingForHour(h: number): string {
-  if (h >= 5 && h < 11) return "Morning, fresh start";
-  if (h >= 11 && h < 14) return "Midday, keep it flowing";
-  if (h >= 14 && h < 18) return "Afternoon, nice progress";
-  if (h >= 18 && h < 23) return "Evening, nice work today";
-  return "Night shift, quiet hours";
+  if (h >= 5 && h < 11) return "Good morning";
+  if (h >= 11 && h < 14) return "Good midday";
+  if (h >= 14 && h < 18) return "Good afternoon";
+  if (h >= 18 && h < 23) return "Good evening";
+  return "Night shift";
 }
 
 export function Hero({
@@ -42,14 +39,11 @@ export function Hero({
   onNewProject,
   onConnectDisk,
 }: HeroProps) {
-  // client-only greeting: computed lazily on mount state (no render-phase effect)
   const [greeting] = React.useState(() =>
     typeof window === "undefined" ? "Hello there" : greetingForHour(new Date().getHours()),
   );
 
   const hasFiles = projectFileCount > 0;
-
-  /** recent non-empty tasks to jump back into */
   const sessions = useDuckyStore((s) => s.sessions);
   const recent = React.useMemo(
     () =>
@@ -60,54 +54,56 @@ export function Hero({
     [sessions],
   );
 
-  /* dim one-line suggestions — adapt to whether the project has files */
-  const dimList = hasFiles
+  const actions = hasFiles
     ? ([
         {
           icon: <ScrollText className="size-4 text-emerald-400" aria-hidden />,
-          text: "Summarize this repository and identify its main packages",
+          title: "Summarize repo",
+          text: "Packages, entry points, risks",
           prompt: "Summarize this repository and identify its main packages",
         },
         {
           icon: <SquareTerminal className="size-4 text-red-400" aria-hidden />,
-          text: "bash tree && head -n 12 README.md",
+          title: "Inspect workspace",
+          text: "bash tree + README scan",
           prompt: "bash tree && head -n 12 README.md",
         },
         {
           icon: <Presentation className="size-4 text-orange-400" aria-hidden />,
-          text: "Add a LICENSE file and a deploy script",
+          title: "Ship something",
+          text: "LICENSE + deploy script",
           prompt: "Add a LICENSE file and a deploy script",
         },
         {
           icon: <MessageCircleQuestion className="size-4 text-sky-400" aria-hidden />,
-          text: `Interview me about the style of ${projectName ?? "this project"}`,
+          title: "Style interview",
+          text: `Tune ${projectName ?? "this project"} with me`,
           prompt: "Interview me about the style of this project",
         },
       ] as const)
     : ([
         {
           icon: <FolderPlus className="size-4 text-[#FF7A1A]" aria-hidden />,
-          text: "Create a project — empty, sample repo, or import your own folder",
+          title: "New project",
+          text: "Empty, sample, or import",
           action: "new-project" as const,
         },
         {
           icon: <HardDrive className="size-4 text-cyan-400" aria-hidden />,
-          text: "Connect a folder on your computer — read & edit real files",
+          title: "Connect folder",
+          text: "Edit real files on disk",
           action: "connect-disk" as const,
         },
         {
-          icon: <Presentation className="size-4 text-orange-400" aria-hidden />,
-          text: "Write a checklist for a refactor I have in mind",
-          prompt: "Write a checklist for a refactor I have in mind",
-        },
-        {
           icon: <MessageCircleQuestion className="size-4 text-sky-400" aria-hidden />,
-          text: "Interview me about an idea before writing any code",
+          title: "Brainstorm",
+          text: "Interview me before code",
           prompt: "Interview me about an idea before writing any code",
         },
         {
           icon: <ScrollText className="size-4 text-emerald-400" aria-hidden />,
-          text: "search the web for the latest ai coding agents",
+          title: "Research",
+          text: "Latest AI coding agents",
           prompt: "search the web for the latest ai coding agents",
         },
       ] as const);
@@ -117,66 +113,58 @@ export function Hero({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="relative flex min-h-full min-w-0 flex-col items-center justify-center overflow-hidden py-8 text-center"
+      className="relative mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-4 py-10 text-center"
     >
-      {/* ambient orbs + faint mark */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="ducky-orb absolute left-1/2 top-2 size-72 -translate-x-1/2 rounded-full bg-[#FF7A1A]/[0.13] blur-[110px] md:size-[28rem]" />
-        <div className="ducky-orb absolute left-[12%] top-44 size-56 rounded-full bg-violet-500/[0.13] blur-[90px] [animation-delay:-3s]" />
-        <div className="ducky-orb absolute right-[10%] top-36 size-56 rounded-full bg-cyan-500/[0.12] blur-[90px] [animation-delay:-6s]" />
-      </div>
-      <img
-        src="/ducky-mark.png"
-        alt=""
-        aria-hidden
-        draggable={false}
-        className="pointer-events-none absolute -top-8 left-1/2 size-60 -translate-x-1/2 select-none opacity-[0.06] md:size-80"
-      />
+      {/* logo */}
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="relative"
+      >
+        <img
+          src="/ducky-mark.png"
+          alt="Ducky"
+          draggable={false}
+          className="ducky-v3-logo-ring size-20 rounded-[22px] bg-black"
+        />
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#FF7A1A]/40 bg-[#0d1117] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#FF7A1A]">
+          Pond OS · v3
+        </span>
+      </motion.div>
 
-      {/* eyebrow + headline */}
-      <p className="ducky-fade-up font-pixel relative mt-12 text-xs uppercase text-[#FF7A1A] md:mt-16">
+      <p className="font-pixel mt-6 text-[10px] uppercase text-[#FF7A1A]">
         {greeting} · ducky ai
       </p>
-      <h1 className="ducky-headline ducky-fade-up t-display relative mt-3 max-w-3xl [animation-delay:80ms]">
+      <h1 className="ducky-v3-headline mt-2 text-balance text-4xl font-extrabold leading-[1.04] md:text-5xl">
         What are we building today?
       </h1>
-
-      {/* project context line — quiet, honest about the empty slate */}
-      <p className="ducky-fade-up relative z-10 mt-3 text-xs text-muted-foreground [animation-delay:140ms]">
+      <p className="mt-3 text-[13px] text-muted-foreground">
         {projectName ? (
-          hasFiles ? (
-            <>
-              working in{" "}
-              <span className="font-mono text-[#FF7A1A]">{projectName}</span> · {projectFileCount}{" "}
-              {projectFileCount === 1 ? "file" : "files"} seeded into new tasks
-            </>
-          ) : (
-            <>
-              working in{" "}
-              <span className="font-mono text-[#FF7A1A]">{projectName}</span> · empty workspace —
-              new tasks start blank
-            </>
-          )
+          <>
+            working in <span className="font-mono text-[#FF7A1A]">{projectName}</span> ·{" "}
+            {projectFileCount} {projectFileCount === 1 ? "file" : "files"}
+          </>
         ) : (
-          <>no project selected — new tasks start in an empty sandbox</>
+          <>sandbox ready — new chats start blank, tools armed</>
         )}
       </p>
 
-      {/* centered composer slot */}
+      {/* composer */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.16, ease: "easeOut" }}
-        className="relative z-10 mt-7 w-full max-w-3xl px-4"
+        transition={{ duration: 0.4, delay: 0.12, ease: "easeOut" }}
+        className="mt-6 w-full"
       >
         {children}
       </motion.div>
 
-      {/* suggestion chips */}
-      <div className="relative z-10 mt-4 flex w-full max-w-3xl flex-wrap items-center justify-center gap-2 px-4">
-        {dimList.map((s) => (
+      {/* action grid — the new style: 2x2 cards */}
+      <div className="mt-4 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+        {actions.map((s) => (
           <button
-            key={s.text}
+            key={s.title}
             type="button"
             onClick={() => {
               if ("action" in s && s.action === "new-project") {
@@ -189,21 +177,24 @@ export function Hero({
               }
               if ("prompt" in s && s.prompt) onPick(s.prompt);
             }}
-            title={s.text}
-            className="group flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] py-1.5 pl-2.5 pr-3 backdrop-blur transition-all hover:-translate-y-px hover:border-[#FF7A1A]/50 hover:bg-[#FF7A1A]/[0.07] hover:shadow-[0_8px_24px_-12px_rgba(253,192,10,0.5)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="ducky-v3-action-card group flex items-center gap-3 rounded-2xl p-3 text-left"
           >
-            <span className="shrink-0 opacity-80">{s.icon}</span>
-            <span className="truncate text-xs text-muted-foreground transition-colors group-hover:text-foreground">
-              {s.text}
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-white/10">
+              {s.icon}
             </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold">{s.title}</span>
+              <span className="block truncate text-xs text-muted-foreground">{s.text}</span>
+            </span>
+            <ArrowUpRight className="size-4 shrink-0 text-muted-foreground/50 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#FF7A1A]" />
           </button>
         ))}
       </div>
 
-      {/* jump back in */}
+      {/* recent */}
       {recent.length > 0 && (
-        <div className="relative z-10 mt-6 w-full max-w-3xl px-4">
-          <p className="mb-2 flex items-center gap-1.5 px-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+        <div className="mt-6 w-full">
+          <p className="mb-2 flex items-center justify-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/60">
             <History className="size-3" aria-hidden /> Jump back in
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -212,13 +203,11 @@ export function Hero({
                 key={s.id}
                 type="button"
                 onClick={() => useDuckyStore.getState().selectSession(s.id)}
-                className="group rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-left transition-all hover:-translate-y-px hover:border-white/[0.15] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="ducky-v3-action-card rounded-2xl p-3 text-left"
               >
-                <span className="block truncate text-[13px] font-medium group-hover:text-foreground">
-                  {s.title}
-                </span>
+                <span className="block truncate text-[13px] font-medium">{s.title}</span>
                 <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
-                  {s.messages.filter((m) => m.role === "user" || m.role === "assistant").length} messages
+                  {s.messages.filter((m) => m.role === "user" || m.role === "assistant").length} msgs
                   {s.projectName ? ` · ${s.projectName}` : ""}
                 </span>
               </button>
@@ -226,7 +215,6 @@ export function Hero({
           </div>
         </div>
       )}
-
     </motion.div>
   );
 }

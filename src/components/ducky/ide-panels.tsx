@@ -51,9 +51,9 @@ export function IdeActivityRail({
   onOpenActivity: () => void;
 }) {
   const btn =
-    "flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+    "flex size-9 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
   return (
-    <div className="hidden w-12 shrink-0 flex-col items-center gap-1 border-r bg-muted/20 py-2 md:flex">
+    <div className="hidden w-[52px] shrink-0 flex-col items-center gap-1 py-2 md:flex">
       <button type="button" aria-label="Toggle sidebar" onClick={onToggleLeft} className={cn(btn, leftOpen && "bg-accent text-foreground")}>
         <PanelLeft className="size-4" />
       </button>
@@ -110,7 +110,7 @@ export function IdeTabBar({
   onToggleRight: () => void;
 }) {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 border-b bg-muted/20 px-2">
+    <div className="flex h-10 shrink-0 items-center gap-1 border-b border-white/[0.06] bg-white/[0.015] px-2">
       <div role="tablist" aria-label="Editor tabs" className="flex min-w-0 items-center gap-1">
         <button
           role="tab"

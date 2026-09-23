@@ -276,10 +276,6 @@ export function Composer({
     }
   };
 
-  const focusGlow = cn(
-    "focus-within:border-[#FF7A1A]/50 focus-within:shadow-[0_0_0_4px_rgba(253,192,10,0.14),0_24px_64px_-24px_rgba(253,192,10,0.45)]",
-  );
-
   const fileInput = (
     <input
       ref={fileInputRef}
@@ -302,8 +298,7 @@ export function Composer({
       <div className="w-full">
         <div
           className={cn(
-            "ducky-glass group/composer relative rounded-[26px] transition-all duration-200",
-            focusGlow,
+            "ducky-v3-composer group/composer relative rounded-[20px] transition-all duration-200",
           )}
         >
           {/* focus glow hairline (top edge) */}
@@ -464,8 +459,7 @@ export function Composer({
   const surface = (
     <div
       className={cn(
-        "ducky-glass group/composer relative mx-auto w-full max-w-3xl rounded-[22px] transition-all duration-200",
-        focusGlow,
+        "ducky-v3-composer group/composer relative mx-auto w-full max-w-3xl rounded-[20px] transition-all duration-200",
         disabledSurface && "opacity-70",
       )}
     >

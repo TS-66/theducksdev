@@ -72,7 +72,7 @@ export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: 
       /* plain overflow container — Radix ScrollArea's display:table content
          wrapper would let the hero's intrinsic width stretch the viewport */
       <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
-        <div className="ducky-grid-bg mx-auto min-h-full w-full max-w-5xl px-4 py-6 md:px-8">
+        <div className="mx-auto min-h-full w-full max-w-3xl px-4 py-6 md:px-8">
           <Hero onPick={onPick} {...heroProps}>{composerSlot}</Hero>
         </div>
       </div>
@@ -82,7 +82,7 @@ export function ChatStream({ sessionRunning, onPick, composerSlot, heroProps }: 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <ScrollArea ref={rootRef} className="min-h-0 flex-1">
-        <div className="ducky-grid-bg mx-auto max-w-[46rem] space-y-7 px-4 py-8 md:px-6">
+        <div className="mx-auto max-w-[46rem] space-y-5 px-4 py-8 md:px-6">
           {visible.map((m) => (
             <MessageItem
               key={m.id}
