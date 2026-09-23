@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Command, Menu, Puzzle, Settings, SquareTerminal } from "lucide-react";
+import { Command, Menu, PanelRight, Puzzle, Settings, SquareTerminal } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
-import { fmtK } from "@/components/ducky/format";
 import {
   APP_VERSION,
   checkForUpdate,
@@ -124,7 +123,7 @@ export default function DuckyCoderPage() {
 
   /* ── IDE shell state ── */
   const [leftOpen, setLeftOpen] = React.useState(true);
-  const [rightOpen, setRightOpen] = React.useState(true);
+  const [rightOpen, setRightOpen] = React.useState(false);
   const [centerTab, setCenterTab] = React.useState<CenterTab>("chat");
 
   const agent = useDuckyAgent();
@@ -798,6 +797,9 @@ export default function DuckyCoderPage() {
               <SideFootButton label="Plugins" onClick={() => setPluginsOpen(true)}>
                 <Puzzle className="size-4" aria-hidden />
               </SideFootButton>
+              <SideFootButton label={rightOpen ? "Hide inspector" : "Show inspector"} onClick={() => setRightOpen((v) => !v)} active={rightOpen}>
+                <PanelRight className="size-4" aria-hidden />
+              </SideFootButton>
               <SideFootButton label="Settings" onClick={() => openSettings()}>
                 <Settings className="size-4" aria-hidden />
               </SideFootButton>
@@ -841,37 +843,10 @@ export default function DuckyCoderPage() {
           </SheetContent>
         </Sheet>
 
-        {/* center column: tabs + chat/file + composer */}
+        {/* center column: chat/file + composer (tabs appear only with open files) */}
         <main className="flex min-w-0 flex-1 flex-col bg-background">
-          {/* task strip — goal, scope, cost at a glance */}
-          {!heroState && activeSession && (
-            <div className="flex h-9 shrink-0 items-center gap-2 overflow-hidden border-b bg-muted/10 px-3">
-              <span
-                aria-hidden
-                className={cn(
-                  "size-1.5 shrink-0 rounded-full",
-                  agent.running ? "ducky-pulse-dot bg-amber-400" : "bg-emerald-400",
-                )}
-              />
-              <span className="truncate text-xs font-semibold">{activeSession.title}</span>
-              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                {Object.keys(activeSession.workspace).length} files
-              </span>
-              <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground sm:inline">
-                {fmtK(activeSession.stats.promptTokens + activeSession.stats.completionTokens)} tok ·{" "}
-                {activeSession.stats.toolCalls} tools
-              </span>
-              {activeSession.planMode && (
-                <span className="shrink-0 rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wide text-violet-300">
-                  plan
-                </span>
-              )}
-              <span className="ml-auto hidden shrink-0 font-mono text-[10px] text-muted-foreground/60 md:inline">
-                {agent.running ? "working…" : "idle"}
-              </span>
-            </div>
-          )}
-          <IdeTabBar
+          {(previewPath || browserCount > 0) && (
+            <IdeTabBar
             tab={effectiveTab}
             onTab={(t) => {
               if (t === "file" && !previewPath) return;
@@ -886,7 +861,8 @@ export default function DuckyCoderPage() {
             browserCount={browserCount}
             rightOpen={rightOpen}
             onToggleRight={() => setRightOpen((v) => !v)}
-          />
+            />
+          )}
 
           <div className="flex min-h-0 flex-1 flex-col">
             {effectiveTab === "file" && previewPath ? (

@@ -961,6 +961,7 @@ if (!wantsWeb) {
 const DEV = has("--dev");
 const NO_OPEN = has("--no-open");
 const NO_BUILD = has("--no-build");
+const FORCE_REBUILD = has("--rebuild");
 let port = parseInt(valueOf("--port", valueOf("-p", "3000")), 10);
 if (!Number.isFinite(port) || port < 1 || port > 65535) port = 3000;
 // Default is explicit IPv4 loopback (not "localhost"): on some machines
@@ -1001,11 +1002,49 @@ function runNextBuild() {
   if (res.status !== 0) fail("`next build` failed. Fix errors above and retry (or use --dev).");
 }
 
-if (!DEV && !NO_BUILD && !fs.existsSync(path.join(APP_DIR, ".next"))) {
-  // Allow CI-style isolated dist dir too
-  if (process.env.NEXT_DIST_DIR && fs.existsSync(path.join(APP_DIR, process.env.NEXT_DIST_DIR))) {
-    // ok
-  } else {
+function newestSourceMtime() {
+  // Newest mtime across everything that affects the build output.
+  const roots = ["src", "public", "bin", "package.json", "package-lock.json", "next.config.ts", "tsconfig.json", "tailwind.config.ts", "postcss.config.mjs", "components.json"];
+  let newest = 0;
+  const walk = (p) => {
+    let st = null;
+    try {
+      st = fs.statSync(p);
+    } catch {
+      return;
+    }
+    if (st.isDirectory()) {
+      if (path.basename(p) === "node_modules") return;
+      for (const e of fs.readdirSync(p)) walk(path.join(p, e));
+    } else if (st.mtimeMs > newest) {
+      newest = st.mtimeMs;
+    }
+  };
+  for (const r of roots) walk(path.join(APP_DIR, r));
+  return newest;
+}
+
+function buildMarkerMtime() {
+  const dist = process.env.NEXT_DIST_DIR || ".next";
+  const marker = path.join(APP_DIR, dist, "BUILD_ID");
+  try {
+    return fs.statSync(marker).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+if (!DEV && !NO_BUILD) {
+  const dist = process.env.NEXT_DIST_DIR || ".next";
+  const hasBuild = fs.existsSync(path.join(APP_DIR, dist));
+  if (!hasBuild || FORCE_REBUILD) {
+    if (FORCE_REBUILD && hasBuild) log("Forced rebuild (--rebuild)…");
+    runNextBuild();
+  } else if (newestSourceMtime() > buildMarkerMtime()) {
+    // Sources changed since the last build (e.g. after `git pull` or an
+    // update) — rebuild automatically so `ducky --web` NEVER serves a
+    // stale UI. This is why updates actually appear on screen.
+    log("Sources changed since the last build — rebuilding so you see the latest UI…");
     runNextBuild();
   }
 }
