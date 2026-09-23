@@ -41,7 +41,7 @@ which is licensed Apache-2.0, © Z.ai:
   mutating route split, accessibility/screenRecording permission status)
   behind `src/lib/ducky/pc.ts` — our bridge protocol itself is original.
 
-Two files are vendored VERBATIM from ZCode (only a notice header added),
+Six files are vendored VERBATIM from ZCode (only a notice header added),
 each carrying its Apache-2.0 attribution inline:
 - `src/lib/ducky/zcode-vendor/trajectory-role-styles.ts`
   (upstream `packages/ui/src/ModelTrajectoryRoleStyles.ts`) — role label
@@ -55,6 +55,21 @@ each carrying its Apache-2.0 attribution inline:
   override registry consumed by `trajectory-expansion.tsx` (provider with
   localStorage persistence), `message-item.tsx` (reasoning rows) and
   `tool-call-card.tsx` (tool rows).
+- `src/lib/ducky/zcode-vendor/token-number-format.ts`
+  (upstream `packages/ui/src/lib/tokenNumberFormat.ts`) — compact token
+  number formatter consumed by `format.ts` (`fmtCompact`) for the status-bar
+  totals/top sessions and the inspector stats;
+- `src/lib/ducky/zcode-vendor/path.ts`
+  (upstream `packages/ui/src/lib/path.ts`) — path leaf/directory/absolute
+  helpers consumed by the file preview header (`ide-panels.tsx`);
+- `src/lib/ducky/zcode-vendor/workspace-context-path-format.ts`
+  (upstream `packages/ui/src/WorkspaceHeaderSections/workspaceContextPathFormat.ts`) —
+  home-relative context path formatter consumed by the file preview header
+  (`ide-panels.tsx`);
+- `src/lib/ducky/zcode-vendor/mermaid-language.ts`
+  (upstream `packages/ui/src/lib/mermaidLanguage.ts`) — mermaid language
+  detection consumed by fenced-code rendering (`markdown-body.tsx`) for a
+  static display-only diagram block.
 
 No other ZCode source files are vendored here; all other implementations
 are original.

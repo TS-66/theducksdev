@@ -212,6 +212,30 @@ function ModelBadges({ modelId }: { modelId: string }) {
   );
 }
 
+/** Trigger-adjacent badges (ZCode ModelInputCapabilityBadge pattern, adapted): always show vision state + defensive context chip. */
+function ModelTriggerBadges({ modelId }: { modelId: string }) {
+  const caps = React.useMemo(() => inferModelCapabilities(modelId), [modelId]);
+  const hasVision = caps.inputFormat.supportsImage;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {hasVision ? (
+        <span title="Vision input supported (inferred from id)" className="flex items-center gap-0.5 rounded border border-sky-500/40 bg-sky-500/10 px-1 py-px font-mono text-[9px] text-sky-400">
+          <Eye className="size-2.5" aria-hidden /> vision
+        </span>
+      ) : (
+        <span title="This model id shows no vision support — image attach still saves to the workspace, but the model may not see it" className="flex items-center gap-0.5 rounded border border-border/70 px-1 py-px font-mono text-[9px] text-muted-foreground">
+          <Eye className="size-2.5" aria-hidden /> no-vision
+        </span>
+      )}
+      {caps.contextWindow !== undefined && (
+        <span title={`${caps.contextWindow.toLocaleString()} context window`} className="rounded border border-border/70 px-1 py-px font-mono text-[9px] text-muted-foreground">
+          {formatContextWindow(caps.contextWindow)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function ModelMenu({ onDone }: { onDone: () => void }) {  const baseUrl = useDuckyStore((s) => s.settings.baseUrl);
   const apiKey = useDuckyStore((s) => s.settings.apiKey);
   const model = useDuckyStore((s) => s.settings.model);
@@ -370,6 +394,8 @@ export function Composer({
   const activeSessionId = useDuckyStore((s) => s.activeSessionId);
   const policy = useDuckyStore((s) => s.settings.policy);
   const model = useDuckyStore((s) => s.settings.model);
+  const caps = React.useMemo(() => inferModelCapabilities(model), [model]);
+  const hasVision = caps.inputFormat.supportsImage;
   const disabledSurface = !hasSession;
   const hero = variant === "hero";
 
@@ -523,7 +549,7 @@ export function Composer({
                   <Plus className="size-4.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">Attach an image — saved into the workspace</TooltipContent>
+              <TooltipContent side="bottom">{hasVision ? "Attach an image — saved into the workspace" : "Model shows no vision support — image will be saved but may not be seen"}</TooltipContent>
             </Tooltip>
 
             {/* @ file mentions */}
@@ -650,6 +676,7 @@ export function Composer({
                   <ModelMenu onDone={() => setModelOpen(false)} />
                 </PopoverContent>
               </Popover>
+              <ModelTriggerBadges modelId={model} />
 
               {/* send / stop */}
               {running ? (
@@ -721,6 +748,7 @@ export function Composer({
             {modelDisplayName(model)} — set it in Settings → Connections
           </TooltipContent>
         </Tooltip>
+        <ModelTriggerBadges modelId={model} />
 
         <Popover>
           <PopoverTrigger asChild>
@@ -780,7 +808,7 @@ export function Composer({
                 <ImagePlus className="size-3.5" aria-hidden /> image
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Paste an image or pick one — saved into the virtual workspace</TooltipContent>
+            <TooltipContent>{hasVision ? "Paste an image or pick one — saved into the virtual workspace" : "Model shows no vision support — image will be saved but may not be seen"}</TooltipContent>
           </Tooltip>
         )}
       </div>

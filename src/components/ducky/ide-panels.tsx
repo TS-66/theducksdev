@@ -27,7 +27,9 @@ import {
   getAiPointerRev,
   subscribeAiPointer,
 } from "@/lib/ducky/pc";
-import { fmtK, shortId } from "./format";
+import { fmtCompact, shortId } from "./format";
+import { getPathLeaf } from "@/lib/ducky/zcode-vendor/path";
+import { formatWorkspaceContextPath } from "@/lib/ducky/zcode-vendor/workspace-context-path-format";
 
 /* ─────────────────────────── activity rail ─────────────────────────── */
 
@@ -282,7 +284,7 @@ export function IdeInspector({
               <div className="text-muted-foreground">tools</div>
             </div>
             <div className="rounded bg-muted/60 px-1.5 py-1 text-center">
-              <div className="font-semibold text-foreground">{fmtK(totalTokens)}</div>
+              <div className="font-semibold text-foreground">{fmtCompact(totalTokens)}</div>
               <div className="text-muted-foreground">tokens</div>
             </div>
             <div className="rounded bg-muted/60 px-1.5 py-1 text-center">
@@ -385,6 +387,8 @@ export function IdeFilePreview({
   onBack: () => void;
 }) {
   const lines = React.useMemo(() => content.split("\n"), [content]);
+  const leaf = getPathLeaf(path);
+  const contextualPath = formatWorkspaceContextPath(path);
   const [copied, setCopied] = React.useState(false);
   const copy = async () => {
     try {
@@ -397,7 +401,8 @@ export function IdeFilePreview({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-2 border-b bg-muted/20 px-3">
         <FileCode2 className="size-3.5 text-[#FF7A1A]" />
-        <span className="truncate font-mono text-xs">{path}</span>
+        <span title={path} className="truncate font-mono text-xs">{leaf}</span>
+        <span title={path} className="hidden truncate font-mono text-[10px] text-muted-foreground xl:inline">{contextualPath}</span>
         <span className="font-mono text-[10px] text-muted-foreground">{lines.length} lines · {(content.length / 1024).toFixed(1)} KB</span>
         <div className="ml-auto flex items-center gap-1">
           <button type="button" onClick={copy} className="rounded-md border px-2 py-1 font-mono text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">

@@ -17,7 +17,7 @@ import {
 } from "@/lib/ducky/disk";
 import { getPcConfig, pcStatus } from "@/lib/ducky/pc";
 import { type PermissionPolicy } from "@/lib/ducky/types";
-import { clockHM, fmtK, shortId } from "./format";
+import { clockHM, fmtCompact, shortId } from "./format";
 
 const POLICY_ORDER: PermissionPolicy[] = ["readonly", "ask", "auto"];
 
@@ -363,7 +363,7 @@ export function StatusBar({
               className="flex cursor-help items-center gap-1 rounded px-1 transition-colors hover:text-foreground"
               aria-label={`Token usage: ${totals.tokens} across ${sessions.length} sessions`}
             >
-              <Zap className="size-3" aria-hidden /> {fmtK(totals.tokens)}
+              <Zap className="size-3" aria-hidden /> {fmtCompact(totals.tokens)}
             </span>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-64">
@@ -376,7 +376,7 @@ export function StatusBar({
                   <li key={s.id} className="flex items-center justify-between gap-3">
                     <span className="max-w-40 truncate">{s.title}</span>
                     <span className="font-mono text-[10px]">
-                      {fmtK(s.stats.promptTokens + s.stats.completionTokens)}
+                      {fmtCompact(s.stats.promptTokens + s.stats.completionTokens)}
                     </span>
                   </li>
                 ))}

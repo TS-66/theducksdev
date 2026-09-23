@@ -63,7 +63,8 @@ export const SKILLS: Skill[] = [
       "1. Explore read-only first (`glob`, `grep`, `read_file`) — plans built on guesses get rejected.",
       "2. Structure: goal (1 line) → phases (numbered, each with files touched + why) → risks → verification.",
       "3. Every phase must name how it will be verified (read-back, targeted grep, build).",
-      "4. Flag unknowns explicitly instead of burying them. In plan mode, end with `exit_plan_mode`.",
+      "4. BOUNDARIES (impact analysis): for each touched area name UI-surface → state-owner → protocol/persistence; use `dep-refs` thinking (who imports the touched symbols?) to rank blast radius; prune validation to the change (happy path + 1 edge per boundary).",
+      "5. Flag unknowns explicitly instead of burying them. In plan mode, end with `exit_plan_mode`.",
     ].join("\n"),
   },
   {

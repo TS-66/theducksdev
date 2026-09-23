@@ -2,12 +2,20 @@
  * Ducky AI | Coder — small formatting helpers (UI-local).
  */
 
+import { formatCompactTokenNumber } from "@/lib/ducky/zcode-vendor/token-number-format";
+
 /** 1234 -> "1.2k", 1234567 -> "1234.6k" style compact counters */
 export function fmtK(n: number): string {
   if (!Number.isFinite(n)) return "0";
   if (Math.abs(n) < 1000) return String(Math.round(n));
   const k = n / 1000;
   return k >= 100 ? `${Math.round(k)}k` : `${k.toFixed(1)}k`;
+}
+
+/** Compact token counter via vendored ZCode formatter ("en-US" keeps K/M/B stable). */
+export function fmtCompact(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  return formatCompactTokenNumber("en-US", n);
 }
 
 /** "5m ago", "2h ago", "3d ago" */

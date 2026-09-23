@@ -22,6 +22,7 @@ import { PLUGINS, resolveEnabledPluginIds } from '@/lib/ducky/plugins';
 import { renderMemoriesForPrompt } from '@/lib/ducky/memory';
 import { renderMcpForPrompt } from '@/lib/ducky/mcp';
 import { SKILLS } from '@/lib/ducky/skills';
+import { inferModelCapabilities, providerOf } from '@/lib/ducky/model-capabilities';
 import { renderTree } from '@/lib/ducky/tools-vfs';
 import { useDiskStore, type DiskStatus } from '@/lib/ducky/disk';
 import { isModelIdSet, isServerLive } from '@/lib/ducky/server-caps';
@@ -98,6 +99,24 @@ export function toWireMessages(messages: ChatMessage[]): WireMessage[] {
   return i > 0 ? out.slice(i) : out;
 }
 
+/** One-line capability brief so the agent knows what this model can consume. */
+function modelCapabilityLine(modelId: string, baseUrl: string): string {
+  const id = (modelId ?? '').trim();
+  if (!id) return '(no model id configured — ask the human to set one in Settings → Connections)';
+  const caps = inferModelCapabilities(id);
+  const bits = [
+    `vision ${caps.inputFormat.supportsImage ? 'yes' : 'no'}`,
+    `tool-calls ${caps.supportsToolCall ? 'yes' : 'no'}`,
+  ];
+  return (
+    `Active model "${id}" via ${providerOf(baseUrl)} (${bits.join(' · ')}). ` +
+    (caps.inputFormat.supportsImage
+      ? 'vision_describe and pasted images work — read screenshots with it.'
+      : 'Assume the model CANNOT see images: describe screenshots and pasted visuals in words instead of sending them blindly.') +
+    (caps.supportsToolCall ? '' : ' This model may not support tool calls — prefer direct answers over tool chains.')
+  );
+}
+
 function buildSystemPrompt(opts: {
   files: string[];
   workspaceTree: string;
@@ -109,6 +128,8 @@ function buildSystemPrompt(opts: {
   memoryBlock: string;
   mcpBlock: string;
   disk: { status: DiskStatus; rootName: string };
+  modelId: string;
+  baseUrl: string;
 }): string {
   const now = new Date();
   const enabled = PLUGINS.filter((p) => !useDuckyStore.getState().disabledPlugins.includes(p.id));
@@ -146,6 +167,9 @@ function buildSystemPrompt(opts: {
     '',
     '# MCP connections (outside apps — call mcp_list before mcp_call)',
     opts.mcpBlock.trim() ? opts.mcpBlock : '(none connected — the human adds them in Settings → Connections → MCP)',
+    '',
+    '# Model capabilities (inferred from the model id — heuristics, not guarantees)',
+    modelCapabilityLine(opts.modelId, opts.baseUrl),
   ];
 
   if (opts.disk.status === 'connected') {
@@ -267,6 +291,8 @@ export function useDuckyAgent() {
         status: useDiskStore.getState().status,
         rootName: useDiskStore.getState().rootName,
       },
+      modelId: settings.model,
+      baseUrl: settings.baseUrl,
     });
     const wireHistory: WireMessage[] = [
       { role: 'system', content: sysPrompt },

@@ -5,6 +5,10 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { CodeBlock } from "./code-block";
+import {
+  isMermaidLanguage,
+  shouldRenderMermaidCodeBlock,
+} from "@/lib/ducky/zcode-vendor/mermaid-language";
 
 /**
  * Hand-rolled prose styling (no @tailwindcss/typography dependency).
@@ -28,7 +32,18 @@ const components: Components = {
     } else {
       code = String(children ?? "");
     }
-    return <CodeBlock code={code.replace(/\n$/, "")} language={lang} />;
+    const clean = code.replace(/\n$/, "");
+    if (isMermaidLanguage(lang ?? "") || shouldRenderMermaidCodeBlock(lang ?? "", clean)) {
+      return (
+        <div className="my-3 overflow-hidden rounded-md border">
+          <div className="border-b bg-muted/50 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            mermaid diagram
+          </div>
+          <pre className="overflow-x-auto p-3 font-mono text-[13px] leading-relaxed">{clean}</pre>
+        </div>
+      );
+    }
+    return <CodeBlock code={clean} language={lang} />;
   },
   code({ className, children }) {
     return (
