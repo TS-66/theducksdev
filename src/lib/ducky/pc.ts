@@ -97,6 +97,27 @@ export interface PcStatus {
   version: string;
 }
 
+/**
+ * ZCode CUA-shaped broker error codes (Apache-2.0, adapted): the bridge
+ * reports these as `PC bridge: <code>...`; the agent treats
+ * not_authorized/foreground_required as ask-the-human, the rest as retryable.
+ */
+export type PcBrokerErrorCode =
+  | "not_authorized"
+  | "not_selectable"
+  | "not_settable"
+  | "element_unavailable"
+  | "action_unavailable"
+  | "foreground_required";
+
+/** Read-only bridge routes (ZCode `isReadOnlyBrokerMethod` equivalent). */
+const PC_READ_ONLY_ROUTES = new Set(["/status", "/caps", "/screen", "/windows", "/ls", "/read"]);
+
+/** True for routes that never mutate the machine — safe to suggest freely. */
+export function isReadOnlyPcRoute(path: string): boolean {
+  return PC_READ_ONLY_ROUTES.has(path);
+}
+
 /** Ping the bridge (/status is intentionally open — pairing check). */
 export async function pcStatus(): Promise<PcStatus> {
   const cfg = getPcConfig();
@@ -169,6 +190,12 @@ export interface PcCaps {
   screenshot: string | null;
   input: string | null;
   inputUnlocked: boolean;
+  /** ZCode CUA-shaped permission split (bridge may omit; defaults below apply). */
+  grantOwner?: string | null;
+  accessibility?: "granted" | "stale" | "denied" | "unknown";
+  screenRecording?: "granted" | "denied" | "unknown";
+  screenCaptureProbeOk?: boolean;
+  permissionReason?: string | null;
 }
 
 /** What this bridge can do (helpers present? input unlocked?). */
@@ -180,6 +207,11 @@ export async function pcCaps(): Promise<PcCaps> {
     screenshot: (r.screenshot as string | null) ?? null,
     input: (r.input as string | null) ?? null,
     inputUnlocked: r.inputUnlocked === true,
+    grantOwner: typeof r.grantOwner === "string" ? r.grantOwner : null,
+    accessibility: r.accessibility ?? (r.inputUnlocked ? "granted" : "unknown"),
+    screenRecording: r.screenRecording ?? (r.screenshot ? "granted" : "unknown"),
+    screenCaptureProbeOk: typeof r.screenCaptureProbeOk === "boolean" ? r.screenCaptureProbeOk : undefined,
+    permissionReason: typeof r.permissionReason === "string" ? r.permissionReason : null,
   };
 }
 

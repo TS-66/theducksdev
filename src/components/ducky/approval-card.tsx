@@ -34,10 +34,36 @@ function commandOf(toolName: string, preview: string): string | null {
 }
 
 /** Inline permission-gate card rendered above the composer.
+ *  ZCode PermissionDialog pattern (Apache-2.0): numbered option rows
+ *  (allow-once / always-allow / deny), keyboard 1/2/3, deny-with-feedback.
  *  exit_plan_mode gets a dedicated violet plan-review treatment. */
 export function ApprovalCard({ request, onRespond, onAlwaysAllow }: ApprovalCardProps) {
   const [feedback, setFeedback] = React.useState("");
   const [feedbackOpen, setFeedbackOpen] = React.useState(false);
+  const deny = React.useCallback(
+    () => onRespond(false, feedback.trim() || undefined),
+    [onRespond, feedback],
+  );
+  const allow = React.useCallback(() => onRespond(true), [onRespond]);
+  /* numeric shortcuts: 1 allow-once · 2 always-allow · 3 deny (not while typing feedback) */
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT")) return;
+      if (e.key === "1") {
+        e.preventDefault();
+        allow();
+      } else if (e.key === "2" && onAlwaysAllow) {
+        e.preventDefault();
+        onAlwaysAllow();
+      } else if (e.key === "3") {
+        e.preventDefault();
+        deny();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [allow, deny, onAlwaysAllow]);
   if (request.toolName === "exit_plan_mode") {
     return (
       <div
@@ -135,27 +161,62 @@ export function ApprovalCard({ request, onRespond, onAlwaysAllow }: ApprovalCard
             </button>
           )}
 
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onRespond(false, feedback.trim() || undefined)}
+          <div
+            role="listbox"
+            aria-label="Permission options"
+            className="mt-2.5 flex flex-col gap-1.5"
+          >
+            <button
+              type="button"
+              role="option"
+              aria-selected="true"
+              onClick={allow}
+              className="flex items-center gap-2.5 rounded-xl bg-[#FF7A1A]/10 px-3 py-2 text-left ring-1 ring-[#FF7A1A]/40 transition-colors hover:bg-[#FF7A1A]/15"
             >
-              Deny{feedback.trim() ? " + send feedback" : ""}
-            </Button>
+              <span aria-hidden className="font-mono text-[11px] font-bold text-[#FF7A1A]">1.</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-semibold">Allow once</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  Run {request.toolName} this time only
+                </span>
+              </span>
+            </button>
             {onAlwaysAllow && (
-              <Button size="sm" variant="outline" onClick={onAlwaysAllow}>
-                Always allow
-              </Button>
+              <button
+                type="button"
+                role="option"
+                aria-selected="false"
+                onClick={onAlwaysAllow}
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.05]"
+              >
+                <span aria-hidden className="font-mono text-[11px] text-muted-foreground">2.</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium">Always allow</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    Stop asking for this kind of action
+                  </span>
+                </span>
+              </button>
             )}
-            <Button
-              size="sm"
-              className="bg-amber-500 text-black hover:bg-amber-400"
-              onClick={() => onRespond(true)}
+            <button
+              type="button"
+              role="option"
+              aria-selected="false"
+              onClick={deny}
+              className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.05]"
             >
-              Allow once
-            </Button>
+              <span aria-hidden className="font-mono text-[11px] text-muted-foreground">{onAlwaysAllow ? "3." : "2."}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium">Deny{feedback.trim() ? " + send feedback" : ""}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  Block it{feedback.trim() ? " — feedback goes as your next message" : " — add feedback below to steer"}
+                </span>
+              </span>
+            </button>
           </div>
+          <p className="mt-2 font-mono text-[10px] text-muted-foreground/60">
+            keys {onAlwaysAllow ? "1 / 2 / 3" : "1 / 2"} — deny carries your feedback as the next message
+          </p>
         </div>
       </div>
     </div>

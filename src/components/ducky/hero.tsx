@@ -23,9 +23,11 @@ interface HeroProps {
   onConnectDisk?: () => void;
 }
 
+/** ZCode-style time-aware greeting (boundaries 5/9/12/14/18/23h). */
 function greetingForHour(h: number): string {
-  if (h >= 5 && h < 11) return "Good morning";
-  if (h >= 11 && h < 14) return "Good midday";
+  if (h >= 5 && h < 9) return "Good morning";
+  if (h >= 9 && h < 12) return "Mid-morning flow";
+  if (h >= 12 && h < 14) return "Good midday";
   if (h >= 14 && h < 18) return "Good afternoon";
   if (h >= 18 && h < 23) return "Good evening";
   return "Night shift";

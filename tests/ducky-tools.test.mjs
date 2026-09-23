@@ -1036,13 +1036,18 @@ await run("tools-extra direct: json path + diff", async () => {
   assert(extra.lineDiff("same\n", "same\n").includes("identical"), "identical");
 });
 
-await run("skills module: 19 playbooks with triggers", async () => {
-  assert(skills.SKILLS.length === 19, `got ${skills.SKILLS.length}`);
+await run("skills module: 24 playbooks with triggers", async () => {
+  assert(skills.SKILLS.length === 24, `got ${skills.SKILLS.length}`);
   assert(skills.getSkill("PLAN")?.name === "plan", "case-insensitive lookup");
   assert(skills.getSkill("mcp-integration")?.name === "mcp-integration", "mcp skill");
   assert(skills.getSkill("local-pc")?.name === "local-pc", "pc skill");
   assert(skills.getSkill("agent-browser")?.name === "agent-browser", "browser skill");
   assert(skills.getSkill("react")?.name === "react", "react skill");
+  assert(skills.getSkill("electron")?.name === "electron", "electron skill");
+  assert(skills.getSkill("dogfood")?.name === "dogfood", "dogfood skill");
+  assert(skills.getSkill("dep-refs")?.name === "dep-refs", "dep-refs skill");
+  assert(skills.getSkill("ai-elements")?.name === "ai-elements", "ai-elements skill");
+  assert(skills.getSkill("architecture-governance")?.name === "architecture-governance", "arch-gov skill");
   for (const s of skills.SKILLS) {
     assert(Array.isArray(s.triggers) && s.triggers.length > 0, `${s.name} missing triggers`);
   }

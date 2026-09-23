@@ -15,7 +15,22 @@ which is licensed Apache-2.0, © Z.ai:
   strict interface type scale, mobile-safe input sizing);
 - the Zai Dark theme values and trajectory role colors adapted into our
   dark theme (`--background #161616`, role colors for user/assistant/
-  reasoning/tool-call/tool-result) and the 14px interface type scale.
+  reasoning/tool-call/tool-result) and the 14px interface type scale;
+- the permission-dialog option pattern (numbered allow-once / always-allow /
+  deny rows with keyboard shortcuts and deny-with-feedback) behind
+  `src/components/ducky/approval-card.tsx`;
+- the time-aware empty-state greeting boundaries (5/9/12/14/18/23h) behind
+  `src/components/ducky/hero.tsx`;
+- the skill playbooks adapted (not copied) into `src/lib/ducky/skills.ts`:
+  `agent-browser` (open → snapshot → act → re-snapshot → verify loop),
+  `ai-elements` (conversation/message/prompt-input/tool structure),
+  `architecture-governance` (one-owner modules, layered deps),
+  `dep-refs` (symbol reference tracing before deletes),
+  `dogfood` (repro-first exploratory QA reports),
+  `electron` (remote-debugging-port desktop automation);
+- the computer-use contract shapes (broker error codes, read-only vs
+  mutating route split, accessibility/screenRecording permission status)
+  behind `src/lib/ducky/pc.ts` — our bridge protocol itself is original.
 
 No ZCode source files are vendored here; all implementations are original.
 If you reuse Ducky code that derives from these ideas, keep this notice.
