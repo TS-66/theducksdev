@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { totalmem } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
@@ -32,6 +33,17 @@ export default defineConfig(({ mode }) => {
     DUCKY_ENV: duckyEnv,
   };
   const duckyEndpointOrigin = resolveRuntimeDuckyEndpointOrigin(endpointEnv);
+
+  // 小内存机器（<4.5GB，如 Chromebook Linux 容器）上，7000+ 模块的生产
+  // 构建会在 sourcemap 链与 gzip 体积计算阶段触顶 OOM（exit 137）。
+  // 低内存模式关闭这两项以换取可构建性；产物功能不变，只是没有隐藏
+  // sourcemap。DUCKY_LOW_MEM=1 可强制开启，=0 可强制关闭。
+  const lowMemFlag = (env.DUCKY_LOW_MEM ?? "").trim();
+  const lowMem =
+    lowMemFlag === "1" || (lowMemFlag !== "0" && totalmem() < 4.5 * 1024 ** 3);
+  if (lowMem) {
+    console.log("[ducky-web] low-memory build: sourcemap off, reportCompressedSize off");
+  }
 
   return {
     plugins: [pdfJsCMapsPlugin(), react(), tailwindcss(), thirdPartyNoticesVitePlugin()],
@@ -80,7 +92,10 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       // 生产不在浏览器产物暴露 sourceMappingURL，避免客户端侧还原业务源码。
-      sourcemap: mode === "production" ? "hidden" : true,
+      // 低内存构建直接关闭 sourcemap，否则大包 mapping 链会 OOM。
+      sourcemap: lowMem ? false : mode === "production" ? "hidden" : true,
+      // gzip 体积报告需要额外压缩全量产物，低内存构建跳过。
+      reportCompressedSize: !lowMem,
     },
   };
 });
