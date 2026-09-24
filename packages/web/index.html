@@ -95,7 +95,7 @@
         background: var(--color-background, var(--zcode-bootstrap-bg, #f8f8f8)) !important;
       }
 
-      .zcode-boot-loading {
+      .ducky-boot-loading {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -106,12 +106,12 @@
         color: var(--zcode-bootstrap-fg, var(--color-foreground, #e2e8f0));
       }
 
-      html[data-zcode-bootstrap-theme="light"] .zcode-boot-loading {
+      html[data-zcode-bootstrap-theme="light"] .ducky-boot-loading {
         background: var(--zcode-bootstrap-bg, var(--color-background, #f8fafc));
         color: var(--zcode-bootstrap-fg, var(--color-foreground, #334155));
       }
 
-      .zcode-boot-loading__logo-shell {
+      .ducky-boot-loading__logo-shell {
         position: relative;
         display: flex;
         width: 96px;
@@ -125,7 +125,7 @@
           0 8px 10px -6px rgb(0 0 0 / 0.2);
       }
 
-      .zcode-boot-loading__logo-shell::before {
+      .ducky-boot-loading__logo-shell::before {
         position: absolute;
         inset: 0;
         pointer-events: none;
@@ -135,28 +135,198 @@
         border-radius: inherit;
       }
 
-      .zcode-boot-loading__logo {
+      .ducky-boot-loading__logo {
         width: 56px;
-        height: auto;
-        color: #ffffff;
+        height: 56px;
+        object-fit: contain;
+        border-radius: 12px;
+      }
+
+      .ducky-boot-loading__column {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .ducky-boot-loading__name {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .ducky-boot-loading__spinner {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid rgba(148, 163, 184, 0.35);
+        border-top-color: #f5b301;
+        animation: ducky-boot-spin 0.9s linear infinite;
+      }
+
+      @keyframes ducky-boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .ducky-boot-loading__status {
+        max-width: 420px;
+        padding: 0 20px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1.5;
+        opacity: 0.75;
+      }
+
+      .ducky-boot-loading__error {
+        max-width: 520px;
+        margin: 0 20px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(248, 113, 113, 0.45);
+        background: rgba(127, 29, 29, 0.25);
+        font-size: 13px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .ducky-boot-loading__error[hidden] {
+        display: none;
+      }
+
+      .ducky-boot-loading__retry {
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 10px;
+        background: transparent;
+        color: inherit;
+        font-size: 13px;
+        padding: 7px 16px;
+        cursor: pointer;
+      }
+
+      .ducky-boot-loading__retry[hidden] {
+        display: none;
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <!-- 远程控制跨 workspace 时会整页跳转；在 JS 入口执行前先给出 loading 壳，避免出现白屏空档。-->
+      <!-- JS bundle 执行前先展示 Ducky Coder loading 屏；React 接管 root 后整棵替换。-->
+      <!-- 如果 bundle 加载失败或后端不可达，下方 watchdog 会把原因写进状态区，而不是留白屏。-->
       <div
         class="ducky-boot-loading"
         role="status"
         aria-live="polite"
         aria-busy="true"
-        aria-label="Loading..."
+        aria-label="Loading Ducky Coder..."
       >
-        <div class="ducky-boot-loading__logo-shell">
-          <img src="/ducky-logo.png" alt="Ducky Coder" class="ducky-boot-loading__logo" style="width:56px;height:56px;object-fit:contain;border-radius:12px;" />
+        <div class="ducky-boot-loading__column">
+          <div class="ducky-boot-loading__logo-shell">
+            <img
+              src="/ducky-logo.png"
+              alt="Ducky Coder"
+              class="ducky-boot-loading__logo"
+              draggable="false"
+            />
+          </div>
+          <div class="ducky-boot-loading__name">Ducky Coder</div>
+          <div class="ducky-boot-loading__spinner" aria-hidden="true"></div>
+          <div class="ducky-boot-loading__status" id="ducky-boot-status">
+            Starting…
+          </div>
+          <div class="ducky-boot-loading__error" id="ducky-boot-error" hidden></div>
+          <button
+            type="button"
+            class="ducky-boot-loading__retry"
+            id="ducky-boot-retry"
+            hidden
+            onclick="window.location.reload()"
+          >
+            Retry
+          </button>
         </div>
       </div>
     </div>
+    <noscript>
+      <div style="padding:40px;font-family:sans-serif;text-align:center;">
+        Ducky Coder needs JavaScript enabled.
+      </div>
+    </noscript>
+    <script>
+      (() => {
+        var statusEl = document.getElementById("ducky-boot-status");
+        var errorEl = document.getElementById("ducky-boot-error");
+        var retryEl = document.getElementById("ducky-boot-retry");
+        var failed = false;
+        function setStatus(text) {
+          if (statusEl && !failed) statusEl.textContent = text;
+        }
+        function fail(title, detail) {
+          failed = true;
+          if (statusEl) statusEl.textContent = title;
+          if (errorEl) {
+            errorEl.hidden = false;
+            errorEl.textContent = detail || "";
+          }
+          if (retryEl) retryEl.hidden = false;
+          var spinner = document.querySelector(".ducky-boot-loading__spinner");
+          if (spinner) spinner.style.display = "none";
+        }
+        window.__duckyBootFail = fail;
+        // Bundle 解析/执行错误（如 404、语法错误）立刻展示，而不是留白屏。
+        window.addEventListener(
+          "error",
+          function (event) {
+            var src =
+              (event.target && (event.target.src || event.target.href)) || "";
+            var msg =
+              (event.message || (event.error && event.error.message) || "").toString();
+            if (src) {
+              fail(
+                "Failed to load the Ducky Coder app.",
+                "Resource failed: " + src + (msg ? "\n" + msg : ""),
+              );
+            } else if (msg) {
+              fail("Ducky Coder failed to start.", msg);
+            }
+          },
+          true,
+        );
+        window.addEventListener("unhandledrejection", function (event) {
+          var reason =
+            (event.reason && (event.reason.message || event.reason.toString())) || "";
+          if (reason) fail("Ducky Coder failed to start.", reason.toString());
+        });
+        setStatus("Connecting…");
+        // 25s 后 loading 壳还在，说明 React 从未接管：探活后端并给出可操作结论。
+        setTimeout(function () {
+          if (!document.querySelector(".ducky-boot-loading")) return;
+          var base = window.location.origin;
+          fetch(base + "/api/server-info", { cache: "no-store" })
+            .then(function (res) {
+              if (res.ok) {
+                fail(
+                  "The page loaded but the app did not start.",
+                  "Backend is reachable at " + base + ". The Web bundle may be broken: rebuild with `./bin/ducky web --build` and hard-reload (Ctrl+Shift+R).",
+                );
+              } else {
+                fail(
+                  "Backend answered with HTTP " + res.status + ".",
+                  "GET " + base + "/api/server-info -> " + res.status + ". Restart the server: `./bin/ducky web`.",
+                );
+              }
+            })
+            .catch(function () {
+              fail(
+                "Cannot reach the Ducky Coder backend.",
+                "GET " + base + "/api/server-info failed. Start it with `./bin/ducky web` (default http://localhost:3030) and open the URL it prints.",
+              );
+            });
+        }, 25000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
