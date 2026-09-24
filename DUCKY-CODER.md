@@ -91,6 +91,11 @@ Serves `packages/web/dist` through `packages/server/dist/entry-http.js`
 (SPA fallback) with `DUCKY_WEB_STATIC_ROOT`, waits for `/api/server-info`,
 then opens the browser.
 
+Dev escape hatch (small machines, skips the bundle): `./bin/ducky web --dev`
+honors `--workspace`, pins UI `:5173` + backend `localhost:3030`
+(`--port`/`--host`/`--build` do not apply), waits for vite plus
+`/api/server-info`, then opens the browser.
+
 ## Verify
 
 ```sh

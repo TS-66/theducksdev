@@ -29,7 +29,8 @@ Usage:
 Options for "web":
   --dev            Dev mode: vite + hot-reload server, no production bundle.
                    Much lighter on small machines (skips the 7000-module build).
-                   Opens http://localhost:5173. --port/--build do not apply.
+                   Fixed wiring: UI http://localhost:5173, backend localhost:3030.
+                   --workspace is honored; --port/--host/--build/--skip-build do not apply.
   --port <n>       Server port. Default 3030 (or $PORT).
   --host <name>    Bind host. Default localhost.
   --workspace <p>  Workspace folder served by the server. Default: current directory.
@@ -190,28 +191,82 @@ async function cmdWebDev(opts) {
   if (opts.build || opts.skipBuild) {
     console.log("[ducky] --dev ignores --build/--skip-build (no bundle is produced).");
   }
+  // Fixed wiring: packages/web/vite.config.ts proxies /ws + /api to
+  // localhost:3030, so a custom --port/--host would move the backend without
+  // moving the proxy target and break the app. Say so instead of silently
+  // ignoring the flags. (Same reason a stray $PORT in the environment must
+  // not leak through to the backend — it is pinned below.)
+  if (opts.port !== 3030) {
+    console.log(
+      `[ducky] --dev pins the backend to localhost:3030 (vite proxy target); ignoring port ${opts.port}. Use prod "ducky web" for custom ports.`,
+    );
+  }
+  if (opts.host !== "localhost") {
+    console.log(
+      `[ducky] --dev pins the backend to localhost:3030 (vite proxy target); ignoring host "${opts.host}". Use prod "ducky web" for custom hosts.`,
+    );
+  }
+  // The child runs with cwd=repoRoot, so without this the backend would serve
+  // the repo checkout instead of the launch directory. --workspace is honored
+  // via the same DUCKY_SERVER_WORKSPACE env the prod entry reads.
+  const workspace = resolve(opts.workspace);
   console.log("[ducky] Ducky Coder dev UI -> http://localhost:5173");
   console.log("[ducky] backend (hot reload) -> http://localhost:3030");
+  console.log(`[ducky] workspace: ${workspace}`);
+  console.log("[ducky] logs below are prefixed server| (backend) and web| (vite).");
   const child = spawn("pnpm", ["dev:web"], {
     cwd: repoRoot,
     stdio: "inherit",
-    env: { ...process.env },
+    env: { ...process.env, PORT: "3030", DUCKY_SERVER_WORKSPACE: workspace },
   });
-  const shutdown = () => {
+  // Forward each signal as itself (not always SIGTERM): concurrently/vite
+  // shut down cleanly on SIGINT, and in a terminal the whole foreground group
+  // already gets SIGINT — this covers kill(1) and non-tty parents.
+  // concurrently (-k, see root package.json dev:web) then tears down the
+  // vite + tsup/server tree.
+  const onSigint = () => {
+    if (!child.killed) child.kill("SIGINT");
+  };
+  const onSigterm = () => {
     if (!child.killed) child.kill("SIGTERM");
   };
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", onSigint);
+  process.on("SIGTERM", onSigterm);
+  // spawn() does not throw when the binary is missing — it emits "error",
+  // which without a listener crashes with an unhandled-event traceback.
+  child.on("error", (error) => {
+    console.error(`[ducky] could not start "pnpm dev:web": ${error.message}`);
+    console.error("[ducky] need pnpm + installed deps: install pnpm 10.33.2 (see mise.toml), then run: pnpm install");
+    process.exit(1);
+  });
   child.on("exit", (code, signal) => {
-    process.removeListener("SIGINT", shutdown);
-    process.removeListener("SIGTERM", shutdown);
-    if (signal) console.log(`[ducky] dev stack stopped (${signal})`);
-    else if (code !== 0 && code !== null) process.exitCode = code;
+    process.removeListener("SIGINT", onSigint);
+    process.removeListener("SIGTERM", onSigterm);
+    if (signal) {
+      console.log(`[ducky] dev stack stopped (${signal})`);
+      return;
+    }
+    // The stack never exits on its own (vite + tsup --watch run forever), so
+    // a plain exit means something failed (e.g. missing `concurrently`).
+    // Exit instead of hanging on the promise below so the failure surfaces.
+    if (code !== 0 && code !== null) {
+      console.error(`[ducky] dev stack exited (code ${code}). If "concurrently" is missing, run: pnpm install`);
+      process.exit(code);
+    }
   });
   if (opts.open) {
-    const ready = await waitForServer("http://localhost:5173/", 60000);
-    if (ready) openBrowser("http://localhost:5173/");
-    else console.log("[ducky] vite is taking a while; open http://localhost:5173/ manually.");
+    const viteReady = await waitForServer("http://localhost:5173/", 60000);
+    if (!viteReady) {
+      console.log('[ducky] vite is taking a while; open http://localhost:5173/ manually once the web| output shows "ready".');
+    } else {
+      // Vite being up says nothing about the backend: probe it too, so a dead
+      // :3030 prints a pointer at the server| log instead of a bare error page.
+      const apiReady = await waitForServer("http://localhost:3030/api/server-info", 15000);
+      if (!apiReady) {
+        console.log("[ducky] backend http://localhost:3030/api/server-info is not answering yet — the page may show an error until it does. Watch the server| output above.");
+      }
+      openBrowser("http://localhost:5173/");
+    }
   }
   await new Promise(() => {});
 }

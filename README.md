@@ -92,6 +92,8 @@ DUCKY_SERVER_WORKSPACE=/path/to/project pnpm dev:web
 
 This starts the Web dev server (`http://localhost:5173`) and the backend (`http://localhost:3030`). `/ws` and `/api` requests are proxied to the local backend. After changing Agent source code, run `pnpm --filter @ducky/cli... build` and restart the service.
 
+`./bin/ducky web --dev` runs this same stack and opens the browser; it honors `--workspace` but pins the UI to `:5173` and the backend to `localhost:3030`, so `--port`/`--host` do not apply.
+
 ### Tutorial 4 — Connect a model provider (no login)
 
 1. Open Settings (gear icon, bottom-left) → Providers.
