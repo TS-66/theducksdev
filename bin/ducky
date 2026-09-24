@@ -1,3 +1,14 @@
 #!/usr/bin/env sh
 # Ducky Coder launcher. Repo-local entrypoint; `ducky install` symlinks this into ~/.local/bin.
-exec node "$(dirname "$0")/../scripts/ducky.mjs" "$@"
+# NOTE: when invoked through a symlink, $0 is the link path, so resolve it
+# first — otherwise `dirname $0` points at the link's directory (e.g.
+# ~/.local/bin) instead of the repo, and node fails with MODULE_NOT_FOUND.
+PRG="$0"
+while [ -L "$PRG" ]; do
+  link="$(readlink "$PRG")"
+  case "$link" in
+    /*) PRG="$link" ;;
+    *) PRG="$(dirname "$PRG")/$link" ;;
+  esac
+done
+exec node "$(dirname "$PRG")/../scripts/ducky.mjs" "$@"
