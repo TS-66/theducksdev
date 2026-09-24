@@ -9,10 +9,12 @@
 import { Button } from "../ui/button.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
 import { cn } from "../lib/utils.js";
-import { CheckIcon, CopyIcon, Maximize2Icon, WrapTextIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, Loader2Icon, Maximize2Icon, WrapTextIcon } from "lucide-react";
 import type { ComponentProps, CSSProperties, HTMLAttributes } from "react";
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -29,11 +31,18 @@ import {
   getCurrentMermaidDocumentVisibility,
   resolveMermaidAutoRenderDecision,
 } from "@/lib/mermaidRenderBudget.js";
-import { MermaidBlock } from "@/components/ai-elements/mermaid-block.js";
 import { DiagramPreviewDialog } from "@/components/ai-elements/diagram-preview-dialog.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
 import type { Theme } from "@/useTheme.js";
+
+// Mermaid 渲染链（@streamdown/mermaid）在模块导入阶段实例化插件并占构建体积，
+// 只有 mermaid 代码块才需要它。这里按需分包加载；Suspense fallback 复刻 MermaidBlock 自身的 loading 形态。
+const MermaidBlock = lazy(() =>
+  import("@/components/ai-elements/mermaid-block.js").then((module) => ({
+    default: module.MermaidBlock,
+  })),
+);
 
 // Types
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
@@ -325,13 +334,29 @@ export const CodeBlock = ({
         {children}
         <div className={cn("p-2 pt-0 pb-3", contentClassName)}>
           {shouldRenderMermaid ? (
-            <MermaidBlock
-              code={code}
-              theme={appTheme}
-              onOpenPreview={openMermaidPreview}
-              onPreviewSvgChange={setMermaidPreviewSvg}
-              // className={cn(children ? "border-t border-border" : null)}
-            />
+            <Suspense
+              fallback={
+                <div
+                  className="group/mermaid relative min-h-32 w-full bg-card"
+                  data-mermaid-block=""
+                >
+                  <div className="max-h-[420px] overflow-auto p-3 text-foreground">
+                    <div className="flex min-h-28 items-center justify-center gap-2 text-foreground-subtle text-ui-base">
+                      <Loader2Icon className="size-4 animate-spin" />
+                      <span>{intl.formatMessage({ id: "codeBlock.mermaid.loading" })}</span>
+                    </div>
+                  </div>
+                </div>
+              }
+            >
+              <MermaidBlock
+                code={code}
+                theme={appTheme}
+                onOpenPreview={openMermaidPreview}
+                onPreviewSvgChange={setMermaidPreviewSvg}
+                // className={cn(children ? "border-t border-border" : null)}
+              />
+            </Suspense>
           ) : (
             <CodeViewer
               code={code}

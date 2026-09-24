@@ -1,6 +1,10 @@
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import type { IServiceAccessor } from "@ducky/services";
-import { TerminalSession } from "@/terminal/TerminalSession.js";
+// xterm 在模块导入阶段就占构建体积，side pane 终端只在对应 tab 打开时需要。
+// TerminalSession 按需分包加载；persistentKey 保活语义仍在组件内部，语义不变。
+const TerminalSession = lazy(() =>
+  import("@/terminal/TerminalSession.js").then((module) => ({ default: module.TerminalSession })),
+);
 
 export function SidePaneTerminalPane({
   services,
@@ -35,17 +39,19 @@ export function SidePaneTerminalPane({
 
   return (
     <section className="h-full min-h-0 overflow-hidden bg-background p-3">
-      <TerminalSession
-        sessionId={sessionId}
-        persistentKey={sessionId}
-        workspaceKey={workspaceKey}
-        services={services}
-        cwd={cwd}
-        isVisible={isVisible}
-        isWindowsDesktop={isWindowsDesktop}
-        onShellLabelChange={handleShellLabelChange}
-        onOpenBrowserUrl={onOpenBrowserUrl}
-      />
+      <Suspense fallback={null}>
+        <TerminalSession
+          sessionId={sessionId}
+          persistentKey={sessionId}
+          workspaceKey={workspaceKey}
+          services={services}
+          cwd={cwd}
+          isVisible={isVisible}
+          isWindowsDesktop={isWindowsDesktop}
+          onShellLabelChange={handleShellLabelChange}
+          onOpenBrowserUrl={onOpenBrowserUrl}
+        />
+      </Suspense>
     </section>
   );
 }

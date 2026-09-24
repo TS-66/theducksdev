@@ -9,7 +9,6 @@ import {
   QrCode,
   Unlink,
 } from "lucide-react";
-import QRCode from "qrcode";
 import { useEffect, useState, type ReactNode } from "react";
 import type { BotConfig, BotServiceStatus } from "@ducky/shared";
 import { isFeishuBotProvider } from "@ducky/shared";
@@ -42,21 +41,25 @@ function TelegramBotFatherQrPanel({
 
   useEffect(() => {
     let cancelled = false;
-    void QRCode.toDataURL(TELEGRAM_BOTFATHER_URL, {
-      margin: 1,
-      width: 220,
-    })
-      .then((dataUrl) => {
+    const generateQr = async () => {
+      try {
+        // qrcode 只在该二维码面板挂载后按需加载，不再常驻首屏包；失败路径与之前生成失败一致。
+        const { default: QRCode } = await import("qrcode");
+        const dataUrl = await QRCode.toDataURL(TELEGRAM_BOTFATHER_URL, {
+          margin: 1,
+          width: 220,
+        });
         if (!cancelled) {
           setQrDataUrl(dataUrl);
         }
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         logger.error(
           "[BotsDialog] 生成 Telegram BotFather 二维码失败",
           error instanceof Error ? error.message : String(error),
         );
-      });
+      }
+    };
+    void generateQr();
     return () => {
       cancelled = true;
     };

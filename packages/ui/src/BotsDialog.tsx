@@ -7,7 +7,6 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import QRCode from "qrcode";
 import { Bot, Loader2, Plus } from "lucide-react";
 import type {
   BotConfig,
@@ -832,6 +831,8 @@ export function BotsDialog({
       });
       let qrDataUrl: string | null = null;
       try {
+        // qrcode 只在扫码流程真正启动时按需加载，不再常驻首屏包；失败路径与之前生成失败一致。
+        const { default: QRCode } = await import("qrcode");
         qrDataUrl = await QRCode.toDataURL(result.qrUrl, {
           margin: 1,
           width: 220,
@@ -876,6 +877,8 @@ export function BotsDialog({
       const result = await botsService.beginWeixinRegistration();
       let qrDataUrl: string | null = null;
       try {
+        // qrcode 只在扫码流程真正启动时按需加载，不再常驻首屏包；失败路径与之前生成失败一致。
+        const { default: QRCode } = await import("qrcode");
         qrDataUrl = await QRCode.toDataURL(result.qrUrl, {
           margin: 1,
           width: 220,

@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { IServiceAccessor } from "@ducky/services";
 import { TID_TERMINAL, TID_TERMINAL_CLOSE_BUTTON } from "@ducky/shared";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button.js";
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs.js";
 import { getPathLeaf } from "@/lib/path.js";
 import { TerminalTabTrigger } from "@/terminal/TerminalTabTrigger.js";
-import { TerminalSession } from "@/terminal/TerminalSession.js";
 import {
   closeTerminalSession,
   createTerminalSession,
@@ -22,6 +21,12 @@ import {
   type TerminalPanelState,
   type TerminalSessionDescriptor,
 } from "@/terminal/terminalPanelState.js";
+
+// xterm（含 addon）在模块导入阶段就占构建体积，终端面板默认收起，首屏不需要它。
+// 这里只保留 Terminal 的 tab 外壳常驻，TerminalSession 按需分包加载；会话状态仍在 Terminal 内，语义不变。
+const TerminalSession = lazy(() =>
+  import("@/terminal/TerminalSession.js").then((module) => ({ default: module.TerminalSession })),
+);
 
 export function Terminal({
   services,
@@ -356,30 +361,32 @@ export function Terminal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden">
-          {allSessions.map((session) => (
-            <TabsContent
-              key={session.id}
-              value={session.id}
-              forceMount
-              className="h-full min-h-0 flex-1 data-[state=inactive]:hidden"
-            >
-              <TerminalSession
-                sessionId={session.id}
-                services={session.services}
-                cwd={session.cwd}
-                isVisible={
-                  isVisible &&
-                  session.workspaceKey === workspaceKey &&
-                  session.id === activeSession?.id
-                }
-                isPanelResizing={isPanelResizing}
-                isWindowsDesktop={isWindowsDesktop}
-                onShellLabelChange={handleShellLabelChange}
-                onExit={handleSessionExit}
-                onOpenBrowserUrl={onOpenBrowserUrl}
-              />
-            </TabsContent>
-          ))}
+          <Suspense fallback={null}>
+            {allSessions.map((session) => (
+              <TabsContent
+                key={session.id}
+                value={session.id}
+                forceMount
+                className="h-full min-h-0 flex-1 data-[state=inactive]:hidden"
+              >
+                <TerminalSession
+                  sessionId={session.id}
+                  services={session.services}
+                  cwd={session.cwd}
+                  isVisible={
+                    isVisible &&
+                    session.workspaceKey === workspaceKey &&
+                    session.id === activeSession?.id
+                  }
+                  isPanelResizing={isPanelResizing}
+                  isWindowsDesktop={isWindowsDesktop}
+                  onShellLabelChange={handleShellLabelChange}
+                  onExit={handleSessionExit}
+                  onOpenBrowserUrl={onOpenBrowserUrl}
+                />
+              </TabsContent>
+            ))}
+          </Suspense>
         </div>
       </Tabs>
     </section>
