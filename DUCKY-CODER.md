@@ -59,7 +59,24 @@ Logo: pixel duck (`public/ducky-logo.png`, `packages/web/public/ducky-logo.png`,
   marketplace publish, usage/plan badges + upgrade CTAs, provider provisioning
   (local providers + manual API keys unaffected).
 
-## `ducky web` (prod launcher)
+## Install (curl, no token) and releases
+
+End users install the public build without any account or token:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
+```
+
+- Root `install.sh`: resolves latest `v*` tag via the public GitHub API,
+  downloads `ducky-<version>.tar.gz` + `sha256.txt` from the GitHub Release,
+  verifies, extracts to `~/.zcode/runtime/releases/<version>`, links `current`,
+  writes `~/.local/bin/ducky`. Env overrides: `DUCKY_VERSION`, `DUCKY_REPO`,
+  `DUCKY_DIST_HOME`, `DUCKY_DIST_BIN_DIR`.
+- `.github/workflows/release-ducky.yml`: on tag `v*`, builds via
+  `node scripts/build-ducky.mjs` and attaches tarball + checksum to the release.
+- Publish: `git tag v3.14.3 && git push origin v3.14.3` (after green CI).
+
+## `ducky web` (prod launcher, from source)
 
 ```sh
 ./bin/ducky web --build   # first time: builds web + server, serves, opens browser

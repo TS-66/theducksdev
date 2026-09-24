@@ -17,7 +17,21 @@ Ducky Coder is an AI coding workspace with desktop, browser, and terminal interf
 
 ## Tutorials
 
-### Tutorial 1 — Open the Web UI in one command (fastest start)
+### Tutorial 0 — Install with curl (no account, no token)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
+```
+
+This downloads the latest public release, verifies its checksum, and installs the `ducky` command to `~/.local/bin` (ensure it is on `PATH`). Pin a version or a custom repo:
+
+```bash
+DUCKY_VERSION=3.14.3 curl -fsSL https://raw.githubusercontent.com/TS-66/theducksdev/main/install.sh | bash
+```
+
+Then run `ducky` (terminal UI) or `ducky --web` (browser UI). You need Node.js **24.14.0+** on your machine; everything else ships in the release tarball. To publish a release, push a version tag (see Packaging → Release below) — CI builds the tarball and attaches it to the GitHub Release, which is what the installer downloads.
+
+### Tutorial 1 — Open the Web UI from source (fastest start for contributors)
 
 Requirements: Git, Node.js **24.14.0**, pnpm **10.33.2** ([mise.toml](mise.toml) is the source of truth).
 
@@ -187,6 +201,15 @@ node dist/ducky/debug/ducky/bin/ducky.mjs --web \
 ```
 
 Open `http://127.0.0.1:3030` to validate the full flow (pick another `--port` if `pnpm dev:web` is running).
+
+### Release (publish a version for the curl installer)
+
+```bash
+git tag v3.14.3
+git push origin v3.14.3
+```
+
+The `release-ducky` workflow (`.github/workflows/release-ducky.yml`) builds the distribution and attaches `ducky-<version>.tar.gz` + `sha256.txt` to the GitHub Release. The root `install.sh` downloads from there — fully public, no token. Make sure CI is green on `main` before tagging.
 
 ## Repository Structure
 
