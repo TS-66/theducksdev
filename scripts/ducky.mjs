@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Ducky Coder launcher (surface brand over Ducky internals).
 // Usage:
-//   ducky web [--port 3030] [--host localhost] [--workspace PATH] [--no-open] [--build|--skip-build]
+//   ducky web [--dev] [--port 3030] [--host localhost] [--workspace PATH] [--no-open] [--build|--skip-build]
 //   ducky install [--bin-dir ~/.local/bin]
 //   ducky --help | version
 //
@@ -22,11 +22,14 @@ function usage() {
   console.log(`Ducky Coder
 
 Usage:
-  ducky web [--port 3030] [--host localhost] [--workspace PATH] [--no-open] [--build|--skip-build]
+  ducky web [--dev] [--port 3030] [--host localhost] [--workspace PATH] [--no-open] [--build|--skip-build]
   ducky install [--bin-dir DIR]
   ducky --help | version
 
 Options for "web":
+  --dev            Dev mode: vite + hot-reload server, no production bundle.
+                   Much lighter on small machines (skips the 7000-module build).
+                   Opens http://localhost:5173. --port/--build do not apply.
   --port <n>       Server port. Default 3030 (or $PORT).
   --host <name>    Bind host. Default localhost.
   --workspace <p>  Workspace folder served by the server. Default: current directory.
@@ -48,6 +51,7 @@ function parseArgs(argv) {
     open: true,
     build: false,
     skipBuild: false,
+    dev: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -64,6 +68,8 @@ function parseArgs(argv) {
       opts.build = true;
     } else if (a === "--skip-build") {
       opts.skipBuild = true;
+    } else if (a === "--dev") {
+      opts.dev = true;
     } else {
       throw new Error(`Unknown option "${a}". Run "ducky --help".`);
     }
@@ -128,6 +134,10 @@ function openBrowser(url) {
 
 async function cmdWeb(rest) {
   const opts = parseArgs(rest);
+  if (opts.dev) {
+    await cmdWebDev(opts);
+    return;
+  }
   if (opts.build && opts.skipBuild) throw new Error("Use only one of --build / --skip-build");
   if (opts.skipBuild) {
     if (!existsSync(join(webDist, "index.html"))) throw new Error(`Missing web dist: ${webDist}. Run "ducky web --build".`);
@@ -168,6 +178,40 @@ async function cmdWeb(rest) {
     const ready = await waitForServer(`${url}/api/server-info`);
     if (ready) openBrowser(url);
     else console.log(`[ducky] server did not answer yet, open manually: ${url}`);
+  }
+  await new Promise(() => {});
+}
+
+async function cmdWebDev(opts) {
+  // Dev mode skips the production bundle entirely: vite serves the Web UI
+  // from source (http://localhost:5173, proxies /ws + /api to :3030) while
+  // the server runs with hot reload. Peak RAM is a fraction of `vite build`,
+  // which matters on 2-3GB machines where the prod bundle OOMs or thrashes.
+  if (opts.build || opts.skipBuild) {
+    console.log("[ducky] --dev ignores --build/--skip-build (no bundle is produced).");
+  }
+  console.log("[ducky] Ducky Coder dev UI -> http://localhost:5173");
+  console.log("[ducky] backend (hot reload) -> http://localhost:3030");
+  const child = spawn("pnpm", ["dev:web"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+    env: { ...process.env },
+  });
+  const shutdown = () => {
+    if (!child.killed) child.kill("SIGTERM");
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+  child.on("exit", (code, signal) => {
+    process.removeListener("SIGINT", shutdown);
+    process.removeListener("SIGTERM", shutdown);
+    if (signal) console.log(`[ducky] dev stack stopped (${signal})`);
+    else if (code !== 0 && code !== null) process.exitCode = code;
+  });
+  if (opts.open) {
+    const ready = await waitForServer("http://localhost:5173/", 60000);
+    if (ready) openBrowser("http://localhost:5173/");
+    else console.log("[ducky] vite is taking a while; open http://localhost:5173/ manually.");
   }
   await new Promise(() => {});
 }

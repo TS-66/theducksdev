@@ -31,6 +31,8 @@ DUCKY_VERSION=3.14.3 curl -fsSL https://raw.githubusercontent.com/TS-66/theducks
 
 Then run `ducky` (terminal UI) or `ducky --web` (browser UI). You need Node.js **24.14.0+** on your machine; everything else ships in the release tarball. To publish a release, push a version tag (see Packaging → Release below) — CI builds the tarball and attaches it to the GitHub Release, which is what the installer downloads.
 
+> **Small machine (2–4 GB RAM)?** Skip the production bundle entirely: `./bin/ducky web --dev` runs vite + the backend with hot reload and opens `http://localhost:5173`. It uses a fraction of the RAM that `vite build` needs (the "modules transformed" stall / `Killed` exit 137 comes from the 7000-module production bundle, which `--dev` never runs).
+
 ### Tutorial 1 — Open the Web UI from source (fastest start for contributors)
 
 Requirements: Git, Node.js **24.14.0**, pnpm **10.33.2** ([mise.toml](mise.toml) is the source of truth).
@@ -214,7 +216,7 @@ The `release-ducky` workflow (`.github/workflows/release-ducky.yml`) builds the 
 ## Troubleshooting
 
 - **`ducky: command not found`** — run `./bin/ducky install`, then ensure `~/.local/bin` is on `PATH` (`export PATH="$HOME/.local/bin:$PATH"`), open a new shell, and retry.
-- **Web build gets `Killed` / exit 137** — the machine ran out of RAM while bundling (7000+ modules). `ducky web --build` already sizes the Node heap to ~75% of total RAM (override with `NODE_OPTIONS=--max-old-space-size=4096 ./bin/ducky web --build`). If it still dies: close other apps, add swap (e.g. `sudo fallocate -l 4G /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`), or build on a bigger machine and copy `packages/web/dist` + `packages/server/dist` over, then run `./bin/ducky web --skip-build`. Easiest of all: install a published release instead of building (`curl -fsSL .../install.sh | bash`, Tutorial 0).
+- **Web build gets `Killed` / exit 137, or stalls at "modules transformed"** — the machine ran out of RAM while bundling (7000+ modules) and started thrashing (that lag is your whole PC slowing down). Fastest fix: don't bundle at all — `./bin/ducky web --dev` serves from source with hot reload on `http://localhost:5173`. If you need the production bundle: `ducky web --build` already sizes the Node heap to ~75% of total RAM and auto-enables low-memory mode under 4.5 GB (override with `NODE_OPTIONS=--max-old-space-size=4096` / `DUCKY_LOW_MEM=1`). Still dies: close other apps, add swap (e.g. `sudo fallocate -l 4G /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`), or build on a bigger machine and copy `packages/web/dist` + `packages/server/dist` over, then run `./bin/ducky web --skip-build`. Easiest of all: install a published release instead of building (`curl -fsSL .../install.sh | bash`, Tutorial 0).
 - **`ducky install` reports `EEXIST`** — fixed; pull latest and rerun. A stale/broken `~/.local/bin/ducky` is now replaced automatically.
 - **Engine warning (`wanted node 24.14.0, current v24.21.0`)** — harmless; any Node 24 works.
 - **Port in use** — pass another one: `./bin/ducky web --port 3040`.
