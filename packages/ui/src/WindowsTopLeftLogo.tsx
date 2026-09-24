@@ -1,5 +1,5 @@
 import { cn } from "@/components/lib/utils.js";
-import zaiLogoUrl from "@/assets/provider-icons/logo-zai.svg";
+import duckyLogoUrl from "@/assets/ducky-logo.png";
 
 export function WindowsTopLeftLogo({
   className,
@@ -20,8 +20,8 @@ export function WindowsTopLeftLogo({
       )}
     >
       <img
-        src={zaiLogoUrl}
-        alt="ZCode"
+        src={duckyLogoUrl}
+        alt="Ducky Coder"
         className={cn("pointer-events-none size-5 select-none", imageClassName)}
         draggable={false}
       />

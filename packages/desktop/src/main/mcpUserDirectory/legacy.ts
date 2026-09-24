@@ -9,7 +9,7 @@ import type {
   McpServerConfig,
   MigrateLegacyCommonMcpRequest,
   MigrateLegacyCommonMcpResult,
-} from "@zcode/shared";
+} from "@ducky/shared";
 import { isRecord, normalizeServerMap } from "./utils.js";
 
 function extractBalancedJson(text: string, startIndex: number): string | null {
@@ -206,10 +206,10 @@ function buildLegacyCommonMcpStorageCandidates(request?: MigrateLegacyCommonMcpR
 
   candidates.push(
     join(localAppData, "ai.z.work", "EBWebView", "Default", "Local Storage", "leveldb"),
-    join(appData, "ZCode", "Local Storage", "leveldb"),
-    join(appData, "ZCode", "Partitions", "zcode-embedded-browser", "Local Storage", "leveldb"),
-    join(appData, "ZCode Dev", "Local Storage", "leveldb"),
-    join(appData, "ZCode Dev", "Partitions", "zcode-embedded-browser", "Local Storage", "leveldb"),
+    join(appData, "Ducky", "Local Storage", "leveldb"),
+    join(appData, "Ducky", "Partitions", "ducky-embedded-browser", "Local Storage", "leveldb"),
+    join(appData, "Ducky Dev", "Local Storage", "leveldb"),
+    join(appData, "Ducky Dev", "Partitions", "ducky-embedded-browser", "Local Storage", "leveldb"),
   );
 
   return Array.from(new Set(candidates));

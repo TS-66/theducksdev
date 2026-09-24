@@ -4,8 +4,8 @@ import type {
   PluginSyncImportResult,
   PluginSyncRemoteStatusResult,
   RemoteSyncWriteAccessResult,
-} from "@zcode/shared";
-import { ServiceChannels } from "@zcode/shared";
+} from "@ducky/shared";
+import { ServiceChannels } from "@ducky/shared";
 import { createServiceDescriptor } from "../descriptors.js";
 
 export interface IPluginSyncService {

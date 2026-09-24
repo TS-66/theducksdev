@@ -34,7 +34,7 @@
  */
 
 /*
- * styles.css 是从 @zcode/ui 包里被 web/desktop 间接引入的，Tailwind v4 在这种工作区场景下
+ * styles.css 是从 @ducky/ui 包里被 web/desktop 间接引入的，Tailwind v4 在这种工作区场景下
  * 仅靠 source(".") 不能稳定把 UI 包里的 TSX 组件都加入扫描，像 Select 这类新组件用到的
  * bg-popover、shadow-md、overflow-x-hidden 等 utility 会直接缺席，页面就只剩下一部分“碰巧命中”的通用类。
  * 这里显式补一条 @source，让 Tailwind 始终扫描 UI 包源码，避免下拉框、菜单这类组件渲染成半残状态。
@@ -897,7 +897,7 @@ body {
   }
 }
 
-@keyframes zcode-stream-text-in {
+@keyframes ducky-stream-text-in {
   0% {
     opacity: 0;
   }
@@ -907,7 +907,7 @@ body {
   }
 }
 
-@keyframes zcode-draft-prompt-waterfall {
+@keyframes ducky-draft-prompt-waterfall {
   from {
     opacity: 0;
     clip-path: inset(0 0 100% 0);
@@ -922,7 +922,7 @@ body {
 }
 
 .zcode-draft-prompt-waterfall {
-  animation: zcode-draft-prompt-waterfall 260ms cubic-bezier(0.22, 1, 0.36, 1)
+  animation: ducky-draft-prompt-waterfall 260ms cubic-bezier(0.22, 1, 0.36, 1)
     var(--zcode-draft-prompt-waterfall-delay, 0ms) both;
 }
 
@@ -960,7 +960,7 @@ body {
   }
 }
 
-@keyframes zcode-stream-marker-in {
+@keyframes ducky-stream-marker-in {
   0% {
     color: transparent;
   }
@@ -971,19 +971,19 @@ body {
 }
 
 [data-zcode-stream-animate="true"] {
-  animation: zcode-stream-text-in 900ms cubic-bezier(0.16, 1, 0.3, 1)
+  animation: ducky-stream-text-in 900ms cubic-bezier(0.16, 1, 0.3, 1)
     var(--zcode-stream-animation-delay, 0ms) both;
   will-change: opacity;
 }
 
 [data-zcode-stream-marker-animate="true"]::marker {
-  animation: zcode-stream-marker-in 900ms cubic-bezier(0.16, 1, 0.3, 1)
+  animation: ducky-stream-marker-in 900ms cubic-bezier(0.16, 1, 0.3, 1)
     var(--zcode-stream-animation-delay, 0ms) both;
 }
 
 [data-zcode-tool-stream-animate="true"],
 [data-zcode-chat-loading-animate="true"] {
-  animation: zcode-stream-text-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ducky-stream-text-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: opacity;
 }
 
@@ -991,14 +991,14 @@ body {
    assistant 历史区自动结束收起需要在延迟卸载期间继续播放高度动画，
    所以这里用 !important 覆盖 Radix 的 inline style，只作用于显式标记的收起窗口。 */
 [data-zcode-collapsible-animate-close="true"][data-state="closed"] {
-  animation: zcode-collapsible-up 300ms ease-in-out forwards !important;
+  animation: ducky-collapsible-up 300ms ease-in-out forwards !important;
 }
 
 [data-zcode-collapsible-animate-close="true"][data-state="closed"] > * {
-  animation: zcode-collapsible-fade-out 300ms ease-in-out forwards !important;
+  animation: ducky-collapsible-fade-out 300ms ease-in-out forwards !important;
 }
 
-@keyframes zcode-collapsible-up {
+@keyframes ducky-collapsible-up {
   from {
     height: var(--radix-collapsible-content-height);
   }
@@ -1008,7 +1008,7 @@ body {
   }
 }
 
-@keyframes zcode-collapsible-fade-out {
+@keyframes ducky-collapsible-fade-out {
   from {
     opacity: 1;
   }
@@ -1037,7 +1037,7 @@ body {
 }
 
 .zcode-reaction-burst > svg {
-  animation: zcode-reaction-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: ducky-reaction-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .zcode-reaction-burst::after {
@@ -1052,14 +1052,14 @@ body {
   background: transparent;
   opacity: 0;
   pointer-events: none;
-  animation: zcode-reaction-particles 560ms cubic-bezier(0.16, 1, 0.3, 1) 60ms forwards;
+  animation: ducky-reaction-particles 560ms cubic-bezier(0.16, 1, 0.3, 1) 60ms forwards;
 }
 
-.animate-zcode-alarm-ring {
-  animation: zcode-alarm-ring 600ms ease-in-out infinite;
+.animate-ducky-alarm-ring {
+  animation: ducky-alarm-ring 600ms ease-in-out infinite;
 }
 
-@keyframes zcode-alarm-ring {
+@keyframes ducky-alarm-ring {
   0%,
   100% {
     transform: rotate(-10deg);
@@ -1070,7 +1070,7 @@ body {
   }
 }
 
-@keyframes zcode-reaction-pop {
+@keyframes ducky-reaction-pop {
   0% {
     transform: scale(0);
   }
@@ -1088,7 +1088,7 @@ body {
   }
 }
 
-@keyframes zcode-reaction-particles {
+@keyframes ducky-reaction-particles {
   0% {
     opacity: 0;
     box-shadow:
@@ -1136,7 +1136,7 @@ body {
   }
 }
 
-@keyframes zcode-task-interaction-countdown {
+@keyframes ducky-task-interaction-countdown {
   from {
     transform: scaleX(var(--zcode-interaction-progress, 1));
   }
@@ -1146,7 +1146,7 @@ body {
 }
 
 .zcode-task-interaction-countdown-fill {
-  animation: zcode-task-interaction-countdown var(--zcode-interaction-remaining-ms, 240000ms) linear
+  animation: ducky-task-interaction-countdown var(--zcode-interaction-remaining-ms, 240000ms) linear
     forwards;
 }
 
@@ -1179,11 +1179,11 @@ body {
     color-mix(in oklab, var(--color-primary-foreground) 62%, transparent),
     transparent
   );
-  animation: zcode-update-charge-sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  animation: ducky-update-charge-sweep 1.15s cubic-bezier(0.65, 0, 0.35, 1) infinite;
   transform: translateX(-120%);
 }
 
-@keyframes zcode-update-charge-sweep {
+@keyframes ducky-update-charge-sweep {
   0% {
     opacity: 0.35;
     transform: translateX(-120%);

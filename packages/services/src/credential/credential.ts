@@ -1,4 +1,4 @@
-import { ServiceChannels } from "@zcode/shared";
+import { ServiceChannels } from "@ducky/shared";
 import { createServiceDescriptor } from "../descriptors.js";
 
 /**

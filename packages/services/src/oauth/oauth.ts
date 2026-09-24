@@ -5,8 +5,8 @@ import type {
   OAuthProviderMeta,
   OAuthStartResponse,
   UserInfo,
-} from "@zcode/shared";
-import { ServiceChannels } from "@zcode/shared";
+} from "@ducky/shared";
+import { ServiceChannels } from "@ducky/shared";
 import { createServiceDescriptor } from "../descriptors.js";
 
 /**
@@ -70,6 +70,12 @@ export interface IOAuthService {
    * @param provider - 可选；不传时取消当前 pending
    */
   cancelPending(provider?: OAuthProviderId): Promise<void>;
+
+  /**
+   * 401 候选请求复核：是当前 OAuth 凭据触发的则清理并返回 true。
+   * Guest 模式恒返回 false（无 OAuth 会话可失效）。
+   */
+  logoutIfCurrentCredentialRequest(input: string | URL, headers: Headers): Promise<boolean>;
 }
 
 export const IOAuthService = createServiceDescriptor<IOAuthService>(ServiceChannels.OAuth);

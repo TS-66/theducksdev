@@ -10,7 +10,7 @@ import {
   type FeedbackTicketModule,
   type FeedbackTicketSeverity,
   type FeedbackTicketType,
-} from "@zcode/shared";
+} from "@ducky/shared";
 import { toast } from "@/components/ui/toast.js";
 import { FeedbackErrorTip } from "@/feedback/feedbackBadges.js";
 import { readFeedbackContactPreference } from "@/feedback/feedbackContactPreference.js";
@@ -47,11 +47,11 @@ import {
   DEFAULT_FEEDBACK_TYPE,
   startSimplifiedFeedbackSubmission,
 } from "@/feedback/feedbackSubmitSubmission.js";
-import type { IFeedbackService } from "@zcode/services";
-import type { IPlatformService } from "@zcode/shared";
-import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import type { IFeedbackService } from "@ducky/services";
+import type { IPlatformService } from "@ducky/shared";
+import { useDuckyIntl } from "@/i18n/IntlProvider.js";
 import { useTabStore } from "@/store/TabStoreProvider.js";
-import { selectWorkspaceZCodeState, useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
+import { selectWorkspaceDuckyState, useDuckySessionStore } from "@/store/duckySessionStore.js";
 
 export { SubmitProgressView } from "@/feedback/FeedbackSubmitProgressView.js";
 export { readCurrentAgentModelContext } from "@/feedback/feedbackSubmitModelContext.js";
@@ -89,7 +89,7 @@ export function FeedbackSubmitForm({
   onViewTickets: () => void;
   onCancel: () => void;
 }) {
-  const { intl, locale } = useZCodeIntl();
+  const { intl, locale } = useDuckyIntl();
   const formatMessage = useCallback(
     (id: string, values?: Record<string, string>) => intl.formatMessage({ id }, values),
     [intl],
@@ -396,13 +396,13 @@ function useActiveFeedbackModelContext(): FeedbackAgentModelContext {
   const activeWorkspaceIdentity = useTabStore(
     (state) => state.activeWorkspaceIdentity ?? undefined,
   );
-  const workspaceZCodeState = useZCodeSessionStore((state) =>
+  const workspaceDuckyState = useDuckySessionStore((state) =>
     activeWorkspacePath
-      ? selectWorkspaceZCodeState(state, activeWorkspacePath, activeWorkspaceIdentity)
+      ? selectWorkspaceDuckyState(state, activeWorkspacePath, activeWorkspaceIdentity)
       : null,
   );
   return useMemo(
-    () => readCurrentAgentModelContext(workspaceZCodeState?.configOptions),
-    [workspaceZCodeState?.configOptions],
+    () => readCurrentAgentModelContext(workspaceDuckyState?.configOptions),
+    [workspaceDuckyState?.configOptions],
   );
 }

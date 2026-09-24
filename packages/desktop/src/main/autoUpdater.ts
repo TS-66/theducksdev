@@ -1,20 +1,20 @@
 /* eslint-disable max-lines -- autoUpdater 需要集中维护 Electron 事件、菜单状态与 IPC 交互，过度拆分会让更新状态流更难追踪 */
-import type { ISettingService } from "@zcode/services";
+import type { ISettingService } from "@ducky/services";
 import {
   DEFAULT_LOCALE,
-  DEFAULT_ZCODE_ENDPOINT_ORIGIN,
+  DEFAULT_DUCKY_ENDPOINT_ORIGIN,
   desktopMenuMessageIds,
   formatDesktopMenuMessage,
   getDesktopMenuMessage,
   PlatformChannels,
-  resolveRuntimeZCodeEndpointOrigin,
-  ZCODE_VERSION,
+  resolveRuntimeDuckyEndpointOrigin,
+  DUCKY_VERSION,
   type ElectronReleaseChannel,
   type Locale,
   type PostUpdateReleaseNotesPayload,
   type UpdateCheckResultPayload,
   type UpdateStatePayload,
-} from "@zcode/shared";
+} from "@ducky/shared";
 import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import pkg, { CancellationToken } from "electron-updater";
 import semver from "semver";
@@ -24,12 +24,15 @@ const { autoUpdater } = pkg;
 
 export const CHECK_FOR_UPDATE_MENU_ID = "check-for-update";
 const AUTO_UPDATE_POLL_INTERVAL_MS = 60 * 60 * 1000;
-const UPDATE_FEED_URL_ENV = "ZCODE_UPDATE_FEED_URL";
-const UPDATE_FEED_URL_SWITCH = "--zcode-update-feed-url";
-const DEV_AUTO_UPDATE_ENV = "ZCODE_AUTO_UPDATE_DEV";
-const DEV_AUTO_UPDATE_SWITCH = "--zcode-auto-update-dev";
-const DEV_AUTO_UPDATE_VERSION_ENV = "ZCODE_AUTO_UPDATE_DEV_VERSION";
-const DEV_AUTO_UPDATE_VERSION_SWITCH = "--zcode-auto-update-dev-version";
+const UPDATE_FEED_URL_ENV = "DUCKY_UPDATE_FEED_URL";
+const UPDATE_FEED_URL_SWITCH = "--ducky-update-feed-url";
+const LEGACY_UPDATE_FEED_URL_SWITCH = "--zcode-update-feed-url";
+const DEV_AUTO_UPDATE_ENV = "DUCKY_AUTO_UPDATE_DEV";
+const DEV_AUTO_UPDATE_SWITCH = "--ducky-auto-update-dev";
+const LEGACY_DEV_AUTO_UPDATE_SWITCH = "--zcode-auto-update-dev";
+const DEV_AUTO_UPDATE_VERSION_ENV = "DUCKY_AUTO_UPDATE_DEV_VERSION";
+const DEV_AUTO_UPDATE_VERSION_SWITCH = "--ducky-auto-update-dev-version";
+const LEGACY_DEV_AUTO_UPDATE_VERSION_SWITCH = "--zcode-auto-update-dev-version";
 let readyUpdateVersion: string | null = null;
 let readyUpdateReleaseNotes: PostUpdateReleaseNotesPayload | null = null;
 let readyUpdateRestoredFromPendingReleaseNotes = false;
@@ -73,7 +76,7 @@ type UpdateDownloadedInfoLike = {
   path?: string | null;
   files?: Array<{ url?: string | null } | null> | null;
   packages?: Record<string, { path?: string | null } | null> | null;
-  zcodeReleaseChannel?: ElectronReleaseChannel | null;
+  duckyReleaseChannel?: ElectronReleaseChannel | null;
   releaseName?: string | null;
   releaseNotes?: string | ReleaseNoteInfoLike[] | null;
   releaseDate?: string | Date | null;
@@ -147,7 +150,8 @@ function readCommandLineSwitchValue(name: string): string | null {
 function isDevAutoUpdateEnabled(): boolean {
   return (
     isTruthyRuntimeFlag(process.env[DEV_AUTO_UPDATE_ENV]) ||
-    readCommandLineSwitchValue(DEV_AUTO_UPDATE_SWITCH) !== null
+    (readCommandLineSwitchValue(DEV_AUTO_UPDATE_SWITCH) ??
+      readCommandLineSwitchValue(LEGACY_DEV_AUTO_UPDATE_SWITCH)) !== null
   );
 }
 
@@ -166,8 +170,9 @@ function getCurrentAppVersionForUpdate(): string {
 function resolveDevAutoUpdateVersion(): string | null {
   const configuredVersion =
     process.env[DEV_AUTO_UPDATE_VERSION_ENV]?.trim() ||
-    readCommandLineSwitchValue(DEV_AUTO_UPDATE_VERSION_SWITCH)?.trim() ||
-    ZCODE_VERSION;
+    (readCommandLineSwitchValue(DEV_AUTO_UPDATE_VERSION_SWITCH) ??
+      readCommandLineSwitchValue(LEGACY_DEV_AUTO_UPDATE_VERSION_SWITCH))?.trim() ||
+    DUCKY_VERSION;
   const parsed = semver.parse(configuredVersion);
   if (!parsed) {
     logger.warn(`[auto-update] ignore invalid dev update version=${configuredVersion}`);
@@ -241,8 +246,8 @@ function getAutoUpdaterReleaseChannelForCurrentState(): ElectronReleaseChannel {
 function readUpdateInfoReleaseChannel(
   info: UpdateDownloadedInfoLike,
 ): ElectronReleaseChannel | null {
-  return info.zcodeReleaseChannel === "preview" || info.zcodeReleaseChannel === "stable"
-    ? info.zcodeReleaseChannel
+  return info.duckyReleaseChannel === "preview" || info.duckyReleaseChannel === "stable"
+    ? info.duckyReleaseChannel
     : null;
 }
 
@@ -700,7 +705,10 @@ export function resolveUpdateFeedSourceFromStartupConfig(
 ): RuntimeUpdateFeedSource | undefined {
   const argv = options.argv ?? process.argv;
   const env = options.env ?? process.env;
-  const feedUrl = readSwitchValue(argv, UPDATE_FEED_URL_SWITCH) ?? env[UPDATE_FEED_URL_ENV]?.trim();
+  const feedUrl =
+    readSwitchValue(argv, UPDATE_FEED_URL_SWITCH) ??
+    readSwitchValue(argv, LEGACY_UPDATE_FEED_URL_SWITCH) ??
+    env[UPDATE_FEED_URL_ENV]?.trim();
   if (!feedUrl) {
     return undefined;
   }
@@ -756,12 +764,12 @@ function applyManifestUpdateProvider(options: InitAutoUpdaterOptions): void {
   autoUpdater.setFeedURL({
     provider: "custom",
     updateProvider: ManifestUpdateProvider,
-    endpointOrigin: DEFAULT_ZCODE_ENDPOINT_ORIGIN,
+    endpointOrigin: DEFAULT_DUCKY_ENDPOINT_ORIGIN,
     ...(manifestUrl ? { manifestUrl } : {}),
     releasePlatform: getElectronReleasePlatform(),
     deviceMid: options.deviceMid,
     resolveEndpointOrigin:
-      options.resolveEndpointOrigin ?? (() => resolveRuntimeZCodeEndpointOrigin(process.env)),
+      options.resolveEndpointOrigin ?? (() => resolveRuntimeDuckyEndpointOrigin(process.env)),
     resolveReleaseChannel: async () => {
       availableUpdateChannel = await resolveUpdateReleaseChannel(options.settingService);
       return availableUpdateChannel;

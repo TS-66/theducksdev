@@ -6,9 +6,9 @@ import {
   resolveModelProviderFamilySpecByProviderId,
   type UsageEntitlementSubscriptionDetail,
   type UsageQuotaLimit,
-  type ZCodeAccountAccess,
-  type ZCodeProviderAccountAccess,
-} from "@zcode/shared";
+  type DuckyAccountAccess,
+  type DuckyProviderAccountAccess,
+} from "@ducky/shared";
 import { InfoIcon, Loader2Icon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button.js";
@@ -17,7 +17,7 @@ import { logger } from "@/logger.js";
 import { LocalizedCodingPlanQuotaResetAction } from "@/components/coding-plan-quota-reset/CodingPlanQuotaResetAction.js";
 import { CodingPlanQuotaResetOpportunity } from "@/components/coding-plan-quota-reset/CodingPlanQuotaResetOpportunity.js";
 import { buildCodingPlanQuotaResetDialogConfig } from "@/components/coding-plan-quota-reset/buildCodingPlanQuotaResetDialogConfig.js";
-import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import { useDuckyIntl } from "@/i18n/IntlProvider.js";
 import { useCodingPlanQuotaResetUi } from "@/hooks/useCodingPlanQuotaResetUi.js";
 import {
   formatQuotaResetTime,
@@ -121,7 +121,7 @@ export function PresetProviderPlaceholderCard({
   displayName: string;
   messageId?: string;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl } = useDuckyIntl();
 
   return (
     <div className="bg-background/50 rounded-2xl p-3">
@@ -213,10 +213,10 @@ export function CodingPlanStatusPanel({
   teamPlanAvailabilityReason?: TeamPlanAvailabilityReason;
   /** Team Plan 必须传完整连接 key，避免与同 provider 的个人套餐共享重置状态。 */
   quotaResetSourceKey?: string;
-  quotaResetAccountAccess?: ZCodeProviderAccountAccess | ZCodeAccountAccess;
+  quotaResetAccountAccess?: DuckyProviderAccountAccess | DuckyAccountAccess;
   onQuotaResetEntitlementRefresh?: () => void | Promise<void>;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl } = useDuckyIntl();
   const [internalUpgradePlansVisible, setInternalUpgradePlansVisible] = useState(false);
   const [startPlanEntitlementRefreshing, setStartPlanEntitlementRefreshing] = useState(false);
   const upgradePlansVisible = controlledUpgradePlansVisible ?? internalUpgradePlansVisible;
@@ -719,10 +719,10 @@ function CodingPlanUsageSummaryCards({
   mcpQuotaLimit: UsageQuotaLimit | null;
   sourceKey: string;
   preferredProviderId: string;
-  accountAccess?: ZCodeProviderAccountAccess | ZCodeAccountAccess;
+  accountAccess?: DuckyProviderAccountAccess | DuckyAccountAccess;
   onEntitlementRefresh?: () => void | Promise<void>;
 }) {
-  const { intl, locale } = useZCodeIntl();
+  const { intl, locale } = useDuckyIntl();
   const [quotaResetDialogOpen, setQuotaResetDialogOpen] = useState(false);
   const resetUi = useCodingPlanQuotaResetUi({
     sourceKey,
@@ -889,7 +889,7 @@ function CodingPlanUsageSummaryCards({
             infoDescription={
               card.key === "serverMcp"
                 ? intl.formatMessage({
-                    id: "sidebar.usage.plan.zcodeMcpDescription",
+                    id: "sidebar.usage.plan.duckyMcpDescription",
                   })
                 : undefined
             }
@@ -951,7 +951,7 @@ function isDisplayableUsageLimit(limit: UsageQuotaLimit): boolean {
 
 function resolveGenericUsageLimitLabel(
   limit: UsageQuotaLimit,
-  intl: ReturnType<typeof useZCodeIntl>["intl"],
+  intl: ReturnType<typeof useDuckyIntl>["intl"],
 ): string {
   if (limit.type === "TIME_LIMIT") {
     return intl.formatMessage({
@@ -980,7 +980,7 @@ function PlanUsageMetricCard({
   progressColor: string;
   resetTimeFormat: "date" | "dateTime";
 }) {
-  const { locale } = useZCodeIntl();
+  const { locale } = useDuckyIntl();
   const remainingPercentage = resolveLimitRemainingPercentage(limit);
   const progressPercentage = remainingPercentage ?? 0;
   const modelLabel = limit && limit.type !== "TIME_LIMIT" ? formatLimitModels(limit) : "";

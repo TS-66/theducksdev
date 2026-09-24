@@ -37,8 +37,8 @@ modules:
   - id: server
     roots: [packages/server/src]
     managed: false
-  - id: zcode-server-cli
-    roots: [packages/zcode-server-cli/src]
+  - id: ducky-server-cli
+    roots: [packages/ducky-server-cli/src]
     managed: false
   - id: ui
     roots: [packages/ui/src]
@@ -52,8 +52,8 @@ modules:
   - id: formal-proof
     roots: [packages/formal-proof/src]
     managed: false
-  - id: zcode-cli
-    roots: [apps/zcode-cli]
+  - id: ducky-cli
+    roots: [apps/ducky-cli]
     managed: false
 
 global:

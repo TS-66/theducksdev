@@ -17,7 +17,7 @@ export const WORKSPACE_HOOK_EVENT_NAMES = [
 ] as const;
 
 export type WorkspaceHookEventName = (typeof WORKSPACE_HOOK_EVENT_NAMES)[number];
-export type WorkspaceHookConfigFileKind = "zcode.json" | ".zcode/config.json" | "explicit";
+export type WorkspaceHookConfigFileKind = "ducky.json" | ".zcode/config.json" | "explicit";
 
 const positiveNumberSchema = z.number().finite().positive();
 
@@ -173,7 +173,7 @@ export function resolveWorkspaceHookConfiguredGates(input: {
  */
 function buildWorkspaceHookCandidatePaths(directories: readonly string[]): string[] {
   return directories.flatMap((directory) => [
-    join(directory, "zcode.json"),
+    join(directory, "ducky.json"),
     join(directory, ".zcode", "config.json"),
   ]);
 }
@@ -236,8 +236,8 @@ export function createWorkspaceHookSourceInput(input: {
     discoveryOrder: input.discoveryOrder,
     configFileKind: explicitProjectConfig
       ? "explicit"
-      : basename(canonicalPath) === "zcode.json"
-        ? "zcode.json"
+      : basename(canonicalPath) === "ducky.json"
+        ? "ducky.json"
         : ".zcode/config.json",
     explicitProjectConfig,
     editable:

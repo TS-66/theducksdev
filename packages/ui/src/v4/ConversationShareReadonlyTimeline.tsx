@@ -25,7 +25,7 @@ import {
   SquareTerminalIcon,
   WrenchIcon,
 } from "lucide-react";
-import { getCompactToolCallStatusMessageId, type Locale } from "@zcode/shared";
+import { getCompactToolCallStatusMessageId, type Locale } from "@ducky/shared";
 import type {
   ArtifactRow,
   AssistantTextRow,
@@ -34,7 +34,7 @@ import type {
   TimelineMarkerRow,
   ToolCallRow,
   UserInputRow,
-} from "@zcode/shared/zcode-protocol-v4";
+} from "@ducky/shared/ducky-protocol-v4";
 import { MessageResponse, type MessageFileLinkTarget } from "@/components/ai-elements/message.js";
 import {
   Reasoning,
@@ -69,7 +69,7 @@ import {
   DEFAULT_CODE_PREVIEW_SETTINGS,
   type CodePreviewSettings,
 } from "@/lib/codePreviewSettings.js";
-import { ZCodeIntlProvider, useZCodeIntl } from "@/i18n/IntlProvider.js";
+import { DuckyIntlProvider, useDuckyIntl } from "@/i18n/IntlProvider.js";
 import type { Theme } from "@/useTheme.js";
 import { FileDisplayIcon, resolveFileDisplayDescriptor } from "@/lib/fileDisplay.js";
 import { formatAttachmentSize } from "@/lib/chatAttachmentMetadata.js";
@@ -269,7 +269,7 @@ const AssistantTextPresentation = memo(function AssistantTextPresentation({
           streaming={false}
           theme={theme}
           codePreviewSettings={codePreviewSettings}
-          renderZCodeFileCitations={false}
+          renderDuckyFileCitations={false}
           onOpenExternalUrl={onOpenExternalUrl}
         >
           {markdown}
@@ -342,7 +342,7 @@ const ToolCallPresentation = memo(function ToolCallPresentation({
   artifactNames: ReadonlyMap<string, string>;
   onOpenExternalUrl: (url: string) => void;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl } = useDuckyIntl();
   const output = row.output?.text?.trim();
   const markdown = useMemo(
     () => (output ? normalizeConversationShareMarkdown(output, artifactNames) : ""),
@@ -391,7 +391,7 @@ const ToolCallPresentation = memo(function ToolCallPresentation({
     <MessageResponse
       theme={theme}
       codePreviewSettings={codePreviewSettings}
-      renderZCodeFileCitations={false}
+      renderDuckyFileCitations={false}
       onOpenExternalUrl={onOpenExternalUrl}
     >
       {markdown}
@@ -437,7 +437,7 @@ const ArtifactPresentation = memo(function ArtifactPresentation({
   url?: string;
   previewLabel: string;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl } = useDuckyIntl();
   const artifactOpenContext = useContext(ArtifactOpenContext);
   const OpenAction = artifactOpenContext?.openAction;
   // 与 AssistantPreviewCards 保持同一视觉：44px 图标底板 + 真实文件类型图标 + 中粗标题 + 类型副标题。
@@ -612,7 +612,7 @@ function GroupedToolPresentation({
   labels: ReadonlyLabels;
   onOpenExternalUrl: (url: string) => void;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl } = useDuckyIntl();
   const rows = item.rows;
   const groupLabel =
     item.kind === "cuaGroup"
@@ -788,7 +788,7 @@ function ReadonlyHistoryStatus({
   labels: ReadonlyLabels;
   locale: Locale;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl } = useDuckyIntl();
   const duration = formatConversationWorkDuration(segment.workStatus?.durationMs, intl, locale);
   const label =
     segment.workStatus?.state === "interrupted"
@@ -1105,7 +1105,7 @@ export function ConversationShareReadonlyTimeline({
           artifactPreview: "下载文件",
           markerCompact: "上下文已压缩",
           markerModelChange: "模型已切换",
-          unsupportedRows: "部分内容需要更新 ZCode 查看",
+          unsupportedRows: "部分内容需要更新 Ducky 查看",
         }
       : {
           history: "Reasoning",
@@ -1116,7 +1116,7 @@ export function ConversationShareReadonlyTimeline({
           artifactPreview: "Download file",
           markerCompact: "Context compacted",
           markerModelChange: "Model switched",
-          unsupportedRows: "Some content requires a newer version of ZCode",
+          unsupportedRows: "Some content requires a newer version of Ducky",
         };
   const artifactOpenContext = useMemo<ArtifactOpenContextValue | null>(() => {
     if (
@@ -1148,7 +1148,7 @@ export function ConversationShareReadonlyTimeline({
   ]);
   return (
     <TooltipProvider delayDuration={0}>
-      <ZCodeIntlProvider initialLocale={locale}>
+      <DuckyIntlProvider initialLocale={locale}>
         <PluginReferenceIconProvider value={null}>
           <ArtifactOpenContext.Provider value={artifactOpenContext}>
             <div className="@container/conversation flex flex-col" data-conversation-share-timeline>
@@ -1178,7 +1178,7 @@ export function ConversationShareReadonlyTimeline({
             </div>
           </ArtifactOpenContext.Provider>
         </PluginReferenceIconProvider>
-      </ZCodeIntlProvider>
+      </DuckyIntlProvider>
     </TooltipProvider>
   );
 }

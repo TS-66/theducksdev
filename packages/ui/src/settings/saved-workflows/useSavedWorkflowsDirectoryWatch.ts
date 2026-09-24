@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { IFileWatcherService } from "@zcode/services";
+import type { IFileWatcherService } from "@ducky/services";
 import { logger } from "@/logger.js";
 
 const WATCH_DEBOUNCE_MS = 300;
@@ -8,7 +8,7 @@ const WATCH_DEBOUNCE_MS = 300;
 function savedWorkflowsDirectoryPath(workspacePath: string): string {
   const separator = workspacePath.includes("\\") && !workspacePath.includes("/") ? "\\" : "/";
   const trimmed = workspacePath.replace(/[\\/]+$/u, "");
-  return `${trimmed}${separator}.zcode${separator}workflows`;
+  return `${trimmed}${separator}.ducky${separator}workflows`;
 }
 
 /**

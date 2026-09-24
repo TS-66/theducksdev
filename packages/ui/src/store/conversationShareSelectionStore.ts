@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { ConversationShareAccessMode } from "@zcode/shared";
-import type { ConversationShareFailureIssue } from "@zcode/services";
+import type { ConversationShareAccessMode } from "@ducky/shared";
+import type { ConversationShareFailureIssue } from "@ducky/services";
 
 type ConversationShareScope = "all" | "partial";
 type ConversationShareSelectionView = "selection" | "timeline";

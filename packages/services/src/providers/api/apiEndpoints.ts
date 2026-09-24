@@ -1,6 +1,6 @@
-import { buildRuntimeZCodeApiUrl, resolveZaiBusinessBaseUrl } from "@zcode/shared";
+import { buildRuntimeDuckyApiUrl, resolveZaiBusinessBaseUrl } from "@ducky/shared";
 
-export const ZCODE_CLIENT_SCENES_URL = buildRuntimeZCodeApiUrl(
+export const DUCKY_CLIENT_SCENES_URL = buildRuntimeDuckyApiUrl(
   process.env,
   "/api/v1/client/scenes",
 );

@@ -9,7 +9,7 @@ import {
   type ConversationShareApiErrorCode,
   type ConversationSharePreview,
   type Locale,
-} from "@zcode/shared";
+} from "@ducky/shared";
 
 const SHARE_CODE_PATTERN = /^[A-Za-z0-9._~-]{1,512}$/u;
 
@@ -244,7 +244,7 @@ export class ConversationSharePreviewClient {
       });
       throw new ConversationSharePreviewClientError({
         kind: "unsupported_schema_version",
-        message: "Conversation share requires a newer ZCode version",
+        message: "Conversation share requires a newer Ducky version",
         status: response.status,
       });
     }

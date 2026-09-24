@@ -1,5 +1,5 @@
-import type { IServiceAccessor } from "@zcode/services";
-import type { EnterpriseCodingPlanPricingProduct, ProviderFamilyDomain } from "@zcode/shared";
+import type { IServiceAccessor } from "@ducky/services";
+import type { EnterpriseCodingPlanPricingProduct, ProviderFamilyDomain } from "@ducky/shared";
 import { logger } from "@/logger.js";
 
 type EnterprisePricingProductsResult =

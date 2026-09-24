@@ -1,5 +1,5 @@
-import { HostResponseTypes } from "@zcode/shared";
-import { setNetworkTelemetrySink, type NetworkObservation } from "@zcode/rpc";
+import { HostResponseTypes } from "@ducky/shared";
+import { setNetworkTelemetrySink, type NetworkObservation } from "@ducky/rpc";
 
 interface HostNetworkTelemetryParentPort {
   postMessage(message: unknown): void;

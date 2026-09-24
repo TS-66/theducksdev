@@ -1,7 +1,7 @@
-import { resolveExecutionState, type ModelSelection } from "@zcode/shared";
-import { submissionModeSchema, type SubmissionMode } from "@zcode/shared/zcode-protocol-v4";
-import type { ModelSelectionView } from "@zcode/services";
-import { validateModelSelectionOptions } from "@zcode/provider";
+import { resolveExecutionState, type ModelSelection } from "@ducky/shared";
+import { submissionModeSchema, type SubmissionMode } from "@ducky/shared/ducky-protocol-v4";
+import type { ModelSelectionView } from "@ducky/services";
+import { validateModelSelectionOptions } from "@ducky/provider";
 
 export interface ComposerSubmissionConfig {
   modelSelection: ModelSelection;

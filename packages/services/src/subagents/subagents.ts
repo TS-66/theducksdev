@@ -1,5 +1,5 @@
 import type {
-  ZCodeProvider,
+  DuckyProvider,
   AgentSummary,
   AgentsListResult,
   AgentCreateParams,
@@ -8,15 +8,15 @@ import type {
   BuiltInSubagentModelOverrideParams,
   PluginSubagentModelOverrideParams,
   SubagentsListMode,
-} from "@zcode/shared";
-import { ServiceChannels } from "@zcode/shared";
+} from "@ducky/shared";
+import { ServiceChannels } from "@ducky/shared";
 import { createServiceDescriptor } from "../descriptors.js";
 
 export interface ISubagentsService {
   list(params: {
     workspacePath: string;
     workspaceIdentity?: string;
-    provider?: ZCodeProvider;
+    provider?: DuckyProvider;
     mode?: SubagentsListMode;
   }): Promise<AgentsListResult>;
 
@@ -28,7 +28,7 @@ export interface ISubagentsService {
   setPluginAgentModelOverride(params: PluginSubagentModelOverrideParams): Promise<void>;
 
   /** 当前筛选来源对应的用户级 agent 根目录（与内置扫描顺序一致，取 buildUserRoots 的首项）。 */
-  getPrimaryUserAgentsDirectory(params: { provider: ZCodeProvider }): Promise<{ path: string }>;
+  getPrimaryUserAgentsDirectory(params: { provider: DuckyProvider }): Promise<{ path: string }>;
 
   /** 创建新的 agent 文件 */
   createAgent(params: AgentCreateParams): Promise<{ agent: AgentSummary }>;

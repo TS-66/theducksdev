@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Ducky Coder launcher. Repo-local entrypoint; `ducky install` symlinks this into ~/.local/bin.
+exec node "$(dirname "$0")/../scripts/ducky.mjs" "$@"

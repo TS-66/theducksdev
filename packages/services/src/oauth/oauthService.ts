@@ -15,7 +15,7 @@ import {
   type OAuthUserProfile,
   type UserInfo,
   resolveJwtExpiration,
-} from "@zcode/shared";
+} from "@ducky/shared";
 import type { ICredentialService } from "../credential/credential.js";
 import { createServiceLogger } from "../logger/serviceLogger.js";
 import { readApiJson } from "../providers/api/apiJson.js";
@@ -31,13 +31,13 @@ import { OAuthCredentialRepo } from "./repo/oauthCredentialRepo.js";
 import { createOAuthRuntimeConfig } from "./runtimeConfig.js";
 import {
   buildDesktopOAuthRedirectUriFromEnv,
-  buildZCodeApiUrlFromEnv,
+  buildDuckyApiUrlFromEnv,
 } from "./providers/configUtils.js";
 
 /** OAuth 超时时间（5 分钟） */
 const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const COMPLETED_POLLING_STATE_GRACE_MS = 30 * 1000;
-const ZCODE_JWT_TOKEN_KEY = "zcodejwttoken";
+const DUCKY_JWT_TOKEN_KEY = "zcodejwttoken";
 const log = (...args: unknown[]) =>
   console.log(formatLogPrefix("oauthService", process.pid), ...args);
 const serviceLog = createServiceLogger("oauthService");
@@ -206,18 +206,18 @@ export class OAuthService implements IOAuthService {
       return { status: "signed-out" };
     }
 
-    // 启动缓存恢复只需要检查共享 zcode JWT；若通过 loadActiveTokenSet 连带读取
+    // 启动缓存恢复只需要检查共享 ducky JWT；若通过 loadActiveTokenSet 连带读取
     // provider access token，会把原本后台执行的 BigModel profile 迁移重新阻塞到首屏恢复链路。
-    const zcodeJwtToken = (await this.credentialService.load(ZCODE_JWT_TOKEN_KEY))?.trim() ?? "";
-    if (zcodeJwtToken && resolveJwtExpiration(zcodeJwtToken, this.now()).kind === "expired") {
-      serviceLog.info("cached session invalidated because zcode JWT expired", {
+    const duckyJwtToken = (await this.credentialService.load(DUCKY_JWT_TOKEN_KEY))?.trim() ?? "";
+    if (duckyJwtToken && resolveJwtExpiration(duckyJwtToken, this.now()).kind === "expired") {
+      serviceLog.info("cached session invalidated because ducky JWT expired", {
         provider: activeProvider,
       });
       const invalidated = await this.invalidateExpiredCachedSession(
         restoreGeneration,
         activeProvider,
         profile,
-        zcodeJwtToken,
+        duckyJwtToken,
       );
       if (!invalidated) {
         return this.restoreCachedSessionState();
@@ -256,7 +256,7 @@ export class OAuthService implements IOAuthService {
     }
 
     if (activeProvider === ZAI_PROVIDER_ID) {
-      if (!zcodeJwtToken) {
+      if (!duckyJwtToken) {
         // sidebar 登录入口之前只看缓存 user_info，会把“缺少 zcodejwttoken”的状态误判成已登录。
         // 这里补充 zcodejwttoken 门槛，确保没有后端 JWT 时统一按未登录处理。
         log("restoreCachedSession skipped: missing zcodejwttoken:", activeProvider);
@@ -277,7 +277,7 @@ export class OAuthService implements IOAuthService {
     const invalidated = await this.runSessionMutation(async () => {
       const currentProvider = await this.repo.getActiveProvider();
       const currentProfile = await this.repo.loadUserProfile(expectedProvider);
-      const currentJwt = (await this.credentialService.load(ZCODE_JWT_TOKEN_KEY))?.trim() ?? "";
+      const currentJwt = (await this.credentialService.load(DUCKY_JWT_TOKEN_KEY))?.trim() ?? "";
       if (
         this.oauthSessionGeneration !== expectedGeneration ||
         currentProvider !== expectedProvider ||
@@ -606,7 +606,7 @@ export class OAuthService implements IOAuthService {
     this.oauthFlowStartProvider = provider;
     this.clearPendingState();
     const pollToken = randomBytes(32).toString("hex");
-    const initUrl = buildZCodeApiUrlFromEnv(this.env, "/api/v1/oauth/cli/init");
+    const initUrl = buildDuckyApiUrlFromEnv(this.env, "/api/v1/oauth/cli/init");
     const envelope = await readApiJson<OAuthFlowEnvelope>(this.apiClient, initUrl, {
       method: "POST",
       headers: {
@@ -683,7 +683,7 @@ export class OAuthService implements IOAuthService {
         nextPollAt: this.now(),
         pollIntervalMs,
         pollToken,
-        pollUrl: buildZCodeApiUrlFromEnv(
+        pollUrl: buildDuckyApiUrlFromEnv(
           this.env,
           `/api/v1/oauth/cli/poll/${encodeURIComponent(flowId)}`,
         ),
@@ -781,9 +781,9 @@ export class OAuthService implements IOAuthService {
           pending.provider === ZAI_PROVIDER_ID
             ? readTrimmedString(zai?.access_token)
             : readTrimmedString(bigmodel?.access_token) || readTrimmedString(bigmodel?.accessToken);
-        const zcodeJwtToken = readTrimmedString(ready.token);
+        const duckyJwtToken = readTrimmedString(ready.token);
         const userId = readTrimmedString(user?.user_id);
-        if (!zcodeJwtToken || !providerAccessToken || !userId) {
+        if (!duckyJwtToken || !providerAccessToken || !userId) {
           throw new Error("OAuth flow 查询响应无效");
         }
         const username = readTrimmedString(user?.name) || readTrimmedString(user?.email) || userId;
@@ -804,12 +804,12 @@ export class OAuthService implements IOAuthService {
         const tokenSet = adapter.normalizePolledTokenSet
           ? await adapter.normalizePolledTokenSet({
               accessToken: providerAccessToken,
-              zcodeJwtToken,
+              duckyJwtToken,
               ...(refreshToken ? { refreshToken } : {}),
             })
           : {
               accessToken: providerAccessToken,
-              zcodeJwtToken,
+              duckyJwtToken,
               ...(refreshToken ? { refreshToken } : {}),
             };
         return { tokenSet, profile };
@@ -1178,16 +1178,70 @@ export class OAuthService implements IOAuthService {
 }
 
 /**
+ * Ducky Coder guest 模式：OAuth 登录已移除，工厂始终返回 signed-out 桩。
+ * 保留 OAuthService 类体以便编译通过；所有会话入口返回未登录，不再触碰凭据存储。
+ */
+class GuestOAuthService implements IOAuthService {
+  async getProviders(): Promise<OAuthProviderMeta[]> {
+    return [];
+  }
+
+  async getActiveProvider(): Promise<OAuthProviderId | null> {
+    return null;
+  }
+
+  async restoreCachedSession(): Promise<UserInfo | null> {
+    return null;
+  }
+
+  async restoreCachedSessionState(): Promise<OAuthCachedSessionRestoreResult> {
+    return { status: "signed-out" };
+  }
+
+  async restoreSession(): Promise<UserInfo | null> {
+    return null;
+  }
+
+  async startOAuth(provider: OAuthProviderId): Promise<OAuthStartResponse> {
+    throw new Error(`Sign-in is disabled in Ducky Coder guest mode (provider: ${provider})`);
+  }
+
+  async startOAuthWithPolling(provider: OAuthProviderId): Promise<OAuthStartResponse> {
+    throw new Error(`Sign-in is disabled in Ducky Coder guest mode (provider: ${provider})`);
+  }
+
+  async pollPendingOAuth(): Promise<OAuthCallbackResult | null> {
+    return null;
+  }
+
+  async handleCallback(_url: string): Promise<OAuthCallbackResult | null> {
+    return null;
+  }
+
+  async refreshToken(_provider?: OAuthProviderId): Promise<void> {}
+
+  async logout(_provider?: OAuthProviderId): Promise<void> {}
+
+  async logoutAll(): Promise<void> {}
+
+  async cancelPending(_provider?: OAuthProviderId): Promise<void> {}
+
+  async logoutIfCurrentCredentialRequest(
+    _input: string | URL,
+    _headers: Headers,
+  ): Promise<boolean> {
+    return false;
+  }
+}
+
+/**
  * 工厂函数：创建 OAuthService 实例
  */
 export function createOAuthService(
   credentialService: ICredentialService,
   dependencies: Omit<OAuthServiceDependencies, "adapters"> = {},
-): OAuthService {
-  return new OAuthService(credentialService, {
-    ...dependencies,
-    adapters: createOAuthProviderAdapters(createOAuthRuntimeConfig(dependencies.env), {
-      apiClient: dependencies.apiClient,
-    }),
-  });
+): IOAuthService {
+  void credentialService;
+  void dependencies;
+  return new GuestOAuthService();
 }

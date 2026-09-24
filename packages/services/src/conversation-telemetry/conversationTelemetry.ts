@@ -1,6 +1,6 @@
-import type { Event } from "@zcode/rpc";
-import type { ConversationTelemetryFact } from "@zcode/shared/zcode-protocol-v4";
-import type { IZCodeAgentService } from "#src/zcode-agent/zcodeAgent.js";
+import type { Event } from "@ducky/rpc";
+import type { ConversationTelemetryFact } from "@ducky/shared/ducky-protocol-v4";
+import type { IDuckyAgentService } from "#src/ducky-agent/duckyAgent.js";
 
 export interface ConversationTelemetryWorkspaceTarget {
   workspacePath: string;
@@ -16,12 +16,12 @@ export interface IConversationTelemetryService {
 }
 
 export function createConversationTelemetryService(
-  zcodeAgentService: Pick<IZCodeAgentService, "onDynamicConversationTelemetryFact">,
+  duckyAgentService: Pick<IDuckyAgentService, "onDynamicConversationTelemetryFact">,
 ): IConversationTelemetryService {
   return {
     onFact: (target) =>
       // 带 workspace 参数的 RPC Event 必须使用 onDynamic* 命名，
       // 否则 ProxyChannel 会把它当普通 Event，并把 target 误当 listener。
-      zcodeAgentService.onDynamicConversationTelemetryFact(target),
+      duckyAgentService.onDynamicConversationTelemetryFact(target),
   };
 }
