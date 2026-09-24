@@ -10,9 +10,9 @@
 // pointing at packages/web/dist, and open the browser.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, symlink, readlink, unlink, readFile } from "node:fs/promises";
+import { mkdir, symlink, unlink, readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
-import { platform } from "node:os";
+import { platform, totalmem } from "node:os";
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const webDist = join(repoRoot, "packages", "web", "dist");
@@ -72,11 +72,21 @@ function parseArgs(argv) {
   return opts;
 }
 
-function run(cmd, args) {
+function run(cmd, args, options = {}) {
   console.log(`[ducky] ${[cmd, ...args].join(" ")}`);
-  const r = spawnSync(cmd, args, { cwd: repoRoot, stdio: "inherit" });
+  const r = spawnSync(cmd, args, { cwd: repoRoot, stdio: "inherit", ...options });
   if (r.error) throw new Error(`${cmd} failed: ${r.error.message}`);
   if (r.status !== 0) throw new Error(`${cmd} ${args.join(" ")} failed`);
+}
+
+// The web bundle (7000+ modules) can exceed the default Node heap on small
+// machines and get OOM-killed (exit 137). Size the heap to ~75% of total RAM
+// (2GB min, 8GB max); explicit NODE_OPTIONS always wins.
+function buildEnv() {
+  if (process.env["NODE_OPTIONS"]) return process.env;
+  const totalMb = Math.floor(totalmem() / 1048576);
+  const heapMb = Math.max(2048, Math.min(8192, Math.floor(totalMb * 0.75)));
+  return { ...process.env, NODE_OPTIONS: `--max-old-space-size=${heapMb}` };
 }
 
 function ensureBuilt(force) {
@@ -84,8 +94,10 @@ function ensureBuilt(force) {
   const serverOk = existsSync(serverEntry);
   if (!force && webOk && serverOk) return;
   console.log("[ducky] building web + server (prod)...");
-  run("pnpm", ["--filter", "@ducky/server", "build"]);
-  run("pnpm", ["--filter", "@ducky/web", "build"]);
+  const env = buildEnv();
+  console.log(`[ducky] build heap: ${env["NODE_OPTIONS"] ?? "(default)"}`);
+  run("pnpm", ["--filter", "@ducky/server", "build"], { env });
+  run("pnpm", ["--filter", "@ducky/web", "build"], { env });
 }
 
 async function waitForServer(url, timeoutMs = 15000) {
@@ -171,10 +183,9 @@ async function cmdInstall(rest) {
   const dest = join(binDir, "ducky");
   await mkdir(binDir, { recursive: true });
   try {
-    if (existsSync(dest)) {
-      const cur = await readlink(dest).catch(() => null);
-      if (cur !== src) await unlink(dest);
-    }
+    // Unconditional remove: a dangling symlink reports existsSync() === false
+    // yet still makes symlink() fail with EEXIST.
+    await unlink(dest).catch(() => {});
     await symlink(src, dest);
   } catch (error) {
     throw new Error(`install failed: ${error}`);

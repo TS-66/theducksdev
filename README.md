@@ -211,6 +211,14 @@ git push origin v3.14.3
 
 The `release-ducky` workflow (`.github/workflows/release-ducky.yml`) builds the distribution and attaches `ducky-<version>.tar.gz` + `sha256.txt` to the GitHub Release. The root `install.sh` downloads from there — fully public, no token. Make sure CI is green on `main` before tagging.
 
+## Troubleshooting
+
+- **`ducky: command not found`** — run `./bin/ducky install`, then ensure `~/.local/bin` is on `PATH` (`export PATH="$HOME/.local/bin:$PATH"`), open a new shell, and retry.
+- **Web build gets `Killed` / exit 137** — the machine ran out of RAM while bundling (7000+ modules). `ducky web --build` already sizes the Node heap to ~75% of total RAM (override with `NODE_OPTIONS=--max-old-space-size=4096 ./bin/ducky web --build`). If it still dies: close other apps, add swap (e.g. `sudo fallocate -l 4G /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`), or build on a bigger machine and copy `packages/web/dist` + `packages/server/dist` over, then run `./bin/ducky web --skip-build`. Easiest of all: install a published release instead of building (`curl -fsSL .../install.sh | bash`, Tutorial 0).
+- **`ducky install` reports `EEXIST`** — fixed; pull latest and rerun. A stale/broken `~/.local/bin/ducky` is now replaced automatically.
+- **Engine warning (`wanted node 24.14.0, current v24.21.0`)** — harmless; any Node 24 works.
+- **Port in use** — pass another one: `./bin/ducky web --port 3040`.
+
 ## Repository Structure
 
 | Directory                                            | Responsibility                                                           |
