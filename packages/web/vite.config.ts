@@ -96,6 +96,9 @@ export default defineConfig(({ mode }) => {
       sourcemap: lowMem ? false : mode === "production" ? "hidden" : true,
       // gzip 体积报告需要额外压缩全量产物，低内存构建跳过。
       reportCompressedSize: !lowMem,
+      // 低内存构建跳过压缩：esbuild minify 大包是内存高峰之一；产物变大
+      // 但功能一致，localhost 使用无感知。DUCKY_LOW_MEM=0 恢复压缩。
+      minify: lowMem ? false : "esbuild",
     },
   };
 });
