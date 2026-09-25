@@ -135,7 +135,23 @@ function openBrowser(url) {
 
 async function cmdWeb(rest) {
   const opts = parseArgs(rest);
-  if (opts.dev) {
+  // Small machines (<4.5GB RAM) cannot survive the 7000-module production
+  // bundle: the build thrashes the whole PC at "modules transformed" and
+  // then gets OOM-killed. Auto-pick the light dev stack unless the user
+  // explicitly forces a bundle (--build) or prod mode. DUCKY_WEB_MODE=prod
+  // forces prod, =dev forces dev.
+  const modeEnv = (process.env["DUCKY_WEB_MODE"] ?? "").trim().toLowerCase();
+  const lowRam = totalmem() < 4.5 * 1024 ** 3;
+  const wantDev =
+    opts.dev || modeEnv === "dev" || (modeEnv !== "prod" && !opts.build && lowRam);
+  if (wantDev && !opts.dev) {
+    console.log(
+      "[ducky] small machine detected (<4.5GB RAM): using the light dev stack " +
+        "instead of the production bundle (pass --build to force it, " +
+        "DUCKY_WEB_MODE=prod to always build).",
+    );
+  }
+  if (wantDev) {
     await cmdWebDev(opts);
     return;
   }
