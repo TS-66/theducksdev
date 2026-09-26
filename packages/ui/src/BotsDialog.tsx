@@ -46,6 +46,7 @@ import {
   type BotProviderEntryId,
 } from "@/botsUi.js";
 import { cn } from "@/components/lib/utils.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import {
   BotDangerCard,
   BotReplyGranularityCard,
@@ -184,8 +185,8 @@ export function BotsDialog({
     setNowMs(Date.now());
     // Bugfix: 绑定码缩短到 30 秒后，1 秒刷新会让进度条明显跳格。
     // 这里用更细的节奏驱动动画，文字仍由 formatBindCountdown 按秒展示。
-    const timer = window.setInterval(() => setNowMs(Date.now()), 250);
-    return () => window.clearInterval(timer);
+    // 后台标签页跳过 tick（返回可见补一次），可见时节奏不变。
+    return startVisibleSecondTicker(() => setNowMs(Date.now()), 250);
   }, [bindCode, open]);
 
   useEffect(() => {
@@ -215,6 +216,8 @@ export function BotsDialog({
 
     void pollBindResult();
     const timer = window.setInterval(() => {
+      // 绑定码展开期间才轮询；隐藏标签页跳过本轮 RPC，返回可见后下一轮继续。
+      if (document.visibilityState === "hidden") return;
       void pollBindResult();
     }, 2000);
 
@@ -315,6 +318,8 @@ export function BotsDialog({
       }
     };
     const timer = window.setInterval(() => {
+      // 微信激活态轮询：隐藏标签页跳过本轮 RPC，返回可见后下一轮继续。
+      if (document.visibilityState === "hidden") return;
       void pollActivationState();
     }, 2000);
     void pollActivationState();
@@ -484,6 +489,8 @@ export function BotsDialog({
     };
 
     const timer = window.setInterval(() => {
+      // 飞书扫码轮询间隔由服务端下发；隐藏标签页跳过本轮 RPC，返回可见后下一轮继续。
+      if (document.visibilityState === "hidden") return;
       void pollRegistration();
     }, pollIntervalMs);
     void pollRegistration();

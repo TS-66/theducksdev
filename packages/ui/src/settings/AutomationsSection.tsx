@@ -792,9 +792,11 @@ export function AutomationsSection({
   }, [now, offPeakTakeNumberAvailability]);
 
   // 位次/状态轮询刷新（host offPeakTaskSync 写库，renderer 每 10s 读快照；无任务不轮）。
+  // 后台标签页跳过本轮快照读取，可见时行为不变。
   useEffect(() => {
     if (view.mode !== "list" || offPeakTasks.length === 0) return;
     const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       void offPeakRefresh(offPeakTaskService);
     }, 10_000);
     return () => clearInterval(timer);

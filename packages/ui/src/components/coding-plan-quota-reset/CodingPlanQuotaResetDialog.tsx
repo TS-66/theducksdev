@@ -5,6 +5,7 @@ import { CheckIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import { getContextQuotaMeterGridClass } from "@/chat-input-toolbar/contextQuotaMeterGrid.js";
 import { burstCodingPlanQuotaResetConfetti } from "@/lib/codingPlanQuotaResetConfetti.js";
 
@@ -148,8 +149,8 @@ export function CodingPlanQuotaResetDialog({
   useEffect(() => {
     if (!open) return;
     setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
+    // 弹框打开期间的秒级倒计时：后台标签页跳过 tick，可见时行为不变。
+    return startVisibleSecondTicker(() => setNow(Date.now()));
   }, [open]);
 
   useEffect(() => {

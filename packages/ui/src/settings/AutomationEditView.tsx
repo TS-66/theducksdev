@@ -1411,6 +1411,8 @@ export function AutomationEditView({
     }
     onLoadRunsRef.current?.();
     const timer = window.setInterval(() => {
+      // History 页后台轮询：隐藏标签页跳过本轮，可见时行为不变。
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       onLoadRunsRef.current?.();
     }, 5_000);
     return () => window.clearInterval(timer);

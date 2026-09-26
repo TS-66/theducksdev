@@ -7,6 +7,7 @@ import {
   type CodingPlanQuotaResetDialogConfig,
 } from "@/components/coding-plan-quota-reset/CodingPlanQuotaResetDialog.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 
 export type { CodingPlanQuotaResetDialogConfig } from "@/components/coding-plan-quota-reset/CodingPlanQuotaResetDialog.js";
 
@@ -48,10 +49,10 @@ export function CodingPlanQuotaResetOpportunity({
     if (!visible || hasMultipleOpportunities) {
       return;
     }
-    const timer = window.setInterval(() => {
+    // 徽标秒级倒计时：后台标签页跳过 tick，可见时行为不变。
+    return startVisibleSecondTicker(() => {
       setRemainingSeconds(getRemainingSeconds(expiresAt));
-    }, 1_000);
-    return () => window.clearInterval(timer);
+    });
   }, [expiresAt, hasMultipleOpportunities, visible]);
 
   const opportunityLabel = intl.formatMessage(

@@ -149,6 +149,10 @@ export const Reasoning = memo(
         if (startTimeRef.current === null) {
           return;
         }
+        // 后台标签页跳过秒级耗时刷新（返回可见后下一拍自动补齐），避免隐藏窗口每秒重渲染整块 reasoning。
+        if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+          return;
+        }
         setDuration(Math.max(1, Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S)));
       };
 

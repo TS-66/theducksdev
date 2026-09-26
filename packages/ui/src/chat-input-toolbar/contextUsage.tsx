@@ -390,21 +390,29 @@ export function ChatContextUsage({
     setOpportunityNow(now);
     let countdownTimer: number | undefined;
     let urgentThresholdTimer: number | undefined;
+    const update = () => {
+      // 后台标签页跳过秒级倒计时（返回可见时补一次）；过期清理仍在可见后执行，可见时行为不变。
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return false;
+      }
+      const currentNow = Date.now();
+      setOpportunityNow(currentNow);
+      const expired = (opportunityBadge.expiresAt ?? 0) <= currentNow;
+      if (expired && countdownTimer !== undefined) {
+        window.clearInterval(countdownTimer);
+        countdownTimer = undefined;
+      }
+      return expired;
+    };
     const startUrgentCountdown = () => {
-      const update = () => {
-        const currentNow = Date.now();
-        setOpportunityNow(currentNow);
-        const expired = (opportunityBadge.expiresAt ?? 0) <= currentNow;
-        if (expired && countdownTimer !== undefined) {
-          window.clearInterval(countdownTimer);
-          countdownTimer = undefined;
-        }
-        return expired;
-      };
       if (!update()) {
         countdownTimer = window.setInterval(update, 1_000);
       }
     };
+    const resync = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", resync);
     const untilUrgent =
       opportunityBadge.expiresAt - now - CONTEXT_QUOTA_RESET_URGENT_SECONDS * 1_000;
     if (untilUrgent <= 0) {
@@ -415,6 +423,7 @@ export function ChatContextUsage({
     return () => {
       if (countdownTimer !== undefined) window.clearInterval(countdownTimer);
       if (urgentThresholdTimer !== undefined) window.clearTimeout(urgentThresholdTimer);
+      document.removeEventListener("visibilitychange", resync);
     };
   }, [opportunityBadge.expiresAt, opportunityBadge.visible, resetSourceKey]);
   const opportunityReminder = resolveContextQuotaResetOpportunityReminder({

@@ -27,6 +27,7 @@ import type {
   SessionPhase,
 } from "@ducky/shared/ducky-protocol-v4";
 import { cn } from "@/components/lib/utils.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import { runUserAction } from "@/lib/userActionTelemetry.js";
 import { Button } from "@/components/ui/button.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
@@ -574,12 +575,11 @@ function ConversationTimelineImpl({
 
     // 运行中的 assistant work 状态文案要显示“工作中 N 秒”并随时间推进；
     // 完成态耗时由协议事实固定，builder 会拒绝把这个 UI 时钟用于已结束轮次。
+    // 后台标签页跳过 tick（可见时行为不变），避免弱机上隐藏窗口持续重渲染时间线。
     setLiveNowMs(Date.now());
-    const timer = window.setInterval(() => {
+    return startVisibleSecondTicker(() => {
       setLiveNowMs(Date.now());
     }, RUNNING_WORK_DURATION_TICK_MS);
-
-    return () => window.clearInterval(timer);
   }, [hasRunningUnit]);
 
   useLayoutEffect(() => {

@@ -948,10 +948,20 @@ function E2ELexicalInputBridgePlugin({ inputTestId }: { inputTestId?: string }) 
     };
 
     let retryTimer: number | null = null;
+    let bridgeAttachAttempts = 0;
+    // E2E bridge 补挂轮询只跑有限轮：正常挂载几帧内就能找到输入框；input 长期不存在时
+    // 说明 bridge 本来就挂不上，无限 100ms 查询只是空转。root 重挂载会经 registerRootListener 直接补挂，不依赖本轮询。
+    const E2E_BRIDGE_MAX_ATTEMPTS = 50;
     const tryAttachBridge = () => {
+      // 隐藏标签页不做 DOM 查询也不计次，可见后继续补挂；产品行为不受影响。
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      bridgeAttachAttempts += 1;
       const nextInput = resolveInput(editor.getRootElement());
       attachBridge(nextInput);
-      if (nextInput && retryTimer !== null) {
+      if (
+        retryTimer !== null &&
+        (nextInput || bridgeAttachAttempts >= E2E_BRIDGE_MAX_ATTEMPTS)
+      ) {
         window.clearInterval(retryTimer);
         retryTimer = null;
       }

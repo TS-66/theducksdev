@@ -26,7 +26,11 @@ export function useDeveloperToolsVisibility(): boolean {
 
     window.addEventListener("storage", handleStorage);
     window.addEventListener("focus", refresh);
-    const intervalId = window.setInterval(refresh, DEVELOPER_TOOLS_PREFERENCE_POLL_MS);
+    // 常驻挂载的每秒 localStorage 轮询：后台标签页跳过（storage/focus 事件仍实时刷新，可见时行为不变）。
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      refresh();
+    }, DEVELOPER_TOOLS_PREFERENCE_POLL_MS);
     refresh();
 
     return () => {

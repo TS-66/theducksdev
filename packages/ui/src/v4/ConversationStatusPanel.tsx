@@ -60,7 +60,7 @@ import {
   RUN_STATUS_DOT,
   RUN_STATUS_TEXT,
 } from "@/components/workflow-graph/run-status-presentation.js";
-import { useNowTicker } from "@/components/workflow-graph/use-now-ticker.js";
+import { startVisibleSecondTicker, useNowTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import {
   Collapsible,
   CollapsibleContent,
@@ -1045,10 +1045,10 @@ function BackgroundWorkStatusSection({
     if (works.length === 0) {
       return;
     }
-    const timer = setInterval(() => {
+    // 后台标签页跳过秒级文案推进，可见时行为不变。
+    return startVisibleSecondTicker(() => {
       setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(timer);
+    });
   }, [works.length]);
 
   if (works.length === 0) return null;
@@ -1145,8 +1145,8 @@ function WorkflowStatusSection({
   const tickingRunCount = runs.filter((run) => run.startedAt !== undefined).length;
   useEffect(() => {
     if (tickingRunCount === 0) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    // 后台标签页跳过秒级文案推进，可见时行为不变。
+    return startVisibleSecondTicker(() => setNow(Date.now()));
   }, [tickingRunCount]);
 
   // 活动行与已结束计数**都**为零才收起整个分区：只按活动数开门的那一版，重启后一个 run
@@ -1346,8 +1346,8 @@ function SubagentStatusSection({
   );
   useEffect(() => {
     if (subagents.length === 0) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    // 后台标签页跳过秒级文案推进，可见时行为不变。
+    return startVisibleSecondTicker(() => setNow(Date.now()));
   }, [subagents.length]);
   if (subagents.length === 0 && endedSubagentCount <= 0) return null;
   const longestElapsedMs = subagents.reduce(

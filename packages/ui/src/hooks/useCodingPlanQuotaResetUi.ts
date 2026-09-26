@@ -17,6 +17,7 @@ import {
   requestCodingPlanResetOpportunityWhenDue,
   subscribeCodingPlanQuotaResetPolling,
 } from "@/lib/codingPlanQuotaResetCoordinator.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import {
   CODING_PLAN_QUOTA_RESET_DONE_DISPLAY_MS,
   CODING_PLAN_QUOTA_RESET_TYPES,
@@ -694,6 +695,7 @@ export function useCodingPlanQuotaResetUi({
   }, [authSessionSeq, enabled, refreshStatus, scope, usageStatsService]);
 
   // available 倒计时：任一类型可用时启动 1 秒 ticker；入口变化时刷新 now 保证倒计时/窗口基于最新时间。
+  // 后台标签页跳过 tick（可见时行为不变），避免弱机上隐藏窗口持续重渲染。
   useEffect(() => {
     if (!enabled) {
       return;
@@ -703,8 +705,7 @@ export function useCodingPlanQuotaResetUi({
     if (!anyAvailable) {
       return;
     }
-    const ticker = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(ticker);
+    return startVisibleSecondTicker(() => setNow(Date.now()));
   }, [enabled, fiveHourEntry, weekEntry]);
 
   // completed 短提示窗口：取两类中最近的未过期到期时刻定时刷新，逐个到期后自动停止。

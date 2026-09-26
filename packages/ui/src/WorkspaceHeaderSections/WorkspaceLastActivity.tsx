@@ -2,18 +2,20 @@ import { Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { DuckyTaskMeta } from "@ducky/shared";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import { getTaskListRowActivity } from "@/v4/taskListRowActivity.js";
 
 export function WorkspaceLastActivity({ task }: { task: DuckyTaskMeta | null }) {
   const { intl } = useDuckyIntl();
   const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
   const timestamp = task
     ? (getTaskListRowActivity(task)?.lastActivityAt ?? task.updatedAt)
     : undefined;
+  useEffect(() => {
+    // 无时间戳不渲染文案，也不启动分钟时钟；后台标签页跳过 tick，可见时行为不变。
+    if (timestamp === undefined) return undefined;
+    return startVisibleSecondTicker(() => setNow(Date.now()), 60_000);
+  }, [timestamp]);
   if (!timestamp || !Number.isFinite(timestamp)) return null;
   const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
   const time =

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkflowNotificationMeta } from "@ducky/shared/ducky-protocol-v4";
 import { CodeBlock, CodeBlockHeader } from "@/components/ai-elements/code-block.js";
 import { ToolLayout } from "@/ToolCallBlocks/ToolLayout.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
 import type { Theme } from "@/useTheme.js";
 import { workflowRunQuestionWaitedLabel } from "@/app-shell/workflowRunQuestions.js";
@@ -114,10 +115,10 @@ export function WorkflowNotificationToolRow({
   const { intl } = useDuckyIntl();
 
   // 等待时长要在没有事件流时也照走（停驻的 run 恰恰不发事件），按固定间隔喂新的"现在"。
+  // 后台标签页跳过 tick（可见时行为不变）；每行一个 30 秒时钟，隐藏窗口不再空转。
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
+    return startVisibleSecondTicker(() => setNow(Date.now()), 30_000);
   }, []);
 
   const openRunLink = onOpenRun ? (

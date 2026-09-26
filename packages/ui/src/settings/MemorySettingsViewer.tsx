@@ -16,6 +16,7 @@ import {
   testId,
 } from "@ducky/shared";
 import { Alert, AlertDescription } from "@/components/ui/alert.js";
+import { startVisibleSecondTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
 import { FileDisplayIcon, resolveFileDisplayDescriptor } from "@/lib/fileDisplay.js";
 import { PluginScopeMenu } from "@/settings/PluginScopeMenu.js";
@@ -46,8 +47,8 @@ export function MemorySettingsViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(interval);
+    // 设置页分钟级相对时间：后台标签页跳过 tick，可见时行为不变。
+    return startVisibleSecondTicker(() => setNow(Date.now()), 60_000);
   }, []);
   const formatMemoryCount = (count: number) =>
     intl.formatMessage(
