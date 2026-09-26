@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- App 当前集中编排 workspace 级状态、导航、Git 派生数据和 shell wiring；已将新增 side pane memory 桥接抽出，剩余拆分需要按 shell 边界单独重构。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { GitChangeSourceId, WorkspacePurpose } from "@ducky/shared";
 import { useDuckyStore } from "@/store/StoreProvider.js";
@@ -33,7 +33,6 @@ import {
   navigateTaskFindSelection,
 } from "@/quickpick/taskFindNavigationState.js";
 import { createQuickPickCommands } from "@/quickpick/quickPickCommands.js";
-import { CommandCenterDialog } from "@/command-center/CommandCenterDialog.js";
 import { FeedbackHost } from "@/feedback/FeedbackHost.js";
 import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import {
@@ -81,6 +80,13 @@ import { usePaneLayoutStore } from "@/v4/paneLayoutStore.js";
 import { useWorkbenchGroupStore } from "@/v4/workbenchGroupStore.js";
 import type { AssistantPreviewCardsAutoOpenRequest } from "@/lib/assistantPreviewCards.js";
 import { startMemoryDiagnosticsLogger } from "@/lib/memoryDiagnostics.js";
+
+// 命令面板只在用户按下快捷键时打开：cmdk 及文件搜索索引链路按需分包，不进首屏。
+const CommandCenterDialog = lazy(() =>
+  import("@/command-center/CommandCenterDialog.js").then((module) => ({
+    default: module.CommandCenterDialog,
+  })),
+);
 
 const EMPTY_RECONNECTING_REMOTE_WORKSPACE_LOGS_BY_WORKSPACE_KEY: NonNullable<
   AppProps["reconnectingRemoteWorkspaceLogsByWorkspaceKey"]
@@ -1106,19 +1112,21 @@ export function App({
 
   return (
     <>
-      <CommandCenterDialog
-        open={isQuickPickOpen}
-        commands={quickPickCommands}
-        workspaceAbsPath={workspaceAbsPath}
-        workspaceIdentity={workspaceIdentity}
-        activeTaskId={activeTaskId}
-        activeTaskChangeSummary={activeTaskChangeSummary}
-        workspaceTabs={commandCenterWorkspaceTabs}
-        onOpenChange={setIsQuickPickOpen}
-        onSelectTask={handleSelectTask}
-        onSearchResultHighlightRequest={handleSearchResultHighlightRequest}
-        onOpenCodeViewer={handleOpenCodeViewerIfWritable}
-      />
+      <Suspense fallback={null}>
+        <CommandCenterDialog
+          open={isQuickPickOpen}
+          commands={quickPickCommands}
+          workspaceAbsPath={workspaceAbsPath}
+          workspaceIdentity={workspaceIdentity}
+          activeTaskId={activeTaskId}
+          activeTaskChangeSummary={activeTaskChangeSummary}
+          workspaceTabs={commandCenterWorkspaceTabs}
+          onOpenChange={setIsQuickPickOpen}
+          onSelectTask={handleSelectTask}
+          onSearchResultHighlightRequest={handleSearchResultHighlightRequest}
+          onOpenCodeViewer={handleOpenCodeViewerIfWritable}
+        />
+      </Suspense>
       {/* 反馈是应用级能力，必须固定走本机 base host；SSH session 连接中或断开时，
           workspace-scoped services 会切成断连代理，不能让反馈提交跟随远程 session 失效。 */}
       <FeedbackHost feedbackService={baseFeedbackService} platform={platform} />

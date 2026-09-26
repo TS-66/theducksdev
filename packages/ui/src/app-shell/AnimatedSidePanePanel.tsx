@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Side pane 当前集中承载 tabs、browser/git/code-viewer 内容；完整拆分需按 pane 功能边界继续推进。 */
 import { ServiceProvider } from "@/hooks/useServices.js";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import type { IServiceAccessor } from "@ducky/services";
 import {
@@ -15,16 +15,12 @@ import {
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import type { BrowserViewScreenshotSurfacePreparePayload, GitChangeSourceId } from "@ducky/shared";
-import { PreviewPane } from "@/PreviewPane.js";
 import { SidePaneTerminalPane } from "@/SidePaneTerminalPane.js";
 import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 import { WorkspaceSidePaneToggleButton } from "@/WorkspaceSidePaneToggleButton.js";
 import { DesktopWindowControls } from "@/DesktopWindowControls.js";
-import { BrowserUseSidePaneContent } from "@/browser-use/BrowserUseSidePaneContent.js";
 import { findScreenshotSurfaceTabForRender } from "@/browser-use/useBrowserScreenshotSurfaceRequest.js";
-import { HumanBrowserView } from "@/browser-use/HumanBrowserView.js";
 import { ScopedErrorBoundary } from "@/ErrorBoundary.js";
-import { GitPane } from "@/GitPane.js";
 import { TreemappingPane } from "@/TreemappingPane.js";
 import { WhiteboardPane } from "@/WhiteboardPane.js";
 import { ModelTrajectoryPane } from "@/ModelTrajectoryPane.js";
@@ -98,6 +94,26 @@ import {
   SquareTerminalIcon,
   type LucideIcon,
 } from "lucide-react";
+
+// side pane 的重型 tab 内容（code-viewer/git/browser）只在对应 tab 打开时需要：
+// PreviewPane 会拉入 @pierre/diffs 高亮链路，GitPane 拉入虚拟列表与 diff 视图，
+// 浏览器视图拉入 viewport 工具链；首屏 side pane 为空时都不挂载，按需分包。
+const PreviewPane = lazy(() =>
+  import("@/PreviewPane.js").then((module) => ({ default: module.PreviewPane })),
+);
+const GitPane = lazy(() =>
+  import("@/GitPane.js").then((module) => ({ default: module.GitPane })),
+);
+const BrowserUseSidePaneContent = lazy(() =>
+  import("@/browser-use/BrowserUseSidePaneContent.js").then((module) => ({
+    default: module.BrowserUseSidePaneContent,
+  })),
+);
+const HumanBrowserView = lazy(() =>
+  import("@/browser-use/HumanBrowserView.js").then((module) => ({
+    default: module.HumanBrowserView,
+  })),
+);
 
 const SIDE_PANE_CONTENT_WIDTH_LOCK_DURATION_MS = 200;
 const PREVIEW_PANE_RESIZE_SETTLE_DELAY_MS = 220;
@@ -1067,28 +1083,29 @@ export function AnimatedSidePanePanel({
                     }
                     if (tab.type === "browser-use") {
                       return (
-                        <BrowserUseSidePaneContent
-                          key={tab.id}
-                          tab={tab}
-                          isPanelVisible={isVisible}
-                          isSelected={tab.id === visibleActiveTabId}
-                          isCurrentTask={tab.sessionId === sidePaneOwnerId}
-                          screenshotSurfaceRequest={
-                            screenshotSurfaceTab?.id === tab.id ? screenshotSurfaceRequest : null
-                          }
-                          // restoring guest 的完整 history 由 main 在 did-attach 后写入；
-                          // renderer 同时消费 initialUrl 会抢先提交导航，使 Chromium 拒绝 restore。
-                          initialUrl={
-                            tab.residency === "restoring" ? undefined : browserRestoreUrls[tab.id]
-                          }
-                          workspacePath={workspaceAbsPath}
-                          workspaceIdentity={workspaceIdentity}
-                          residencyGeneration={tab.residencyGeneration}
-                          onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}
-                          onPageMetadataChange={(metadata) =>
-                            onBrowserPageMetadataChange(tab.id, metadata)
-                          }
-                        />
+                        <Suspense key={tab.id} fallback={null}>
+                          <BrowserUseSidePaneContent
+                            tab={tab}
+                            isPanelVisible={isVisible}
+                            isSelected={tab.id === visibleActiveTabId}
+                            isCurrentTask={tab.sessionId === sidePaneOwnerId}
+                            screenshotSurfaceRequest={
+                              screenshotSurfaceTab?.id === tab.id ? screenshotSurfaceRequest : null
+                            }
+                            // restoring guest 的完整 history 由 main 在 did-attach 后写入；
+                            // renderer 同时消费 initialUrl 会抢先提交导航，使 Chromium 拒绝 restore。
+                            initialUrl={
+                              tab.residency === "restoring" ? undefined : browserRestoreUrls[tab.id]
+                            }
+                            workspacePath={workspaceAbsPath}
+                            workspaceIdentity={workspaceIdentity}
+                            residencyGeneration={tab.residencyGeneration}
+                            onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}
+                            onPageMetadataChange={(metadata) =>
+                              onBrowserPageMetadataChange(tab.id, metadata)
+                            }
+                          />
+                        </Suspense>
                       );
                     }
                     return (
@@ -1184,45 +1201,49 @@ export function AnimatedSidePanePanel({
                               : { onRevealFileInTree: onRevealGitFileInTree })}
                           />
                         ) : tab.type === "code-viewer" ? (
-                          <PreviewPane
-                            markdownSelectionTarget={{ sessionId: activeTaskId, workspaceKey }}
-                            source={tab.source}
-                            onClose={onCloseCodeViewer}
-                            workspacePath={workspaceAbsPath}
-                            onOpenBrowserUrl={onOpenBrowserUrl}
-                            onOpenCodeViewer={onOpenCodeViewer}
-                            // inactive/窄条/resize 中的 code preview 不应继续让
-                            // @pierre/diffs 的千行 Shadow DOM 参与布局；这里只裁剪 body，保留 tab/source/file state。
-                            renderHeavyContent={shouldRenderPreviewPaneHeavyContent({
-                              isActiveTab: tab.id === visibleActiveTabId,
-                              // video/audio 原生全屏会触发 resize，resize settling
-                              // 期间必须保持当前媒体节点挂载，否则浏览器会立即退出全屏。
-                              isMediaPreview:
-                                tab.source.type === "media" ||
-                                (tab.source.type === "file" &&
-                                  inferMediaPreview(tab.source.path) !== null),
-                              isResizeSettling: isWindowResizeSettling,
-                              isSidePaneVisible: isVisible,
-                              visibleInlineSizePx: sidePaneVisibleInlineSizePx,
-                            })}
-                          />
+                          <Suspense fallback={null}>
+                            <PreviewPane
+                              markdownSelectionTarget={{ sessionId: activeTaskId, workspaceKey }}
+                              source={tab.source}
+                              onClose={onCloseCodeViewer}
+                              workspacePath={workspaceAbsPath}
+                              onOpenBrowserUrl={onOpenBrowserUrl}
+                              onOpenCodeViewer={onOpenCodeViewer}
+                              // inactive/窄条/resize 中的 code preview 不应继续让
+                              // @pierre/diffs 的千行 Shadow DOM 参与布局；这里只裁剪 body，保留 tab/source/file state。
+                              renderHeavyContent={shouldRenderPreviewPaneHeavyContent({
+                                isActiveTab: tab.id === visibleActiveTabId,
+                                // video/audio 原生全屏会触发 resize，resize settling
+                                // 期间必须保持当前媒体节点挂载，否则浏览器会立即退出全屏。
+                                isMediaPreview:
+                                  tab.source.type === "media" ||
+                                  (tab.source.type === "file" &&
+                                    inferMediaPreview(tab.source.path) !== null),
+                                isResizeSettling: isWindowResizeSettling,
+                                isSidePaneVisible: isVisible,
+                                visibleInlineSizePx: sidePaneVisibleInlineSizePx,
+                              })}
+                            />
+                          </Suspense>
                         ) : tab.type === "git" ? (
-                          <GitPane
-                            workspacePath={workspaceAbsPath}
-                            workspaceIdentity={workspaceIdentity}
-                            workspaceRemoteSessionId={workspaceRemoteSessionId}
-                            gitState={gitState}
-                            isDesktop={isDesktop}
-                            selectedSourceId={activeGitSourceId}
-                            fileChangeFindActiveIndex={fileChangeFindActiveIndex}
-                            fileChangeFindNavigationRequestId={fileChangeFindNavigationRequestId}
-                            fileChangeFindQuery={fileChangeFindQuery}
-                            onFileChangeFindMatchCountChange={onFileChangeFindMatchCountChange}
-                            onSelectSource={onSelectGitSource}
-                            onClose={onCloseGit}
-                            onRefresh={onRefreshGit}
-                            onRevealFileInTree={onRevealGitFileInTree}
-                          />
+                          <Suspense fallback={null}>
+                            <GitPane
+                              workspacePath={workspaceAbsPath}
+                              workspaceIdentity={workspaceIdentity}
+                              workspaceRemoteSessionId={workspaceRemoteSessionId}
+                              gitState={gitState}
+                              isDesktop={isDesktop}
+                              selectedSourceId={activeGitSourceId}
+                              fileChangeFindActiveIndex={fileChangeFindActiveIndex}
+                              fileChangeFindNavigationRequestId={fileChangeFindNavigationRequestId}
+                              fileChangeFindQuery={fileChangeFindQuery}
+                              onFileChangeFindMatchCountChange={onFileChangeFindMatchCountChange}
+                              onSelectSource={onSelectGitSource}
+                              onClose={onCloseGit}
+                              onRefresh={onRefreshGit}
+                              onRevealFileInTree={onRevealGitFileInTree}
+                            />
+                          </Suspense>
                         ) : tab.type === "treemapping" ? (
                           <TreemappingPane
                             activeTaskId={activeTaskId}
@@ -1264,41 +1285,43 @@ export function AnimatedSidePanePanel({
                             onOpenBrowserUrl={onOpenBrowserUrl}
                           />
                         ) : (
-                          <HumanBrowserView
-                            browserKey={tab.id}
-                            agentOpened={tab.agentOpened}
-                            deferEmptyGuest
-                            isResidencyRestore={tab.residency === "restoring"}
-                            isVisible={isVisible && isBrowserOpen && tab.id === visibleActiveTabId}
-                            isSelected={tab.id === visibleActiveTabId}
-                            isCurrentTask={tab.ownerTaskId === sidePaneOwnerId}
-                            // restoring 只挂载不会提交 document 的 bootstrap URL，
-                            // 由 main 独占 pageState/URL 恢复事务。
-                            initialUrl={
-                              tab.residency === "restoring"
-                                ? undefined
-                                : (browserRestoreUrls[tab.id] ?? tab.initialUrl)
-                            }
-                            faviconUrl={tab.faviconUrl}
-                            workspacePath={workspaceAbsPath}
-                            workspaceIdentity={workspaceIdentity}
-                            remoteSessionId={tab.remoteSessionId ?? workspaceRemoteSessionId}
-                            residencyGeneration={tab.residencyGeneration}
-                            sessionId={tab.ownerTaskId ?? "unscoped"}
-                            onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}
-                            onPageMetadataChange={(metadata) =>
-                              onBrowserPageMetadataChange(tab.id, metadata)
-                            }
-                            navigationRequest={
-                              browserNavigationRequest?.targetTabId === tab.id
-                                ? {
-                                    id: browserNavigationRequest.id,
-                                    url: browserNavigationRequest.url,
-                                  }
-                                : null
-                            }
-                            onNavigationRequestHandled={onBrowserNavigationRequestHandled}
-                          />
+                          <Suspense fallback={null}>
+                            <HumanBrowserView
+                              browserKey={tab.id}
+                              agentOpened={tab.agentOpened}
+                              deferEmptyGuest
+                              isResidencyRestore={tab.residency === "restoring"}
+                              isVisible={isVisible && isBrowserOpen && tab.id === visibleActiveTabId}
+                              isSelected={tab.id === visibleActiveTabId}
+                              isCurrentTask={tab.ownerTaskId === sidePaneOwnerId}
+                              // restoring 只挂载不会提交 document 的 bootstrap URL，
+                              // 由 main 独占 pageState/URL 恢复事务。
+                              initialUrl={
+                                tab.residency === "restoring"
+                                  ? undefined
+                                  : (browserRestoreUrls[tab.id] ?? tab.initialUrl)
+                              }
+                              faviconUrl={tab.faviconUrl}
+                              workspacePath={workspaceAbsPath}
+                              workspaceIdentity={workspaceIdentity}
+                              remoteSessionId={tab.remoteSessionId ?? workspaceRemoteSessionId}
+                              residencyGeneration={tab.residencyGeneration}
+                              sessionId={tab.ownerTaskId ?? "unscoped"}
+                              onUrlChange={(url) => onBrowserUrlChange(tab.id, url)}
+                              onPageMetadataChange={(metadata) =>
+                                onBrowserPageMetadataChange(tab.id, metadata)
+                              }
+                              navigationRequest={
+                                browserNavigationRequest?.targetTabId === tab.id
+                                  ? {
+                                      id: browserNavigationRequest.id,
+                                      url: browserNavigationRequest.url,
+                                    }
+                                  : null
+                              }
+                              onNavigationRequestHandled={onBrowserNavigationRequestHandled}
+                            />
+                          </Suspense>
                         )}
                       </TabsContent>
                     );

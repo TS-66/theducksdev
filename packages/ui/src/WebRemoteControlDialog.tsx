@@ -1,7 +1,6 @@
-import { memo, useState } from "react";
+import { lazy, memo, Suspense, useState } from "react";
 import type { BotProvider } from "@ducky/shared";
 import { Bot as BotIcon, MonitorSmartphone, XIcon } from "lucide-react";
-import { BotsDialog } from "@/BotsDialog.js";
 import { ProviderIcon } from "@/BotsDialog/shared.js";
 import { Button } from "@/components/ui/button.js";
 import {
@@ -14,6 +13,12 @@ import {
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
 import { getBotProviderRegionTagLabelId } from "@/botsUi.js";
+
+// Bots 配置弹层只在用户从远控入口二次打开时挂载：Bot 渠道表单、扫码与 provider 卡片按需分包。
+// 渠道品牌图标仍走轻量的 BotsDialog/shared.js，保持静态导入。
+const BotsDialog = lazy(() =>
+  import("@/BotsDialog.js").then((module) => ({ default: module.BotsDialog })),
+);
 
 type RemoteControlBotProvider = Extract<
   BotProvider,
@@ -185,13 +190,15 @@ export const WebRemoteControlDialog = memo(function WebRemoteControlDialogCompon
           </div>
         </DialogContent>
       </Dialog>
-      <BotsDialog
-        open={botsDialogOpen}
-        onOpenChange={setBotsDialogOpen}
-        workspacePath={workspacePath}
-        workspaceIdentity={workspaceIdentity}
-        entryProvider={botEntryProvider}
-      />
+      <Suspense fallback={null}>
+        <BotsDialog
+          open={botsDialogOpen}
+          onOpenChange={setBotsDialogOpen}
+          workspacePath={workspacePath}
+          workspaceIdentity={workspaceIdentity}
+          entryProvider={botEntryProvider}
+        />
+      </Suspense>
     </>
   );
 });

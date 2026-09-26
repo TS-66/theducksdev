@@ -5,7 +5,7 @@
  */
 /* eslint-disable max-lines -- 空态工作区菜单集中维护本地、远程与会话 workspace 的筛选和切换交互，局部样式扩展需保持同一套语义。 */
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button.js";
 import {
   DropdownMenu,
@@ -35,7 +35,6 @@ import {
   hasRemoteWorkspaceIdentity,
 } from "@/lib/remoteWorkspaceHistory.js";
 import { logger } from "@/logger.js";
-import { SSHDialog } from "@/SSHDialog.js";
 import {
   TID_COMPOSER_PROJECT_DETACH,
   TID_COMPOSER_REMOTE_CONNECTION,
@@ -51,6 +50,11 @@ export {
   getScratchWorkspaceLocationHint,
   getScratchWorkspaceNameErrorKind,
 } from "@/ChatEmptyScratchWorkspaceDialog.js";
+
+// 远程连接弹层只在用户显式打开时挂载：SSHDialog 按需分包，空态菜单本身保持同步渲染。
+const SSHDialog = lazy(() =>
+  import("@/SSHDialog.js").then((module) => ({ default: module.SSHDialog })),
+);
 
 // ---------------------------------------------------------------------------
 // Workspace 路径工具函数
@@ -447,17 +451,19 @@ export function ChatEmptyWorkspacePreviewMenu({
         </div>
       </DropdownMenuContent>
       {canUseRemoteWorkspace ? (
-        <SSHDialog
-          onConnect={onConnectRemote}
-          onSelectProject={onSelectRemoteProject}
-          onCancelSession={onCancelRemoteProject}
-          localWorkspacePath={localWorkspacePathForRemoteConnection}
-          isWindowsDesktop={isWindowsDesktop}
-          remoteWorkspaceSessions={remoteWorkspaceSessions}
-          open={sshDialogOpen}
-          onOpenChange={setSshDialogOpen}
-          hideTriggerWhenClosed
-        />
+        <Suspense fallback={null}>
+          <SSHDialog
+            onConnect={onConnectRemote}
+            onSelectProject={onSelectRemoteProject}
+            onCancelSession={onCancelRemoteProject}
+            localWorkspacePath={localWorkspacePathForRemoteConnection}
+            isWindowsDesktop={isWindowsDesktop}
+            remoteWorkspaceSessions={remoteWorkspaceSessions}
+            open={sshDialogOpen}
+            onOpenChange={setSshDialogOpen}
+            hideTriggerWhenClosed
+          />
+        </Suspense>
       ) : null}
     </DropdownMenu>
   );

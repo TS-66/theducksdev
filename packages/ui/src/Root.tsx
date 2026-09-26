@@ -16,8 +16,6 @@ import { DirectoryBrowser } from "@/DirectoryBrowser.js";
 import { useTabPersistence } from "@/hooks/useTabPersistence.js";
 import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useDuckyIntl } from "@/i18n/IntlProvider.js";
-import { SSHDialog } from "@/SSHDialog.js";
-import { SettingsPage } from "@/SettingsPage.js";
 import { CodingPlanUpgradeDialogProvider } from "@/settings/CodingPlanUpgradeDialogProvider.js";
 import { setDefaultFileDisplayBasePath } from "@/lib/fileDisplay.js";
 import { readRendererLaunchTimings, shouldReportLaunchToInput } from "@/lib/launchToInputReport.js";
@@ -40,7 +38,6 @@ import { RootShell } from "@/root/RootShell.js";
 import { RootWorkspaceContent } from "@/root/RootWorkspaceContent.js";
 import { resolveRootWorkspaceShellTarget } from "@/root/rootWorkspaceShellTarget.js";
 import { OccupationOnboarding } from "@/onboarding/OccupationOnboarding.js";
-import { OnboardingDialog } from "@/onboarding/OnboardingDialog.js";
 import { useRemoteWorkspaceHistory } from "@/root/useRemoteWorkspaceHistory.js";
 import { useRemoteWorkspaceTabLifecycle } from "@/root/useRemoteWorkspaceTabLifecycle.js";
 import { useRootProviderStateRefresh } from "@/root/useRootProviderStateRefresh.js";
@@ -77,6 +74,21 @@ import {
   disposeConversationTelemetrySupervisors,
   reconcileConversationTelemetryWorkspaceScopes,
 } from "@/v4/telemetry/ConversationTelemetryAttachment.js";
+
+// 首屏不需要远程连接弹层：只在用户显式打开时挂载，按需分包避免把远程会话模块拉进首次加载。
+const SSHDialog = lazy(() =>
+  import("@/SSHDialog.js").then((module) => ({ default: module.SSHDialog })),
+);
+// 首屏默认展示 workspace 而非设置页：15+ 设置 section 只在用户打开设置时挂载，按需分包。
+const SettingsPage = lazy(() =>
+  import("@/SettingsPage.js").then((module) => ({ default: module.SettingsPage })),
+);
+// 迁移引导弹层默认关闭：只在需要时挂载，按需分包。
+const OnboardingDialog = lazy(() =>
+  import("@/onboarding/OnboardingDialog.js").then((module) => ({
+    default: module.OnboardingDialog,
+  })),
+);
 
 const DEFAULT_LUCIDE_STROKE_WIDTH = 1.5;
 interface RemoteConnectionOpenPreference {
@@ -780,21 +792,23 @@ function RootInner({
   }, []);
 
   const remoteConnectionDialog = allowRemoteWorkspace ? (
-    <SSHDialog
-      onConnect={handleConnectRemote}
-      onSelectProject={handleSelectRemoteProject}
-      onCancelSession={handleCancelRemoteProject}
-      localWorkspacePath={localWorkspacePathForRemoteConnection}
-      isWindowsDesktop={isWindowsDesktop}
-      remoteWorkspaceSessions={remoteWorkspaceSessions}
-      open={remoteConnectionDialogOpen}
-      onOpenChange={handleRemoteConnectionDialogOpenChange}
-      onFlowActiveChange={setRemoteConnectionInProgress}
-      onFlowRequestIdChange={setRemoteConnectionRequestId}
-      preferredKind={remoteConnectionOpenPreference?.preferredKind}
-      preferredWslDistro={remoteConnectionOpenPreference?.preferredWslDistro}
-      hideTriggerWhenClosed
-    />
+    <Suspense fallback={null}>
+      <SSHDialog
+        onConnect={handleConnectRemote}
+        onSelectProject={handleSelectRemoteProject}
+        onCancelSession={handleCancelRemoteProject}
+        localWorkspacePath={localWorkspacePathForRemoteConnection}
+        isWindowsDesktop={isWindowsDesktop}
+        remoteWorkspaceSessions={remoteWorkspaceSessions}
+        open={remoteConnectionDialogOpen}
+        onOpenChange={handleRemoteConnectionDialogOpenChange}
+        onFlowActiveChange={setRemoteConnectionInProgress}
+        onFlowRequestIdChange={setRemoteConnectionRequestId}
+        preferredKind={remoteConnectionOpenPreference?.preferredKind}
+        preferredWslDistro={remoteConnectionOpenPreference?.preferredWslDistro}
+        hideTriggerWhenClosed
+      />
+    </Suspense>
   ) : null;
   const directoryBrowserDialog = directoryBrowserOpen ? (
     <ScopedErrorBoundary
@@ -887,7 +901,9 @@ function RootInner({
               variant="panel"
               className="h-full"
             >
-              <SettingsPage {...settingsLayerProps} />
+              <Suspense fallback={null}>
+                <SettingsPage {...settingsLayerProps} />
+              </Suspense>
             </ScopedErrorBoundary>
           ) : null
         ) : (
@@ -937,11 +953,13 @@ function RootInner({
           resetKeys={[workspaceShellIdentity?.trim() || workspaceShellPath]}
           variant="silent"
         >
-          <OnboardingDialog
-            workspacePath={workspaceShellPath || undefined}
-            workspaceIdentity={workspaceShellIdentity}
-            isDesktop={isDesktop}
-          />
+          <Suspense fallback={null}>
+            <OnboardingDialog
+              workspacePath={workspaceShellPath || undefined}
+              workspaceIdentity={workspaceShellIdentity}
+              isDesktop={isDesktop}
+            />
+          </Suspense>
         </ScopedErrorBoundary>
       </OccupationOnboarding>
     </RootShell>

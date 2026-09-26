@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- workspace shell 当前集中编排 sidebar、chat、terminal 和 browser pane 的布局联动，先保持单文件收口，避免为满足行数限制打散关键布局状态。*/
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -37,15 +37,12 @@ import { WorkspacePluginPreview } from "@/WorkspacePluginPreview.js";
 import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 import { GitBranchSwitcher } from "@/GitBranchSwitcher.js";
 import { ScopedErrorBoundary } from "@/ErrorBoundary.js";
-
-import { AUTOMATIONS_TOAST_ANCHOR_ID, AutomationsSection } from "@/settings/AutomationsSection.js";
 import type {
   SavedWorkflowLaunchTarget,
   SavedWorkflowsOpenArtifactParams,
   SavedWorkflowsOpenRunParams,
 } from "@/settings/saved-workflows/SavedWorkflowsSection.js";
 import { AutomationsMainBreadcrumbFrame } from "@/settings/AutomationsMainBreadcrumbFrame.js";
-import { PluginStorePage } from "@/settings/PluginStorePage.js";
 import { TaskFindDialog } from "@/quickpick/TaskFindDialog.js";
 import { WorkspaceHeader } from "@/WorkspaceHeader.js";
 import { WorkspaceSidebar, type SidebarFileTreeOpenRequest } from "@/WorkspaceSidebar.js";
@@ -95,6 +92,23 @@ import type { WorkspaceShellLayoutProps } from "@/app-shell/types.js";
 import { useTabStoreApi } from "@/store/TabStoreProvider.js";
 import { useDuckySessionStore } from "@/store/duckySessionStore.js";
 import type { ComposerMentionPrefill } from "@/store/duckySessionStoreTypes.js";
+
+// Automations 主视图只在 workspaceMainView 切换到 automations 时挂载：
+// section 本体（含 saved-workflows、off-peak/定时编辑视图）按需分包。
+// toast 锚点 id 必须与 settings/AutomationsSection.tsx 内导出的 AUTOMATIONS_TOAST_ANCHOR_ID
+// 保持一致；这里内联字面量是为了不把整个 section 模块拉回首屏，改值时必须两边同步。
+const AUTOMATIONS_TOAST_ANCHOR_ID = "automations-main-toast-anchor";
+const AutomationsSection = lazy(() =>
+  import("@/settings/AutomationsSection.js").then((module) => ({
+    default: module.AutomationsSection,
+  })),
+);
+// 插件商店主视图只在 workspaceMainView 切换到 plugin-store 时挂载，按需分包。
+const PluginStorePage = lazy(() =>
+  import("@/settings/PluginStorePage.js").then((module) => ({
+    default: module.PluginStorePage,
+  })),
+);
 
 const WORKSPACE_SIDEBAR_DEFAULT_WIDTH_PX = 264;
 const WORKSPACE_SIDEBAR_MIN_WIDTH_PX = 264;
@@ -1770,28 +1784,30 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                                 className="min-h-full"
                               >
                                 <div className="mx-auto flex w-full max-w-5xl flex-col px-4 py-4 md:px-6 md:py-6">
-                                  <AutomationsSection
-                                    workspacePath={workspaceAbsPath}
-                                    workspaceIdentity={workspaceIdentity}
-                                    onCreateViaChat={handleCreateAutomationInChat}
-                                    onNavigateToLaunchedRun={handleNavigateToLaunchedRun}
-                                    onOpenWorkflowRun={handleOpenSavedWorkflowRun}
-                                    onOpenWorkflowArtifact={handleOpenSavedWorkflowArtifact}
-                                    openAutomationId={openAutomationId}
-                                    openAutomationTab={openAutomationTab}
-                                    onOpenAutomationConsumed={onOpenAutomationConsumed}
-                                    onOpenSession={({
-                                      sessionId,
-                                      workspacePath,
-                                      workspaceIdentity,
-                                    }) =>
-                                      handleSelectTaskInChat(
-                                        workspacePath,
+                                  <Suspense fallback={null}>
+                                    <AutomationsSection
+                                      workspacePath={workspaceAbsPath}
+                                      workspaceIdentity={workspaceIdentity}
+                                      onCreateViaChat={handleCreateAutomationInChat}
+                                      onNavigateToLaunchedRun={handleNavigateToLaunchedRun}
+                                      onOpenWorkflowRun={handleOpenSavedWorkflowRun}
+                                      onOpenWorkflowArtifact={handleOpenSavedWorkflowArtifact}
+                                      openAutomationId={openAutomationId}
+                                      openAutomationTab={openAutomationTab}
+                                      onOpenAutomationConsumed={onOpenAutomationConsumed}
+                                      onOpenSession={({
                                         sessionId,
+                                        workspacePath,
                                         workspaceIdentity,
-                                      )
-                                    }
-                                  />
+                                      }) =>
+                                        handleSelectTaskInChat(
+                                          workspacePath,
+                                          sessionId,
+                                          workspaceIdentity,
+                                        )
+                                      }
+                                    />
+                                  </Suspense>
                                 </div>
                               </ScopedErrorBoundary>
                             </div>
@@ -1810,13 +1826,15 @@ export const WorkspaceShellLayout = memo(function WorkspaceShellLayoutComponent(
                           >
                             <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
                               <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-4 md:px-6 md:py-6">
-                                <PluginStorePage
-                                  key={`plugin-store:${pluginStoreOpenVersion}`}
-                                  workspacePath={workspaceAbsPath}
-                                  workspaceIdentity={workspaceIdentity}
-                                  onCreateTask={handleCreateTaskInChat}
-                                  onManageInstalled={handleManageInstalledPlugins}
-                                />
+                                <Suspense fallback={null}>
+                                  <PluginStorePage
+                                    key={`plugin-store:${pluginStoreOpenVersion}`}
+                                    workspacePath={workspaceAbsPath}
+                                    workspaceIdentity={workspaceIdentity}
+                                    onCreateTask={handleCreateTaskInChat}
+                                    onManageInstalled={handleManageInstalledPlugins}
+                                  />
+                                </Suspense>
                               </div>
                             </div>
                           </AutomationsMainBreadcrumbFrame>
